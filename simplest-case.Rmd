@@ -1,0 +1,78 @@
+---
+title: "Simplest case: 1 clone, 100% purity"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+opts_chunk$set(echo = TRUE)
+opts_chunk$set(tidy.opts=list(width.cutoff=70),tidy=TRUE)
+```
+
+## Generate example data set
+
+Note: All positions are diploid
+
+$\pi = \text{proportion of heterozygous variants} = 0.8$
+
+$n = \text{total number of reads} \sim \text{Poisson(50)}$
+
+$z = 
+    \begin{cases}
+    0 & \text{if  heterozygous}\\
+    1 & \text{if  homozygous}
+    \end{cases}$
+
+$\theta = 
+    \begin{cases}
+    0.5 & \text{if  heterozygous, z=0}\\
+    1 & \text{if  homozygous, z=1}
+    \end{cases}$
+
+
+```{r data}
+set.seed(1234)
+pi <- 0.8
+n <- rpois(100, 50) 
+theta <- 0.5
+z <- rbinom(100, 1, (1-pi)) # z = sample 100 from binomial
+# generate y as list with 100 samples
+#y[z==0] <- 1/2 reads else all reads 
+het <- rbinom(100, n, theta)
+y <- ifelse(z==0, het, n)
+```
+
+## Run Gibbs sampler
+
+```{r gibbs}
+S <- 1000
+pi_mcmc <- rep(NA, S)
+z_mcmc <- matrix(NA, nrow = S, ncol = length(n))
+theta_mcmc <- matrix(NA, nrow = S, ncol = length(n))
+
+T <- 100 # burnin
+# starting values
+pi_mcmc[1] <- runif(1, min = 0, max = 1) # starting value from uniform prior
+for (i in 1:length(n)) {
+  pi_star <- dbinom(y[i], n[i], theta) * pi_mcmc[1] / (dbinom(y[i], n[i], theta) * pi_mcmc[1] + dbinom(y[i], n[i], 1) * (1-pi_mcmc[1]))
+  z_mcmc[1, i] <- rbinom(n=1, size=1, prob=(1-pi_star))
+  theta_mcmc[1, i] <- ifelse(z_mcmc[1, i] == 0, 0.5, 1)
+}
+
+
+for (j in 2:S) {
+  pi_mcmc[j] <- rbeta(n=1, shape1 = sum(1-z_mcmc[j-1, ])+1, shape2 = sum(z_mcmc[j-1, ])+1)
+  
+  for (i in 1:length(n)) {
+    pi_star <- dbinom(y[i], n[i], theta) * pi_mcmc[j] / (dbinom(y[i], n[i], theta) * pi_mcmc[j] + dbinom(y[i], n[i], 1) * (1-pi_mcmc[j]))
+    z_mcmc[j, i] <- rbinom(n=1, size=1, prob=(1-pi_star))
+    theta_mcmc[j, i] <- ifelse(z_mcmc[j, i] == 0, 0.5, 1)
+  }
+}
+```
+
+```{r, plots}
+density(pi_mcmc)
+plot.ts(pi_mcmc)
+colSums(z_mcmc)
+```
