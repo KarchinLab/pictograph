@@ -1,0 +1,199 @@
+---
+title: "Version 3: 3 clusters"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rjags)
+library(coda)
+library(MCMCpack)
+#library(bayesplot)
+library(ggmcmc)
+
+working.dir <- "~/Dropbox/Wood-Collab-Progression/clustering/v3"
+models.dir <- file.path(working.dir, "models")
+trace.dir <- file.path(working.dir, "trace")
+#dir.create(trace.dir, showWarnings = F)
+runName <- "v3_K3_noConstraints"
+```
+
+## Simulate data
+
+```{r sim}
+I <- 50
+K <- 3
+S <- 10
+
+# choose diffuse priors for gamma
+a_gamma <- 2
+b_gamma <- 10
+
+set.seed(123)
+
+a <- matrix(NA, nrow=K, ncol=S)
+b <- matrix(NA, nrow=K, ncol=S)
+for (s in 1:S) {
+  a[, s] <- rgamma(K, a_gamma, rate = 1/b_gamma)
+  b[, s] <- rgamma(K, a_gamma, rate = 1/b_gamma)
+}
+
+# reorder a,b matrices to match ordering of means (U) in S1
+U <- a/(a+b)
+V <- a+b
+ix <- order(U[, 1])
+U.ordered <- U[ix, ]
+a.ordered <- a[ix, ]
+b.ordered <- b[ix, ]
+V.ordered <- V[ix, ]
+
+#pi <- as.vector(rdirichlet(1, rep(1, K)))
+pi <- c(0.2, 0.3, 0.5)
+z <- sample(1:K, size = I, replace = T, prob = pi)
+
+##
+## omega (w) is the cancer cell fraction
+## - shouldn't omega have dimension K x S
+## - I'd like to be able to recover the true values of a and b
+## ->  a single random ordinate drawn from this distribution
+##     might not be representative
+##     a an average over 1000 random ordinates guarantees that
+##     we have a representative ordinate of beta(a, b)
+w <- matrix(NA, nrow=K, ncol=S)
+for(k in seq_len(K)){
+    tmp <- rowMeans(replicate(1000,
+                              rbeta(S, a.ordered[k, ],
+                                    b.ordered[k, ])))
+    w[k, ] <- tmp
+}
+
+tcn <- matrix(2, nrow=I, ncol=S)
+m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
+            nrow=I, ncol=S)
+W <- w[z, ]
+calcTheta <- function(m, tcn, w) {
+  (m * w) / (tcn * w + 2*(1-w))
+}
+theta <- calcTheta(m, tcn, W)
+
+n <- replicate(S, rpois(I, 100))
+y <- matrix(NA, nrow=I, ncol=S)
+for (i in 1:I) {
+  for (s in 1:S) {
+    y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+  }
+}
+
+test.data <- list("I" = I, "S" = S, "K" = K, 
+                  "y" = y, "n" = n,
+                  "m" = m, "tcn" = tcn)
+```
+
+## JAGS
+
+```{r JAGS}
+jags.file <- file.path(models.dir, "rs_no_constraints.jags")
+inits <- list(".RNG.name" = "base::Wichmann-Hill", 
+              ".RNG.seed" = 123)
+jags.m <- jags.model(jags.file, test.data,
+                     n.chains = 1,
+                     inits = inits,
+                     n.adapt = 1000)
+params <- c("z", "w", "U", "V")
+samps <- coda.samples(jags.m, params, n.iter=10000, thin=7)
+jags_df <- ggs(samps)
+s <- summary(samps)
+#effectiveSize(samps)
+#pdf(file.path(trace.dir, paste0(runName, "_trace.pdf")))
+#plot(samps)
+#dev.off()
+```
+
+```{r plots}
+mcmc_vals <- s$statistics
+mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
+plot(as.vector(w), mcmc_w, type = "p")
+abline(a=0, b=1)
+
+mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
+#mcmc_z <- round(mcmc_z, 0)
+plot(z, mcmc_z, type = "p")
+
+mcmc_U <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "U", "Mean"]
+mcmc_U <- matrix(mcmc_U, nrow=K)
+mcmc_V <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "V", "Mean"]
+mcmc_V <- matrix(mcmc_V, nrow=K)
+
+p <- seq(0, 1, length = 100)
+colors <- c("#000000", "#DCA200", "#8FA7ED", "#9D847A", "#A47901")
+for (s in 1:S) {
+  for (k in 1:K) {
+    if (k == 1) {
+      # plot mcmc mean U,V
+      plot(p, dbeta(p, mcmc_U[k,s] * mcmc_V[k,s], (1-mcmc_U[k,s])*mcmc_V[k,s]), 
+           main = paste0("S", s), 
+           ylab = "density", xlab = "w", type = "l", col = colors[k],
+           ylim = c(0, 20))
+      # plot truth
+      lines(p, dbeta(p, a.ordered[k,s], b.ordered[k,s]), type = "l", col = colors[k], lty=2)
+      # add legend
+      allU <- round(as.vector(rbind(mcmc_U[,s], U.ordered[,s])), digits = 2)
+      legend(x = "topleft", 
+             legend = paste0(c("mean k", "true k"), rep(1:K, each=2), ", U=", allU),
+             col = colors[rep(1:K, each=2)],
+             lty = rep(1:2, K),
+             cex=0.8)
+    } else {
+      # plot mcmc mean U,V
+      lines(p, dbeta(p, mcmc_U[k,s] * mcmc_V[k,s], (1-mcmc_U[k,s])*mcmc_V[k,s]), 
+            type = "l", col = colors[k])
+      # plot truth
+      lines(p, dbeta(p, a.ordered[k,s], b.ordered[k,s]), type = "l", col = colors[k], lty=2)
+    }
+  }
+}
+
+```
+
+```{r eval=FALSE}
+samples_matrix <- as.matrix(samps)
+
+U_chains <- samples_matrix[, which(substr(colnames(samples_matrix), 1, 1) == "U")]
+
+pdf(file.path(working.dir, paste0(runName, "_Uplots.pdf")))
+for (s in 1:S) {
+  s.char <- paste(s)
+  if (nchar(s.char) == 1) {
+    U_sub <- U_chains[, which(substr(colnames(U_chains), 5, 6) == paste0(s.char, "]"))]
+  } else {
+    U_sub <- U_chains[, which(substr(colnames(U_chains), 5, 7) == paste0(s.char, "]"))]
+  }
+  plot(density(as.vector(U_sub)),
+       main = paste0("S", s, " U density; K=", K))
+  legend(x = "topright", 
+         legend = paste0("k", 1:K, ", true U = ", round(U[,s], 2)))
+}
+dev.off()
+
+pdf(file.path(working.dir, paste0(runName, "_Uplots_withTruth.pdf")))
+for (s in 1:S) {
+  s.char <- paste(s)
+  if (nchar(s.char) == 1) {
+    U_sub <- U_chains[, which(substr(colnames(U_chains), 5, 6) == paste0(s.char, "]"))]
+  } else {
+    U_sub <- U_chains[, which(substr(colnames(U_chains), 5, 7) == paste0(s.char, "]"))]
+  }
+  plot(density(as.vector(U_sub)),
+       main = paste0("S", s, " U density; K=", K))
+  legend(x = "topright", 
+         legend = paste0("k", 1:K, ", true U = ", round(U[,s], 2)),
+         col = colors[1:K],
+         lty = "dashed")
+  u <- round(U[,s], 2)
+  for ( i in 1:length(u)) {
+    abline(v = u[i], col = colors[i], lty = "dashed")
+  }
+  
+}
+dev.off()
+```

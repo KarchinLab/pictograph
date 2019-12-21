@@ -1,0 +1,25 @@
+model {
+	for (i in 1:I) {
+
+		w[i] ~ dbeta(a[z[i]], b[z[i]]) T(0.05, 1)
+		theta.temp[i] <- m[i] * w[i] / (tcn[i] * w[i] + 2*(1 - w[i]))
+		theta[i] <- ifelse(theta.temp[i] > 1, 1, ifelse(theta.temp[i] <= 0, 0.05, theta.temp[i])) # make sure theta is [0.05, 1]
+		y[i] ~ dbin(theta[i], n[i])
+
+		z[i] ~ dcat(pi[1:K])
+	}
+	
+	pi[1:K] ~ ddirch(alpha[1:K])
+	alpha <- rep(1, K)
+
+	U[1] ~ dbeta(1,1)
+	#U[2] ~ dunif(U[1], 1)
+	U[2] <- U[1] + delta
+	delta ~ dgamma(1, 1/20)T(0,1 - U[1])
+
+	for (k in 1:K) {
+		V[k] ~ dgamma(1,1/20)
+		a[k] <- U[k] * V[k]
+		b[k] <- (1 - U[k]) * V[k]
+	}
+}

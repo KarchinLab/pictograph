@@ -1,0 +1,335 @@
+---
+title: "Version 5: 5 samples, 15 variants; truth = 3 clusters, linear"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rjags)
+library(coda)
+#library(MCMCpack)
+#library(bayesplot)
+library(ggmcmc)
+library(dplyr)
+library(gridExtra)
+
+working.dir <- ".."
+models.dir <- file.path(working.dir, "models")
+trace.dir <- file.path(working.dir, "trace")
+#dir.create(trace.dir, showWarnings = F)
+runName <- "wks_K3_S5_I15_linear_BIC"
+```
+
+## Simulate data
+
+```{r sim}
+I <- 15
+K <- 3
+S <- 5
+
+set.seed(123)
+
+pi <- c(0.2, 0.5, 0.3)
+z <- sample(1:K, size = I, replace = T, prob = pi)
+
+w <- matrix(c(0.9, 0.95, 0.9, 0.8, 0.9,
+              0.89, 0.85, 0.85, 0.78, 0.7,
+              0.85, 0.7, 0.83, 0.76, 0.6),
+            byrow=T,
+            nrow=K, ncol=S)
+# w <- matrix(c(0.9, 0.95, 0.9, 0.8, 0.9,
+#               0.7, 0.8, 0.85, 0.78, 0.7,
+#               0.7, 0.2, 0.83, 0.76, 0.5), 
+#             byrow=T,
+#             nrow=K, ncol=S)
+colnames(w) <-  paste0("sample", 1:S)
+
+tcn <- matrix(2, nrow=I, ncol=S)
+m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
+            nrow=I, ncol=S)
+W <- w[z, ]
+calcTheta <- function(m, tcn, w) {
+  (m * w) / (tcn * w + 2*(1-w))
+}
+
+theta <- calcTheta(m, tcn, W)
+
+n <- replicate(S, rpois(I, 100))
+y <- matrix(NA, nrow=I, ncol=S)
+for (i in 1:I) {
+  for (s in 1:S) {
+    y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+  }
+}
+
+test.data <- list("I" = I, "S" = S, "K" = K, 
+                  "y" = y, "n" = n,
+                  "m" = m, "tcn" = tcn)
+```
+# Visualize densities of simulated data
+
+Clustering is by $\omega$
+
+```{r simulated_densities, echo=F}
+p <- test.data$y/test.data$n
+colnames(w) <- colnames(p) <- paste0("sample", 1:S)
+colnames(m) <- colnames(p)
+m2 <- m %>%
+    as_tibble() %>%
+    mutate(z=factor(z),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "multiplicity", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(p)))
+p2 <- p %>%
+    as_tibble() %>%
+    mutate(z=factor(z),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "fraction", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(p))) %>%
+    left_join(m2, by=c("z", "variant_index", "sample")) %>%
+    mutate(multiplicity=factor(multiplicity))
+## what the data looks like by sample
+ggplot(p2, aes(z, fraction)) +
+    geom_jitter(width=0.1, size=1, aes(color=multiplicity)) +
+    facet_wrap(~sample) +
+    ylab("y/n") +
+    xlab("True cluster") +
+    theme(panel.background=element_rect(fill="white", color="black"))
+## by variant
+ggplot(p2, aes(sample, fraction, group=variant_index)) +
+    geom_point(size=1) +
+    geom_line(aes(color=z)) +
+    ylab("y/n") +
+    xlab("Patient sample\n(arbitrary order)") +
+    theme(axis.text.x=element_text(angle=45, hjust=1)) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+##
+## Cluster means and variances
+##
+meds   <- apply(W, 2, median)
+slevels <- colnames(w)[order(meds, decreasing=TRUE)]
+w2 <- w %>%
+    as_tibble() %>%
+    mutate(z=factor(1:K)) %>%
+    ##       variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "omega", -z) %>%
+    mutate(sample=factor(sample, levels=slevels))
+##fig1 <- ggplot(w2, aes(z, omega)) +
+##    geom_jitter(width=0.1, size=1) +
+##    facet_wrap(~sample) +
+##    ylab(expression(omega)) +
+##    xlab("True cluster") +
+##    theme(panel.background=element_rect(fill="white", color="black"))
+fig2 <- ggplot(w2, aes(sample, omega, group=z)) +
+    geom_point(size=1,  aes(color=z)) +
+    geom_line(aes(color=z)) +
+    ylab(expression(omega)) +
+    xlab("") +
+    theme(axis.text.x=element_text(angle=45, hjust=1),
+          panel.background=element_rect(fill="white", color="black"),
+          legend.key=element_rect(fill="white", color="white")) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+fig2
+```
+
+## functions
+```{r func}
+runMCMC <- function(data, K, jags.file, inits, params, n.iter, thin) {
+  data$K <- K
+  jags.m <- jags.model(jags.file, data,
+                       n.chains = 1,
+                       inits = inits,
+                       n.adapt = 1000)
+  samps <- coda.samples(jags.m, params, n.iter=n.iter, thin=thin)
+  samps
+}
+
+getParamChain <- function(samps, param) {
+  chains <- do.call(rbind, samps)
+  chain <- chains[, grep(param, colnames(chains))]
+}
+
+reshapeW <- function(w, S, K) {
+  w.mat <- matrix(w, nrow = K)
+  colnames(w.mat) <- paste0("sample", 1:S)
+  w.mat
+}
+
+calcLogLik <- function(z.iter, w.iter, data) {
+  W <- w.iter[z.iter, ]
+  theta <- calcTheta(data$m, data$tcn, W)
+  sum(dbinom(data$y, data$n, theta, log=T))
+}
+
+calcChainLogLik <- function(samps, data, K) {
+  z.chain <- getParamChain(samps, "z")
+  w.chain <- getParamChain(samps, "w")
+  lik <- c()
+  for(iter in 1:nrow(z.chain)) {
+    z.iter <- z.chain[iter,]
+    w.iter <- reshapeW(w.chain[iter,], data$S, K)
+    lik <- c(lik, calcLogLik(z.iter, w.iter, data))
+  }
+  mean(lik)
+}
+
+calcBIC <- function(n, k, ll) log(n)*k - 2*ll
+```
+
+## JAGS
+
+```{r JAGS}
+jags.files <- c(file.path(models.dir, "w.jags"),
+               file.path(models.dir, "w_K1.jags"))
+inits <- list(".RNG.name" = "base::Wichmann-Hill", 
+              ".RNG.seed" = 123)
+test.data <- list("I" = I, "S" = S, 
+                  "y" = y, "n" = n,
+                  "m" = m, "tcn" = tcn)
+params <- c("z", "w", "ystar")
+
+n.iter = 10000
+thin = 7
+kToTest <- 1:5
+
+BIC <- c()
+samps.list <- list()
+
+for(ix in 1:length(kToTest)) {
+  if(kToTest[ix] == 1) {
+    jags.file <- jags.files[2]
+  } else {
+    jags.file <- jags.files[1]
+  }
+  
+  K <- kToTest[ix]
+  samps <- runMCMC(test.data, K, jags.file, inits, params, n.iter, thin)
+  z.chain <- getParamChain(samps, "z")
+  w.chain <- getParamChain(samps, "w")
+  bic <- calcBIC(length(test.data$y), K, calcChainLogLik(samps, test.data, K))
+  BIC <- c(BIC, bic)
+  samps.list[[ix]] <- samps
+}
+names(BIC) <- paste0("K", kToTest)
+BIC
+best <- which.min(BIC)
+s1 <- samps.list[[best]]
+bestK <- kToTest[best]
+
+
+ggplot(data.frame(numClust = kToTest, BIC), aes(x=numClust, y=BIC)) +
+  geom_point(size=1) +
+  geom_line() +
+  xlab("Number of Clusters") +
+  geom_vline(xintercept=bestK, linetype="dashed")
+  
+s1.w <- getParamChain(s1, "w")
+
+```
+
+```{r ppd, echo=F}
+plot.ppd <- function(samps, test.data, K) {
+  ##
+  ## 50 mutations x 10 samples
+  chains <- do.call(rbind, samps)
+  ystar <- chains[, grep("ystar", colnames(chains))]
+  ## each row of MCMC is in column-major order
+  orig.order <- tibble(statistic=colnames(ystar))
+  ppd.summaries <- ystar %>%
+      as_tibble() %>%
+      gather("statistic", "value") %>%
+      group_by(statistic) %>%
+      summarize(mean=mean(value),
+                q1=quantile(value, 0.025),
+                q3=quantile(value, 0.975))
+  ppd.summaries2 <- left_join(orig.order,
+                              ppd.summaries, by="statistic") %>%
+      mutate(observed=as.numeric(test.data$y)) %>%
+      mutate(sample=paste0("sample", rep(1:test.data$S, each=test.data$I)),
+             variant=rep(1:test.data$I, test.data$S))
+  ggplot(ppd.summaries2, aes(x=statistic, y=mean,
+                             ymin=q1,
+                             ymax=q3)) +
+      geom_errorbar() +
+      geom_point(aes(x=statistic, y=observed),
+                 size=1, color="steelblue") +
+      theme(axis.text.x=element_blank(),
+            axis.ticks.x=element_blank(),
+            panel.background=element_rect(fill="white",
+                                          color="black")) +
+      ylab("Middle 95% of posterior\npredictive distribution") +
+      xlab("observation index (column-major order)") +
+      facet_wrap(~sample) +
+      ggtitle(paste0("K = ", K))
+}
+
+plot.ppd(s1, test.data, best)
+```
+
+
+```{r z, echo=F, eval=F}
+plot.z <- function(samps, z) {
+  mcmc_vals <- summary(samps)$statistics
+  mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
+  plot(z, mcmc_z, type = "p")
+  z_comp <- data.frame(z, mcmc_z)
+  z_mapping <- distinct(round(z_comp, 0))
+  z_mapping <- z_mapping[order(z_mapping$mcmc_z), ]
+  plot.new()
+  grid.table(z_mapping, rows=NULL)
+}
+
+plot.z(samps.k2, z)
+
+```
+
+```{r w, echo=F, eval=F}
+mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
+mcmc_w <- matrix(mcmc_w, nrow=K)
+colnames(mcmc_w) <- paste0("sample", 1:S)
+
+z_mapping_byws1 <- order(mcmc_w[,1], decreasing=T)
+
+mcmc_w2 <- mcmc_w %>%
+  as_tibble() %>%
+  mutate(cluster=z_mapping_byws1) %>%
+  gather("sample", "mcmc_w", -c(cluster))
+w_comp <- w %>%
+  as_tibble() %>%
+  mutate(cluster=1:K) %>%
+  gather("sample", "w", -c(cluster)) %>%
+  left_join(mcmc_w2, by=c("cluster", "sample")) %>%
+  mutate(cluster=factor(cluster),
+         sample=factor(sample))
+
+# scatter
+ggplot(w_comp, aes(w, mcmc_w)) +
+  geom_point(size=3, aes(color=sample, shape=cluster)) +
+  geom_abline(slope=1, intercept=0, linetype="dotted")
+
+# by sample
+w_comp2 <- w_comp %>% 
+  gather("type", "omega", -c(cluster, sample)) %>%
+  mutate(type=factor(type))
+w_comp2$grp <- paste(w_comp2$cluster, w_comp2$type)
+ggplot(w_comp2, aes(sample, omega, group=grp)) +
+    geom_point(size=3,  aes(color=cluster)) +
+    geom_line(aes(color=cluster, lty=type)) +
+    ylab(expression(omega)) +
+    xlab("") +
+    theme(axis.text.x=element_text(angle=45, hjust=1),
+          panel.background=element_rect(fill="white", color="black"),
+          legend.key=element_rect(fill="white", color="white")) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+
+# distribution
+w_chains <- chains[, grep("w", colnames(chains))]
+w_chains2 <- w_chains %>%
+  as_tibble() %>%
+  gather("chain", "w") 
+w_chains2$cluster <- substr(w_chains2$chain, 3,3)
+w_chains2$sample <- paste0("sample", substr(w_chains2$chain, 5,5))
+ggplot(w_chains2, aes(x=w, fill=cluster)) +
+  geom_histogram(alpha=0.2, position="identity", binwidth = 0.01) +
+  facet_wrap(~sample)
+```

@@ -1,0 +1,125 @@
+---
+title: "Version 2: 2 clusters; Fix cluster label switching; U,V re-parameterization"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rjags)
+library(coda)
+library(MCMCpack)
+working.dir <- "~/Dropbox/Wood-Collab-Progression/clustering/v2"
+```
+
+## Simulate data
+
+```{r sim}
+I <- 50
+K <- 2
+S <- 10
+
+# choose diffuse priors for gamma
+a_gamma <- 2
+b_gamma <- 10
+
+avrg <- a_gamma * b_gamma
+std.dv <- sqrt(a_gamma*b_gamma^2)
+g_range = seq(0, avrg + 5*std.dv, 0.01)
+g_y = dgamma(g_range, a_gamma, rate = 1/b_gamma)
+#plot(g_range, g_y, type = "l", ylim=c(0, max(g_y) + 0.01))
+
+set.seed(123)
+
+a <- matrix(NA, nrow=K, ncol=S)
+b <- matrix(NA, nrow=K, ncol=S)
+for (s in 1:S) {
+  a[, s] <- rgamma(K, a_gamma, rate = 1/b_gamma)
+  b[, s] <- rgamma(K, a_gamma, rate = 1/b_gamma)
+}
+
+pi <- as.vector(rdirichlet(1, rep(1, K)))
+z <- sample(1:K, size = I, replace = T, prob = pi)
+
+w <- matrix(NA, nrow=I, ncol=S)
+for (s in 1:S) {
+  w[, s] <- rbeta(I, a[,s][z], b[,s][z])
+}
+
+tcn <- matrix(2, nrow=I, ncol=S)
+m <- matrix(rep(sample(1:2, size = I, replace = T), S), nrow=I, ncol=S)
+
+calcTheta <- function(m, tcn, w) {
+  (m * w) / (tcn * w + 2*(1-w))
+}
+theta <- calcTheta(m, tcn, w)
+
+n <- replicate(S, rpois(I, 100))
+y <- matrix(NA, nrow=I, ncol=S)
+for (i in 1:I) {
+  for (s in 1:S) {
+    y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+  }
+}
+```
+
+## JAGS
+
+```{r JAGS}
+jags.file <- file.path(working.dir, "model_v2_unif.jags")
+
+test.data <- list("I" = I, "S" = S, "K" = K, 
+                  "y" = y, "n" = n,
+                  "m" = m, "tcn" = tcn)
+jags.m <- jags.model(jags.file, test.data,
+                       n.chains = 1,
+                       n.adapt = 500)
+params <- c("z", "w", "a", "b", "U", "V")
+samps <- coda.samples(jags.m, params, n.iter=10000)
+s <- summary(window(samps, start=5001))
+#effectiveSize(window(samps, start=5001))
+pdf(file.path(working.dir, "trace-plots-uv-unif-c1.pdf"))
+plot(samps)
+dev.off()
+```
+
+```{r plots}
+mcmc_vals <- s$statistics
+mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
+plot(as.vector(w), mcmc_w, type = "p")
+
+mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
+#mcmc_z <- round(mcmc_z, 0)
+plot(z, mcmc_z, type = "p")
+
+mcmc_U <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "U", "Mean"]
+mcmc_U <- matrix(mcmc_U, nrow=K)
+mcmc_V <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "V", "Mean"]
+mcmc_V <- matrix(mcmc_V, nrow=K)
+
+mcmc_U
+
+p <- seq(0, 1, length = 100)
+for (s in 1:S) {
+  for (k in 1:K) {
+    if (k == 1) {
+      plot(p, dbeta(p, mcmc_U[k,s] * mcmc_V[k,s], (1-mcmc_U[k,s])*mcmc_V[k,s]), 
+           main = paste0("S", s, " MCMC mean U,V"), 
+           ylab = "density", xlab = "w", type = "l", col = k)
+    } else {
+      lines(p, dbeta(p, mcmc_U[k,s] * mcmc_V[k,s], (1-mcmc_U[k,s])*mcmc_V[k,s]), 
+            type = "l", col = k)
+    }
+  }
+  
+  for (k in 1:K) {
+    if (k == 1) {
+      plot(p, dbeta(p, a[k,s], b[k,s]), 
+           main = paste0("S", s, " truth"), 
+           ylab = "density", xlab = "w", type = "l", col = k)
+    } else {
+      lines(p, dbeta(p, a[k,s], b[k,s]), type = "l", col = k)
+    }
+  }
+}
+
+```
