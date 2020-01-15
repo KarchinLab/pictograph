@@ -30,8 +30,8 @@ S <- 3
 set.seed(123)
 
 pi <- rep(0.1, 10)
-z <- sample(1:K, size = I, replace = T, prob = pi)
-
+#z <- sample(1:K, size = I, replace = T, prob = pi)
+z <- rep(1:10, each=10)
 w <- matrix(c(0.98, 0.99, 0.97, 
               0.98, 0.90, 0.82,
               0.55, 0.00, 0.80, 
@@ -182,8 +182,7 @@ calcBIC <- function(n, k, ll) log(n)*k - 2*ll
 ## Cluster -- JAGS
 
 ```{r JAGS}
-jags.files <- c(file.path(models.dir, "w.jags"),
-               file.path(models.dir, "w_K1.jags"))
+jags.file <- file.path(models.dir, "w.jags")
 inits <- list(".RNG.name" = "base::Wichmann-Hill", 
               ".RNG.seed" = 123)
 test.data <- list("I" = I, "S" = S, 
@@ -195,43 +194,10 @@ n.iter = 10000
 thin = 7
 K <- 10
 
-samps <- runMCMC(test.data, K, jags.files[1], inits, params, n.iter, thin)
+samps <- runMCMC(test.data, K, jags.file, inits, params, n.iter, thin)
 z.chain <- getParamChain(samps, "z")
 w.chain <- getParamChain(samps, "w")
 
-#kToTest <- 1:5
-
-#BIC <- c()
-#samps.list <- list()
-
-# for(ix in 1:length(kToTest)) {
-#   if(kToTest[ix] == 1) {
-#     jags.file <- jags.files[2]
-#   } else {
-#     jags.file <- jags.files[1]
-#   }
-#   
-#   K <- kToTest[ix]
-#   samps <- runMCMC(test.data, K, jags.file, inits, params, n.iter, thin)
-#   z.chain <- getParamChain(samps, "z")
-#   w.chain <- getParamChain(samps, "w")
-#   bic <- calcBIC(length(test.data$y), K, calcChainLogLik(samps, test.data, K))
-#   BIC <- c(BIC, bic)
-#   samps.list[[ix]] <- samps
-# }
-# names(BIC) <- paste0("K", kToTest)
-# BIC
-# best <- which.min(BIC)
-# s1 <- samps.list[[best]]
-# bestK <- kToTest[best]
-# 
-# ggplot(data.frame(numClust = kToTest, BIC), aes(x=numClust, y=BIC)) +
-#   geom_point(size=1) +
-#   geom_line() +
-#   xlab("Number of Clusters") +
-#   geom_vline(xintercept=bestK, linetype="dashed")
-  
-#s1.w <- getParamChain(s1, "w")
 
 ```
 
@@ -281,13 +247,63 @@ plot.z <- function(samps, z) {
   mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
   plot(z, mcmc_z, type = "p")
   z_comp <- data.frame(z, mcmc_z)
-  plot.new()
-  grid.table(z_comp, rows=NULL)
-  z_mapping <- distinct(round(z_comp, 0))
-  z_mapping <- z_mapping[order(z_mapping$mcmc_z), ]
-  plot.new()
-  grid.table(z_mapping, rows=NULL)
+  #plot.new()
+  #grid.table(z_comp, rows=NULL)
+  #z_mapping <- distinct(round(z_comp, 0))
+  #z_mapping <- z_mapping[order(z_mapping$mcmc_z), ]
+  #plot.new()
+  #grid.table(z_mapping, rows=NULL)
 }
+
+z.chain.to.tb <- function(z.chain) {
+  z.chain.tb <- z.chain %>%
+    as_tibble() %>%
+    mutate(iter=1:nrow(z.chain)) %>%
+    gather(variant, mcmc_z, -c(iter)) 
+  z.chain.tb %>%
+    mutate(variant = as.integer(gsub(".*\\[(.*)\\].*", "\\1", z.chain.tb$variant)))
+}
+
+z.chain.tb <- z.chain.to.tb(z.chain)
+z.chain.tb <- z.chain.tb %>%
+  mutate(true_z = rep(1:10, each=nrow(z.chain)*10))
+z.chain.tb_simp <- distinct(select(z.chain.tb, -c(iter)))
+
+z.chain.plot <- ggplot(z.chain.tb, aes(variant, mcmc_z)) +
+  geom_point(size=1, aes(color=true_z)) +
+  ylab("mcmc z") + 
+  xlab("variant") +
+  theme_light() +
+  scale_y_continuous(breaks = 1:K) 
+
+z.simp.tb <- tibble(variant = integer(),
+                    mcmc_z_1 = integer(),
+                    mcmc_z_2 = integer(), 
+                    true_z = integer()) 
+for (i in 1:ncol(z.chain)) {
+  z.vals <- as.integer(names(table(z.chain[,i])))
+  if (length(z.vals) > 1) {
+    z.simp.tb[i, ] <- c(i, z.vals[1], z.vals[2], z[i]) 
+  } else {
+    z.simp.tb[i, ] <- c(i, z.vals, z.vals, z[i]) 
+  }
+}
+z.simp.tb
+z.simp.plot <- ggplot(z.simp.tb, aes(variant, mcmc_z_1)) +
+  ylab("mcmc z") + 
+  xlab("variant") +
+  theme_light() +
+  scale_y_continuous(breaks = 1:K, minor_breaks=NULL) +
+  scale_x_continuous(breaks = seq(10,100,10), minor_breaks=NULL) +
+  geom_segment(aes(x=variant, xend=variant,
+                   y=mcmc_z_1, yend=mcmc_z_2,
+                   color=true_z%%2)) +
+  geom_point(size=1, aes(color=true_z%%2)) +
+  geom_point(aes(y=mcmc_z_2, color=true_z%%2), size=1) +
+  theme(legend.position = "none")
+  
+z.simp.plot
+
 mcmc_vals <- summary(samps)$statistics
 mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
 plot.z(samps, z)
