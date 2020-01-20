@@ -16,6 +16,7 @@ library(gridExtra)
 working.dir <- ".."
 models.dir <- file.path(working.dir, "models")
 trace.dir <- file.path(working.dir, "trace")
+figs.dir <- file.path(working.dir, "figs")
 #dir.create(trace.dir, showWarnings = F)
 runName <- "v.6.0"
 ```
@@ -201,6 +202,8 @@ w.chain <- getParamChain(samps, "w")
 
 ```
 
+## PPD
+
 ```{r ppd, echo=F}
 plot.ppd <- function(samps, test.data, K) {
   ##
@@ -240,8 +243,9 @@ plot.ppd <- function(samps, test.data, K) {
 plot.ppd(samps, test.data, K)
 ```
 
+## Z
 
-```{r z, echo=T, eval=T}
+```{r zplot, echo=T, eval=T}
 plot.z <- function(samps, z) {
   mcmc_vals <- summary(samps)$statistics
   mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
@@ -260,54 +264,76 @@ z.chain.to.tb <- function(z.chain) {
     as_tibble() %>%
     mutate(iter=1:nrow(z.chain)) %>%
     gather(variant, mcmc_z, -c(iter)) 
-  z.chain.tb %>%
-    mutate(variant = as.integer(gsub(".*\\[(.*)\\].*", "\\1", z.chain.tb$variant)))
+  z.chain.tb <- z.chain.tb %>%
+    mutate(variant = as.integer(gsub(".*\\[(.*)\\].*", "\\1", z.chain.tb$variant))) %>%
+    mutate(true_z = rep(1:10, each=nrow(z.chain)*10)) %>%
+    group_by(variant, mcmc_z) %>% 
+    mutate(count = n())
+  z.chain.tb_simp <- distinct(select(z.chain.tb, -c(iter)))
+  z.chain.tb_simp %>% 
+    group_by(variant) %>%
+    mutate(prop = count/sum(count))
 }
 
 z.chain.tb <- z.chain.to.tb(z.chain)
-z.chain.tb <- z.chain.tb %>%
-  mutate(true_z = rep(1:10, each=nrow(z.chain)*10))
-z.chain.tb_simp <- distinct(select(z.chain.tb, -c(iter)))
+z.chain.tb
 
-z.chain.plot <- ggplot(z.chain.tb, aes(variant, mcmc_z)) +
-  geom_point(size=1, aes(color=true_z)) +
-  ylab("mcmc z") + 
-  xlab("variant") +
-  theme_light() +
-  scale_y_continuous(breaks = 1:K) 
-
-z.simp.tb <- tibble(variant = integer(),
-                    mcmc_z_1 = integer(),
-                    mcmc_z_2 = integer(), 
-                    true_z = integer()) 
+z.seg.tb <- tibble(variant = numeric(),
+                    mcmc_z_1 = numeric(),
+                    mcmc_z_2 = numeric()) 
 for (i in 1:ncol(z.chain)) {
   z.vals <- as.integer(names(table(z.chain[,i])))
   if (length(z.vals) > 1) {
-    z.simp.tb[i, ] <- c(i, z.vals[1], z.vals[2], z[i]) 
+    z.seg.tb[i, ] <- c(i, z.vals[1], z.vals[2]) 
   } else {
-    z.simp.tb[i, ] <- c(i, z.vals, z.vals, z[i]) 
+    z.seg.tb[i, ] <- c(i, z.vals, z.vals) 
   }
 }
-z.simp.tb
-z.simp.plot <- ggplot(z.simp.tb, aes(variant, mcmc_z_1)) +
+#z.seg.tb
+z.plot <- ggplot(z.chain.tb, aes(variant, mcmc_z)) +
   ylab("mcmc z") + 
   xlab("variant") +
   theme_light() +
   scale_y_continuous(breaks = 1:K, minor_breaks=NULL) +
   scale_x_continuous(breaks = seq(10,100,10), minor_breaks=NULL) +
-  geom_segment(aes(x=variant, xend=variant,
-                   y=mcmc_z_1, yend=mcmc_z_2,
-                   color=true_z%%2)) +
-  geom_point(size=1, aes(color=true_z%%2)) +
-  geom_point(aes(y=mcmc_z_2, color=true_z%%2), size=1) +
-  theme(legend.position = "none")
-  
-z.simp.plot
+  geom_segment(data = z.seg.tb, 
+               aes(x=variant, xend=variant,
+                   y=mcmc_z_1, yend=mcmc_z_2),
+                   color="gray", linetype=2) +
+  geom_point(aes(y=mcmc_z, fill=prop), 
+             pch=21, size=3, stroke=0)
 
-mcmc_vals <- summary(samps)$statistics
-mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
-plot.z(samps, z)
+z.plot
+ggsave(file.path(figs.dir, "zplot.pdf"), z.plot, width=14, height=6)
 
+# mcmc_vals <- summary(samps)$statistics
+# mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
+# plot.z(samps, z)
+
+```
+
+```{r map} 
+z.map.tb <- z.chain.tb %>%
+  group_by(variant) %>%
+  filter(prop == max(prop))
+z.map.tb
+z.map <- z.map.tb$mcmc_z
+z.map
+z.map.ind <- which(apply(z.chain, 1, function(x) all(x == z.map)))
+w.chain.map <- w.chain[z.map.ind, ]
+w.map.tb <- w.chain.map %>%
+  as_tibble() %>%
+  mutate(iter=1:nrow(w.chain.map)) %>%
+  gather(ind, mcmc_w, -c(iter)) %>%
+  group_by(ind) %>%
+  summarize(mean_w = mean(mcmc_w))
+w.map.tb <- w.map.tb %>%
+  mutate(cluster = as.integer(gsub(".*\\[(.*)\\,.*", "\\1", w.map.tb$ind))) %>%
+  mutate(sample = as.integer(gsub(".*\\,(.*)\\]", "\\1", w.map.tb$ind))) %>%
+  arrange(cluster)
+#w.map.tb
+w.map <- matrix(data=w.map.tb$mean_w, nrow=10, ncol=3, byrow=TRUE)
+w.map
 ```
 
 ```{r w, echo=F, eval=F}
