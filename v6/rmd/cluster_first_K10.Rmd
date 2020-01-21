@@ -337,101 +337,97 @@ w.map
 ```
 
 ```{r admat_restraints_test}
-# presence of clusters in samples
-cluster.sample.presence <- apply(w, 1, function(x) which(x>0.01))
-cluster.sample.presence
-all.samples <- 1:S
-admat <- matrix(data=0, nrow=11, ncol=10) # rows=from is root + 1:K, cols=to is 1:K
 
-# fill in restraints
-# can go from root to anyone, skip and start at nrow=2 (cluster 1)
-for (from in 2:(K+1)) {
-  for (to in 1:K) {
-
-    # can't go to self 
-    if ((from-1) == to) {
-      admat[from, to] <- NA
-      #print(c(from, to, "self"))
-      next
-    }
-    # hierarchy restraints
-    from.samples <- cluster.sample.presence[[from-1]]
-    to.samples <- cluster.sample.presence[[to]]
-    
-    ## no restraints if same sample presence
-    if (setequal(from.samples, to.samples)) {
-      #print(c(from, to, "same")) 
-      next
-    }
-    
-    ## restraint if # from.samples < # to.samples
-    if(length(from.samples) < length(to.samples)) {
-      #print(c(from, to, "from set is smaller than to set")) 
-      admat[from, to] <- NA 
-      next
-    }
-    
-    ## no restraints if to.samples is subset of from.samples
-    if (all(to.samples %in% from.samples)) {
-      #print(c(from, to, "subset")) 
-      next
-    } else {
-      #print(c(from, to, "not subset"))
-      admat[from, to] <- NA 
+init.admat <- function(w, zero.thresh) {
+  cluster.sample.presence <- apply(w, 1, function(x) which(x>zero.thresh))
+  K <- nrow(w)
+  S <- ncol(w)
+  all.samples <- 1:S
+  admat <- matrix(data=0, nrow=(1+K), ncol=K) # rows=from is root + 1:K, cols=to is 1:K
+  
+  # fill in restraints
+  # can go from root to anyone, skip and start at nrow=2 (cluster 1)
+  for (from in 2:(K+1)) {
+    for (to in 1:K) {
+  
+      # can't go to self 
+      if ((from-1) == to) {
+        admat[from, to] <- NA
+        #print(c(from, to, "self"))
+        next
+      }
+      # hierarchy restraints
+      from.samples <- cluster.sample.presence[[from-1]]
+      to.samples <- cluster.sample.presence[[to]]
+      
+      ## no restraints if same sample presence
+      if (setequal(from.samples, to.samples)) {
+        #print(c(from, to, "same")) 
+        next
+      }
+      
+      ## restraint if # from.samples < # to.samples
+      if(length(from.samples) < length(to.samples)) {
+        #print(c(from, to, "from set is smaller than to set")) 
+        admat[from, to] <- NA 
+        next
+      }
+      
+      ## no restraints if to.samples is subset of from.samples
+      if (all(to.samples %in% from.samples)) {
+        #print(c(from, to, "subset")) 
+        next
+      } else {
+        #print(c(from, to, "not subset"))
+        admat[from, to] <- NA 
+      }
     }
   }
+  admat
 }
 
-admat
+# test admat restraints 
+zero.thresh <- 0.01
+test.admat <- init.admat(w, zero.thresh)
+
+test.admat
 ```
 
-```{r w, echo=F, eval=F}
-mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
-mcmc_w <- matrix(mcmc_w, nrow=K)
-colnames(mcmc_w) <- paste0("sample", 1:S)
-
-z_mapping_byws1 <- order(mcmc_w[,1], decreasing=T)
-
-mcmc_w2 <- mcmc_w %>%
-  as_tibble() %>%
-  mutate(cluster=z_mapping_byws1) %>%
-  gather("sample", "mcmc_w", -c(cluster))
-w_comp <- w %>%
-  as_tibble() %>%
-  mutate(cluster=1:K) %>%
-  gather("sample", "w", -c(cluster)) %>%
-  left_join(mcmc_w2, by=c("cluster", "sample")) %>%
-  mutate(cluster=factor(cluster),
-         sample=factor(sample))
-
-# scatter
-ggplot(w_comp, aes(w, mcmc_w)) +
-  geom_point(size=3, aes(color=sample, shape=cluster)) +
-  geom_abline(slope=1, intercept=0, linetype="dotted")
-
-# by sample
-w_comp2 <- w_comp %>% 
-  gather("type", "omega", -c(cluster, sample)) %>%
-  mutate(type=factor(type))
-w_comp2$grp <- paste(w_comp2$cluster, w_comp2$type)
-ggplot(w_comp2, aes(sample, omega, group=grp)) +
-    geom_point(size=3,  aes(color=cluster)) +
-    geom_line(aes(color=cluster, lty=type)) +
-    ylab(expression(omega)) +
-    xlab("") +
-    theme(axis.text.x=element_text(angle=45, hjust=1),
-          panel.background=element_rect(fill="white", color="black"),
-          legend.key=element_rect(fill="white", color="white")) +
-    guides(color=guide_legend(title="Variant cluster\n(z)"))
-
-# distribution
-w_chains <- chains[, grep("w", colnames(chains))]
-w_chains2 <- w_chains %>%
-  as_tibble() %>%
-  gather("chain", "w") 
-w_chains2$cluster <- substr(w_chains2$chain, 3,3)
-w_chains2$sample <- paste0("sample", substr(w_chains2$chain, 5,5))
-ggplot(w_chains2, aes(x=w, fill=cluster)) +
-  geom_histogram(alpha=0.2, position="identity", binwidth = 0.01) +
-  facet_wrap(~sample)
+```{r admat_random} 
+rand.admat <- function(admat) {
+  for(col in 1:ncol(admat)) {
+    ind.0 <- which(admat[,col] == 0) # possible positions (0's)
+    rand.ind <- sample(ind.0, size=1)
+    admat[rand.ind,col] <- 1
+  }
+  admat
+}
+test.admat.2 <- rand.admat(test.admat)
+test.admat.2
 ```
+
+```{r admat_mutate}
+mutate.admat <- function(admat) {
+  # choose a column to mutate
+  K <- ncol(admat)
+  rand.k <- sample(1:K, size=1)
+  
+  # mutate
+  possiblePos <- which(!is.na(admat[,rand.k]))
+  ind.1 <- which(admat[,rand.k] == 1)
+  new.1 <- sample(possiblePos[-ind.1], size=1)
+  admat[ind.1,rand.k] <- 0
+  admat[new.1,rand.k] <- 1
+  admat
+}
+
+test.admat.3 <- mutate.admat(test.admat.2)
+test.admat.3
+```
+
+
+```{r admat_score} 
+
+```
+
+
