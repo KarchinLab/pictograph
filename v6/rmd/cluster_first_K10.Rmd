@@ -336,6 +336,55 @@ w.map <- matrix(data=w.map.tb$mean_w, nrow=10, ncol=3, byrow=TRUE)
 w.map
 ```
 
+```{r admat_restraints_test}
+# presence of clusters in samples
+cluster.sample.presence <- apply(w, 1, function(x) which(x>0.01))
+cluster.sample.presence
+all.samples <- 1:S
+admat <- matrix(data=0, nrow=11, ncol=10) # rows=from is root + 1:K, cols=to is 1:K
+
+# fill in restraints
+# can go from root to anyone, skip and start at nrow=2 (cluster 1)
+for (from in 2:(K+1)) {
+  for (to in 1:K) {
+
+    # can't go to self 
+    if ((from-1) == to) {
+      admat[from, to] <- NA
+      #print(c(from, to, "self"))
+      next
+    }
+    # hierarchy restraints
+    from.samples <- cluster.sample.presence[[from-1]]
+    to.samples <- cluster.sample.presence[[to]]
+    
+    ## no restraints if same sample presence
+    if (setequal(from.samples, to.samples)) {
+      #print(c(from, to, "same")) 
+      next
+    }
+    
+    ## restraint if # from.samples < # to.samples
+    if(length(from.samples) < length(to.samples)) {
+      #print(c(from, to, "from set is smaller than to set")) 
+      admat[from, to] <- NA 
+      next
+    }
+    
+    ## no restraints if to.samples is subset of from.samples
+    if (all(to.samples %in% from.samples)) {
+      #print(c(from, to, "subset")) 
+      next
+    } else {
+      #print(c(from, to, "not subset"))
+      admat[from, to] <- NA 
+    }
+  }
+}
+
+admat
+```
+
 ```{r w, echo=F, eval=F}
 mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
 mcmc_w <- matrix(mcmc_w, nrow=K)
