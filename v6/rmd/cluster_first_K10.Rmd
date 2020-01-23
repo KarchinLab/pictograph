@@ -47,6 +47,7 @@ w <- matrix(c(0.98, 0.99, 0.97,
             nrow=K, ncol=S)
 
 colnames(w) <-  paste0("sample", 1:S)
+w
 
 tcn <- matrix(2, nrow=I, ncol=S)
 m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
@@ -427,7 +428,45 @@ test.admat.3
 
 
 ```{r admat_score} 
+getChildrenWSum <- function(admat, w, row) {
+  curr.row <- admat[row,]
+  children <- which(curr.row == 1)
+  children.w <- w[children,]
+  if(length(children) > 1) {
+    return(colSums(children.w))
+  } else {
+    return(children.w)
+  }
+}
 
+score.admat <- function(admat, w) {
+  
+  S <- ncol(w)
+  # root, MCF=1.0
+  children.w.sum <- getChildrenWSum(admat, w, 1)
+  score <- log(sum(1 >= children.w.sum) / S)
+  
+  for(i in 2:nrow(admat)) {
+    if(all(is.na(admat[i,]))) next #leaf
+    
+    curr.child.sum <- getChildrenWSum(admat, w, i)
+    curr.parent.mcf <- w[i-1, ]
+    curr.score <- log(sum(curr.parent.mcf >= curr.child.sum) / S)
+    score <- score + curr.score
+  }
+  score
+}
+
+true.admat <- test.admat
+true.admat[1,1] <- true.admat[2,2] <- true.admat[3,3] <-  true.admat[3,6] <- 
+  true.admat[4,4] <- true.admat[4,5] <- true.admat[5,8] <- true.admat[6,9] <- 
+  true.admat[7,7] <- true.admat[8,10] <- 1
+true.admat
+
+score.admat(true.admat, w)
 ```
 
+```{r w}
+mcmc_vals <- summary(samps)$statistics
+```
 
