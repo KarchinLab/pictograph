@@ -1,0 +1,597 @@
+---
+title: "Version 6: Cluster first"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rjags)
+library(coda)
+#library(MCMCpack)
+#library(bayesplot)
+library(ggmcmc)
+library(dplyr)
+library(gridExtra)
+
+working.dir <- ".."
+models.dir <- file.path(working.dir, "models")
+trace.dir <- file.path(working.dir, "trace")
+figs.dir <- file.path(working.dir, "figs")
+#dir.create(trace.dir, showWarnings = F)
+runName <- "v.6.1"
+```
+
+## Simulate data
+
+```{r sim}
+I <- 100
+K <- 10
+S <- 3
+
+set.seed(123)
+
+pi <- rep(0.1, 10)
+#z <- sample(1:K, size = I, replace = T, prob = pi)
+z <- rep(1:10, each=10)
+w <- matrix(c(0.98, 0.99, 0.97, 
+              0.98, 0.90, 0.82,
+              0.55, 0.00, 0.80, 
+              0.20, 0.00, 0.50,
+              0.30, 0.00, 0.30, 
+              0.43, 0.90, 0.00,
+              0.30, 0.70, 0.00,
+              0.20, 0.00, 0.00,
+              0.00, 0.00, 0.30,
+              0.00, 0.50, 0.00),
+            byrow=T,
+            nrow=K, ncol=S)
+
+colnames(w) <-  paste0("sample", 1:S)
+w
+
+tcn <- matrix(2, nrow=I, ncol=S)
+m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
+            nrow=I, ncol=S)
+W <- w[z, ]
+calcTheta <- function(m, tcn, w) {
+  (m * w) / (tcn * w + 2*(1-w))
+}
+
+theta <- calcTheta(m, tcn, W)
+
+n <- replicate(S, rpois(I, 100))
+y <- matrix(NA, nrow=I, ncol=S)
+for (i in 1:I) {
+  for (s in 1:S) {
+    y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+  }
+}
+
+test.data <- list("I" = I, "S" = S, "K" = K, 
+                  "y" = y, "n" = n,
+                  "m" = m, "tcn" = tcn)
+```
+# Visualize densities of simulated data
+
+Clustering is by $\omega$
+
+```{r simulated_densities, echo=F}
+p <- test.data$y/test.data$n
+colnames(w) <- colnames(p) <- paste0("sample", 1:S)
+colnames(m) <- colnames(p)
+m2 <- m %>%
+    as_tibble() %>%
+    mutate(z=factor(z),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "multiplicity", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(p)))
+p2 <- p %>%
+    as_tibble() %>%
+    mutate(z=factor(z),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "fraction", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(p))) %>%
+    left_join(m2, by=c("z", "variant_index", "sample")) %>%
+    mutate(multiplicity=factor(multiplicity))
+## what the data looks like by sample
+ggplot(p2, aes(z, fraction)) +
+    geom_jitter(width=0.1, size=1, aes(color=multiplicity)) +
+    facet_wrap(~sample) +
+    ylab("y/n") +
+    xlab("True cluster") +
+    theme(panel.background=element_rect(fill="white", color="black"))
+## by variant
+ggplot(p2, aes(sample, fraction, group=variant_index)) +
+    geom_point(size=1) +
+    geom_line(aes(color=z)) +
+    ylab("y/n") +
+    xlab("Patient sample\n(arbitrary order)") +
+    theme(axis.text.x=element_text(angle=45, hjust=1)) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+##
+## Cluster means and variances
+##
+meds   <- apply(W, 2, median)
+slevels <- colnames(w)[order(meds, decreasing=TRUE)]
+w2 <- w %>%
+    as_tibble() %>%
+    mutate(z=factor(1:K)) %>%
+    ##       variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "omega", -z) %>%
+    mutate(sample=factor(sample, levels=slevels))
+##fig1 <- ggplot(w2, aes(z, omega)) +
+##    geom_jitter(width=0.1, size=1) +
+##    facet_wrap(~sample) +
+##    ylab(expression(omega)) +
+##    xlab("True cluster") +
+##    theme(panel.background=element_rect(fill="white", color="black"))
+fig2 <- ggplot(w2, aes(sample, omega, group=z)) +
+    geom_point(size=1,  aes(color=z)) +
+    geom_line(aes(color=z)) +
+    ylab(expression(omega)) +
+    xlab("") +
+    theme(axis.text.x=element_text(angle=45, hjust=1),
+          panel.background=element_rect(fill="white", color="black"),
+          legend.key=element_rect(fill="white", color="white")) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+fig2
+```
+
+## functions
+```{r func}
+runMCMC <- function(data, K, jags.file, inits, params, n.iter, thin) {
+  data$K <- K
+  jags.m <- jags.model(jags.file, data,
+                       n.chains = 1,
+                       inits = inits,
+                       n.adapt = 1000)
+  samps <- coda.samples(jags.m, params, n.iter=n.iter, thin=thin)
+  samps
+}
+
+getParamChain <- function(samps, param) {
+  chains <- do.call(rbind, samps)
+  chain <- chains[, grep(param, colnames(chains))]
+}
+
+reshapeW <- function(w, S, K) {
+  w.mat <- matrix(w, nrow = K)
+  colnames(w.mat) <- paste0("sample", 1:S)
+  w.mat
+}
+
+calcLogLik <- function(z.iter, w.iter, data) {
+  W <- w.iter[z.iter, ]
+  theta <- calcTheta(data$m, data$tcn, W)
+  sum(dbinom(data$y, data$n, theta, log=T))
+}
+
+calcChainLogLik <- function(samps, data, K) {
+  z.chain <- getParamChain(samps, "z")
+  w.chain <- getParamChain(samps, "w")
+  lik <- c()
+  for(iter in 1:nrow(z.chain)) {
+    z.iter <- z.chain[iter,]
+    w.iter <- reshapeW(w.chain[iter,], data$S, K)
+    lik <- c(lik, calcLogLik(z.iter, w.iter, data))
+  }
+  mean(lik)
+}
+
+calcBIC <- function(n, k, ll) log(n)*k - 2*ll
+```
+
+## Cluster -- JAGS
+
+```{r JAGS}
+jags.file <- file.path(models.dir, "w.jags")
+inits <- list(".RNG.name" = "base::Wichmann-Hill", 
+              ".RNG.seed" = 123)
+test.data <- list("I" = I, "S" = S, 
+                  "y" = y, "n" = n,
+                  "m" = m, "tcn" = tcn)
+params <- c("z", "w", "ystar")
+
+n.iter = 10000
+thin = 7
+K <- 10
+
+samps <- runMCMC(test.data, K, jags.file, inits, params, n.iter, thin)
+z.chain <- getParamChain(samps, "z")
+w.chain <- getParamChain(samps, "w")
+
+mcmc_vals <- summary(samps)$statistics
+mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
+mcmc_w <- matrix(mcmc_w, nrow=K)
+colnames(mcmc_w) <- paste0("sample", 1:S)
+```
+
+## PPD
+
+```{r ppd, echo=F}
+plot.ppd <- function(samps, test.data, K) {
+  ##
+  ## 50 mutations x 10 samples
+  chains <- do.call(rbind, samps)
+  ystar <- chains[, grep("ystar", colnames(chains))]
+  ## each row of MCMC is in column-major order
+  orig.order <- tibble(statistic=colnames(ystar))
+  ppd.summaries <- ystar %>%
+      as_tibble() %>%
+      gather("statistic", "value") %>%
+      group_by(statistic) %>%
+      summarize(mean=mean(value),
+                q1=quantile(value, 0.025),
+                q3=quantile(value, 0.975))
+  ppd.summaries2 <- left_join(orig.order,
+                              ppd.summaries, by="statistic") %>%
+      mutate(observed=as.numeric(test.data$y)) %>%
+      mutate(sample=paste0("sample", rep(1:test.data$S, each=test.data$I)),
+             variant=rep(1:test.data$I, test.data$S))
+  ggplot(ppd.summaries2, aes(x=statistic, y=mean,
+                             ymin=q1,
+                             ymax=q3)) +
+      geom_errorbar() +
+      geom_point(aes(x=statistic, y=observed),
+                 size=1, color="steelblue") +
+      theme(axis.text.x=element_blank(),
+            axis.ticks.x=element_blank(),
+            panel.background=element_rect(fill="white",
+                                          color="black")) +
+      ylab("Middle 95% of posterior\npredictive distribution") +
+      xlab("observation index (column-major order)") +
+      facet_wrap(~sample) +
+      ggtitle(paste0("K = ", K))
+}
+
+plot.ppd(samps, test.data, K)
+```
+
+## Z
+
+```{r zplot, echo=T, eval=T}
+plot.z <- function(samps, z) {
+  mcmc_vals <- summary(samps)$statistics
+  mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
+  plot(z, mcmc_z, type = "p")
+  z_comp <- data.frame(z, mcmc_z)
+}
+
+z.chain.to.tb <- function(z.chain) {
+  z.chain.tb <- z.chain %>%
+    as_tibble() %>%
+    mutate(iter=1:nrow(z.chain)) %>%
+    gather(variant, mcmc_z, -c(iter)) 
+  z.chain.tb <- z.chain.tb %>%
+    mutate(variant = as.integer(gsub(".*\\[(.*)\\].*", "\\1", z.chain.tb$variant))) %>%
+    mutate(true_z = rep(1:10, each=nrow(z.chain)*10)) %>%
+    group_by(variant, mcmc_z) %>% 
+    mutate(count = n())
+  z.chain.tb_simp <- distinct(select(z.chain.tb, -c(iter)))
+  z.chain.tb_simp %>% 
+    group_by(variant) %>%
+    mutate(prop = count/sum(count))
+}
+
+z.chain.tb <- z.chain.to.tb(z.chain)
+z.chain.tb
+
+z.seg.tb <- tibble(variant = numeric(),
+                    mcmc_z_1 = numeric(),
+                    mcmc_z_2 = numeric()) 
+for (i in 1:ncol(z.chain)) {
+  z.vals <- as.integer(names(table(z.chain[,i])))
+  if (length(z.vals) > 1) {
+    z.seg.tb[i, ] <- c(i, z.vals[1], z.vals[2]) 
+  } else {
+    z.seg.tb[i, ] <- c(i, z.vals, z.vals) 
+  }
+}
+#z.seg.tb
+z.plot <- ggplot(z.chain.tb, aes(variant, mcmc_z)) +
+  ylab("mcmc z") + 
+  xlab("variant") +
+  theme_light() +
+  scale_y_continuous(breaks = 1:K, minor_breaks=NULL) +
+  scale_x_continuous(breaks = seq(10,100,10), minor_breaks=NULL) +
+  geom_segment(data = z.seg.tb, 
+               aes(x=variant, xend=variant,
+                   y=mcmc_z_1, yend=mcmc_z_2),
+                   color="gray", linetype=2) +
+  geom_point(aes(y=mcmc_z, fill=prop), 
+             pch=21, size=3, stroke=0)
+
+z.plot
+#gsave(file.path(figs.dir, "zplot.pdf"), z.plot, width=14, height=6)
+
+# mcmc_vals <- summary(samps)$statistics
+# mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
+# plot.z(samps, z)
+
+```
+
+```{r map} 
+z.map.tb <- z.chain.tb %>%
+  group_by(variant) %>%
+  filter(prop == max(prop))
+z.map.tb
+z.map <- z.map.tb$mcmc_z
+z.map
+z.map.ind <- which(apply(z.chain, 1, function(x) all(x == z.map)))
+w.chain.map <- w.chain[z.map.ind, ]
+w.map.tb <- w.chain.map %>%
+  as_tibble() %>%
+  mutate(iter=1:nrow(w.chain.map)) %>%
+  gather(ind, mcmc_w, -c(iter)) %>%
+  group_by(ind) %>%
+  summarize(mean_w = mean(mcmc_w))
+w.map.tb <- w.map.tb %>%
+  mutate(cluster = as.integer(gsub(".*\\[(.*)\\,.*", "\\1", w.map.tb$ind))) %>%
+  mutate(sample = as.integer(gsub(".*\\,(.*)\\]", "\\1", w.map.tb$ind))) %>%
+  arrange(cluster)
+#w.map.tb
+w.map <- matrix(data=w.map.tb$mean_w, nrow=10, ncol=3, byrow=TRUE)
+w.map
+```
+
+## Admat
+
+```{r admat_functions}
+rand.admat <- function(admat) {
+  for(col in 1:ncol(admat)) {
+    ind.0 <- which(admat[,col] == 0) # possible positions (0's)
+    rand.ind <- sample(ind.0, size=1)
+    admat[rand.ind,col] <- 1
+  }
+  
+  while (sum(admat[1, ]) == 0) {
+    admat <- mutate.admat(admat)
+  }
+  
+  admat
+}
+
+base.admat <- function(w, zero.thresh=0.01) {
+  cluster.sample.presence <- apply(w, 1, function(x) which(x>zero.thresh))
+  K <- nrow(w)
+  S <- ncol(w)
+  all.samples <- 1:S
+  admat <- matrix(data=0, nrow=(1+K), ncol=K) # rows=from is root + 1:K, cols=to is 1:K
+  
+  # fill in restraints
+  # can go from root to anyone, skip and start at nrow=2 (cluster 1)
+  for (from in 2:(K+1)) {
+    for (to in 1:K) {
+  
+      # can't go to self 
+      if ((from-1) == to) {
+        admat[from, to] <- NA
+        #print(c(from, to, "self"))
+        next
+      }
+      # hierarchy restraints
+      from.samples <- cluster.sample.presence[[from-1]]
+      to.samples <- cluster.sample.presence[[to]]
+      
+      ## no restraints if same sample presence
+      if (setequal(from.samples, to.samples)) {
+        #print(c(from, to, "same")) 
+        next
+      }
+      
+      ## restraint if # from.samples < # to.samples
+      if(length(from.samples) < length(to.samples)) {
+        #print(c(from, to, "from set is smaller than to set")) 
+        admat[from, to] <- NA 
+        next
+      }
+      
+      ## no restraints if to.samples is subset of from.samples
+      if (all(to.samples %in% from.samples)) {
+        #print(c(from, to, "subset")) 
+        next
+      } else {
+        #print(c(from, to, "not subset"))
+        admat[from, to] <- NA 
+      }
+    }
+  }
+  admat
+}
+
+init.admat <- function(w, zero.thresh) {
+  base <- base.admat(w, zero.thresh)
+  rand.admat(base)
+}
+
+
+mutate.admat <- function(admat) {
+  # choose a column to mutate
+  K <- ncol(admat)
+  rand.k <- sample(1:K, size=1)
+  
+  # mutate
+  ## possible positions (0's)
+  possiblePos <- which(!is.na(admat[,rand.k]) & admat[,rand.k] != 1)
+  ## current position with 1
+  ind.1 <- which(admat[,rand.k] == 1)
+  ## select new position
+  if (length(possiblePos == 1)) {
+    new.1 <- possiblePos
+  } else {
+    new.1 <- sample(possiblePos, size=1)
+  }
+  
+  new.admat <- admat 
+  new.admat[ind.1,rand.k] <- 0
+  new.admat[new.1,rand.k] <- 1
+  
+  while (sum(new.admat[1, ]) == 0) {
+    new.admat <- mutate.admat(admat)
+  }
+  new.admat
+}
+```
+
+
+
+```{r admat_score} 
+decide.ht <- function(pval, alpha=0.05) {
+  # 1 signals rejection event for null of i -> j
+  if (pval <= alpha) return(1)
+  else return(0)
+}
+
+create.cpov <- function(mcmc_w, mcmc_w_sd, alpha=0.05) {
+  cpov <- base.admat(mcmc_w, zero.thresh = 0.01)
+  S <- ncol(mcmc_w) # number of samples
+  
+  # root can go to anyone -- all 0's (default base admat value)
+  
+  for (r in 2:nrow(cpov)) {
+    for (c in 1:ncol(cpov)) {
+      
+      if (is.na(cpov[r,c])) next # skip restricted position
+      
+      from <- r-1 # 'from' cluster node
+      to <- c # 'to' cluster node
+      
+      statistic <- 0
+      pval <- 0
+      
+      for(s in 1:S) {
+        d <- mcmc_w[from,s] - mcmc_w[to,s]
+        d_sd <- sqrt((mcmc_w_sd[from,s])^2 + (mcmc_w_sd[to,s])^2)
+        I <- sum(d < 0)
+        statistic <- statistic + (d / d_sd)^2 * I
+        
+        for (k in 0:S) {
+        pval <- pval + ((1 - pchisq(statistic, k)) * choose(S, k) / (2^S))
+        }
+      }
+      cpov[r,c] <- decide.ht(pval, alpha)
+    }
+  }
+  cpov
+}
+
+calc.topology.cost <- function(admat, cpov) {
+  
+  TC <- 0
+  edges <- which(admat == 1, arr.ind=T)
+  for (i in 1:nrow(edges)) {
+    TC <- TC + cpov[edges[i,1], edges[i,2]]
+  }
+  
+  TC
+}
+
+calc.mass.cost <- function(admat, mcmc_w) {
+  
+  numChildren <- rowSums(admat, na.rm = T)
+  nodes <- which(numChildren > 0, arr.ind = T) # not leaves
+  mc.node <- rep(0, length(nodes))
+  
+  for (i in 1:length(nodes)) {
+    node <- nodes[i]
+    
+    # root node: MCF = 1
+    parent.w <- rep(1, ncol(mcmc_w))
+    # not root node: look up MCF in mcmc_w
+    if (node != 1) { 
+      parent.w <- mcmc_w[node-1,]
+    }
+    
+    kids <- which(admat[node,] == 1, arr.ind = T)
+    if (numChildren[node] > 1) {
+      children.w <- colSums(mcmc_w[kids,])
+    } else {
+      children.w <- mcmc_w[kids,]
+    }
+    
+    mc.s <- ifelse(parent.w >= children.w, 0, children.w - parent.w)
+    mc.node[i] <- sqrt(sum(mc.s^2))
+  }
+  
+  sum(mc.node)
+
+}
+
+calc.tree.fitness <- function(admat, cpov, mcmc_w, scaling.coeff=5) {
+  TC <- calc.topology.cost(admat, cpov)
+  MC <- calc.mass.cost(admat, mcmc_w)
+  Z <- TC + MC
+  fitness <- exp(-scaling.coeff * Z)
+  fitness
+}
+```
+
+```{r tree_mcmc}
+set.seed(1234)
+
+mcmc_vals <- summary(samps)$statistics
+mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
+mcmc_w <- matrix(mcmc_w, nrow=K)
+colnames(mcmc_w) <- paste0("sample", 1:S)
+
+mcmc_w_sd <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "SD"]
+mcmc_w_sd <- matrix(mcmc_w_sd, nrow=K)
+colnames(mcmc_w_sd) <- paste0("sample", 1:S)
+
+answer <- base.admat(mcmc_w)
+answer[1,1] <- answer[2,2] <- answer[3,7] <- answer[3,8] <- 
+  answer[5,3] <- answer[8,9] <- answer[9,4] <- answer[9,10] <- 
+  answer[10,5] <- answer[11,6] <- 1
+
+
+
+cpov <- create.cpov(mcmc_w, mcmc_w_sd)
+calc.tree.fitness(answer, cpov, mcmc_w)
+
+#score.admat.chain(answer, w.chain)
+
+
+admat.chain <- list(init.admat(mcmc_w, zero.thresh=0.01))
+score.chain <- c()
+
+numAccept = 0
+#2*2*6*5*8*4*5*4*5
+numIter <- 2000
+for (i in 1:numIter) {
+  fit.prev <- calc.tree.fitness(admat.chain[[i]], cpov, mcmc_w)
+  score.chain[i] <- fit.prev
+  #admat.star <- mutate.admat(admat.chain[[i]])
+  #P.star <- score.admat.chain(admat.star, w.chain)
+  
+  # if(P.prev == 0 & P.star == 0) {
+  #   admat.chain[[i+1]] <- admat.star
+  #   numAccept <- numAccept + 1
+  #   next
+  # }
+  fit.star <- 0
+  while (fit.star == 0) {
+    admat.star <- mutate.admat(admat.chain[[i]])
+    fit.star <- calc.tree.fitness(admat.star, cpov, mcmc_w)
+  }
+  
+  r <- fit.star / fit.prev
+  u <- runif(1,0,1)
+  if(u <= r) {
+    admat.chain[[i+1]] <- admat.star
+    numAccept <- numAccept + 1
+  } else {
+    admat.chain[[i+1]] <- admat.chain[[i]]
+  }
+}
+score.chain[i+1] <- calc.tree.fitness(admat.chain[[i+1]], cpov, mcmc_w)
+acceptRate <- numAccept/(numIter)
+acceptRate
+
+plot(score.chain)
+max(score.chain)
+max.score.ind <- which(score.chain == max(score.chain))
+if(length(max.score.ind) > 1) max.score.ind <- max.score.ind[1]
+max.admat <- admat.chain[[max.score.ind]]
+max.admat
+```
+
