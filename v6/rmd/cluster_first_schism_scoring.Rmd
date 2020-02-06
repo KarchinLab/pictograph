@@ -334,7 +334,7 @@ w.map <- matrix(data=w.map.tb$mean_w, nrow=10, ncol=3, byrow=TRUE)
 w.map
 ```
 
-## Admat
+## Admat functions
 
 ```{r admat_functions}
 rand.admat <- function(admat) {
@@ -412,19 +412,19 @@ mutate.admat <- function(admat) {
   
   # mutate
   ## possible positions (0's)
-  possiblePos <- which(!is.na(admat[,rand.k]) & admat[,rand.k] != 1)
+  possiblePos <- which(!is.na(admat[, rand.k]) & admat[, rand.k] != 1)
   ## current position with 1
-  ind.1 <- which(admat[,rand.k] == 1)
+  ind.1 <- which(admat[, rand.k] == 1)
   ## select new position
-  if (length(possiblePos == 1)) {
+  if (length(possiblePos) == 1) {
     new.1 <- possiblePos
   } else {
     new.1 <- sample(possiblePos, size=1)
   }
   
   new.admat <- admat 
-  new.admat[ind.1,rand.k] <- 0
-  new.admat[new.1,rand.k] <- 1
+  new.admat[ind.1, rand.k] <- 0
+  new.admat[new.1, rand.k] <- 1
   
   while (sum(new.admat[1, ]) == 0) {
     new.admat <- mutate.admat(admat)
@@ -432,8 +432,6 @@ mutate.admat <- function(admat) {
   new.admat
 }
 ```
-
-
 
 ```{r admat_score} 
 decide.ht <- function(pval, alpha=0.05) {
@@ -526,6 +524,8 @@ calc.tree.fitness <- function(admat, cpov, mcmc_w, scaling.coeff=5) {
 }
 ```
 
+## Tree MCMC
+
 ```{r tree_mcmc}
 set.seed(1234)
 
@@ -542,34 +542,25 @@ answer <- base.admat(mcmc_w)
 answer[1,1] <- answer[2,2] <- answer[3,7] <- answer[3,8] <- 
   answer[5,3] <- answer[8,9] <- answer[9,4] <- answer[9,10] <- 
   answer[10,5] <- answer[11,6] <- 1
-
+answer
 
 
 cpov <- create.cpov(mcmc_w, mcmc_w_sd)
+
 calc.tree.fitness(answer, cpov, mcmc_w)
-
-#score.admat.chain(answer, w.chain)
-
 
 admat.chain <- list(init.admat(mcmc_w, zero.thresh=0.01))
 score.chain <- c()
 
 numAccept = 0
-#2*2*6*5*8*4*5*4*5
-numIter <- 2000
+
+numIter <- 1000
 for (i in 1:numIter) {
   fit.prev <- calc.tree.fitness(admat.chain[[i]], cpov, mcmc_w)
   score.chain[i] <- fit.prev
-  #admat.star <- mutate.admat(admat.chain[[i]])
-  #P.star <- score.admat.chain(admat.star, w.chain)
-  
-  # if(P.prev == 0 & P.star == 0) {
-  #   admat.chain[[i+1]] <- admat.star
-  #   numAccept <- numAccept + 1
-  #   next
-  # }
+
   fit.star <- 0
-  while (fit.star == 0) {
+  while (fit.star < 0.0001) {
     admat.star <- mutate.admat(admat.chain[[i]])
     fit.star <- calc.tree.fitness(admat.star, cpov, mcmc_w)
   }
