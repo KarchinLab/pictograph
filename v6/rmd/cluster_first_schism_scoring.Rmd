@@ -533,6 +533,9 @@ mcmc_vals <- summary(samps)$statistics
 mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
 mcmc_w <- matrix(mcmc_w, nrow=K)
 colnames(mcmc_w) <- paste0("sample", 1:S)
+round(mcmc_w, 2)
+
+w[c(1,2,9,5,10,8,6,3,7,4),]
 
 mcmc_w_sd <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "SD"]
 mcmc_w_sd <- matrix(mcmc_w_sd, nrow=K)
@@ -548,6 +551,7 @@ answer
 cpov <- create.cpov(mcmc_w, mcmc_w_sd)
 
 calc.tree.fitness(answer, cpov, mcmc_w)
+calc.tree.fitness(answer, cpov, w[c(1,2,9,5,10,8,6,3,7,4),])
 
 admat.chain <- list(init.admat(mcmc_w, zero.thresh=0.01))
 score.chain <- c()
