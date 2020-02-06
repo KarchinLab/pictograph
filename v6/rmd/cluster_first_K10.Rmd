@@ -411,13 +411,20 @@ mutate.admat <- function(admat) {
   rand.k <- sample(1:K, size=1)
   
   # mutate
-  possiblePos <- which(!is.na(admat[,rand.k]) & admat[,rand.k] != 1)
-  ind.1 <- which(admat[,rand.k] == 1)
-  new.1 <- sample(possiblePos, size=1)
+  ## possible positions (0's)
+  possiblePos <- which(!is.na(admat[, rand.k]) & admat[, rand.k] != 1)
+  ## current position with 1
+  ind.1 <- which(admat[, rand.k] == 1)
+  ## select new position
+  if (length(possiblePos) == 1) {
+    new.1 <- possiblePos
+  } else {
+    new.1 <- sample(possiblePos, size=1)
+  }
   
   new.admat <- admat 
-  new.admat[ind.1,rand.k] <- 0
-  new.admat[new.1,rand.k] <- 1
+  new.admat[ind.1, rand.k] <- 0
+  new.admat[new.1, rand.k] <- 1
   
   while (sum(new.admat[1, ]) == 0) {
     new.admat <- mutate.admat(admat)
