@@ -303,11 +303,6 @@ z.plot <- ggplot(z.chain.tb, aes(variant, mcmc_z)) +
 
 z.plot
 #gsave(file.path(figs.dir, "zplot.pdf"), z.plot, width=14, height=6)
-
-# mcmc_vals <- summary(samps)$statistics
-# mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
-# plot.z(samps, z)
-
 ```
 
 ```{r map} 
@@ -318,20 +313,42 @@ z.map.tb
 z.map <- z.map.tb$mcmc_z
 z.map
 z.map.ind <- which(apply(z.chain, 1, function(x) all(x == z.map)))
-w.chain.map <- w.chain[z.map.ind, ]
-w.map.tb <- w.chain.map %>%
+```
+
+## $\omega$
+
+```{r omega} 
+mcmc_vals <- summary(samps)$statistics
+mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
+mcmc_w <- matrix(mcmc_w, nrow=K)
+colnames(mcmc_w) <- paste0("sample", 1:S)
+round(mcmc_w, 2)
+
+mcmc_w_sd <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "SD"]
+mcmc_w_sd <- matrix(mcmc_w_sd, nrow=K)
+colnames(mcmc_w_sd) <- paste0("sample", 1:S)
+
+# order true w based on mcmc cluster numbering 
+w_ordered <- w[c(1,2,9,5,10,8,6,3,7,4),]
+
+# scatter
+mcmc_w_tb <- mcmc_w %>%
   as_tibble() %>%
-  mutate(iter=1:nrow(w.chain.map)) %>%
-  gather(ind, mcmc_w, -c(iter)) %>%
-  group_by(ind) %>%
-  summarize(mean_w = mean(mcmc_w))
-w.map.tb <- w.map.tb %>%
-  mutate(cluster = as.integer(gsub(".*\\[(.*)\\,.*", "\\1", w.map.tb$ind))) %>%
-  mutate(sample = as.integer(gsub(".*\\,(.*)\\]", "\\1", w.map.tb$ind))) %>%
-  arrange(cluster)
-#w.map.tb
-w.map <- matrix(data=w.map.tb$mean_w, nrow=10, ncol=3, byrow=TRUE)
-w.map
+  mutate(cluster=1:K) %>%
+  gather("sample", "mcmc_w", -c(cluster))
+w_master <- w_ordered %>%
+  as_tibble() %>%
+  mutate(cluster=1:K) %>%
+  gather("sample", "true_w", -c(cluster)) %>%
+  left_join(mcmc_w_tb, by=c("cluster", "sample")) %>%
+  mutate(cluster=factor(cluster),
+         sample=factor(sample))
+ggplot(w_master, aes(true_w, mcmc_w)) +
+  geom_point(size=3, aes(color = cluster, shape = sample)) +
+  geom_abline(slope=1, intercept=0, linetype="dotted") +
+  xlab(expression("True "*omega)) +
+  ylab(expression("Estimated "*omega)) +
+  theme_light()
 ```
 
 ## Admat functions
@@ -405,26 +422,30 @@ init.admat <- function(w, zero.thresh) {
 }
 
 
-mutate.admat <- function(admat) {
-  # choose a column to mutate
-  K <- ncol(admat)
-  rand.k <- sample(1:K, size=1)
+mutate.admat <- function(admat, ncol.to.mutate) {
   
-  # mutate
-  ## possible positions (0's)
-  possiblePos <- which(!is.na(admat[, rand.k]) & admat[, rand.k] != 1)
-  ## current position with 1
-  ind.1 <- which(admat[, rand.k] == 1)
-  ## select new position
-  if (length(possiblePos) == 1) {
-    new.1 <- possiblePos
-  } else {
-    new.1 <- sample(possiblePos, size=1)
+  # choose a column(s) to mutate
+  K <- ncol(admat)
+  rand.ks <- sample(1:K, size=ncol.to.mutate)
+  
+  # mutate columns
+  new.admat <- admat 
+  for (rand.k in rand.ks) {
+    ## possible positions (0's)
+    possiblePos <- which(!is.na(admat[, rand.k]) & admat[, rand.k] != 1)
+    ## current position with 1
+    ind.1 <- which(admat[, rand.k] == 1)
+    ## select new position
+    if (length(possiblePos) == 1) {
+      new.1 <- possiblePos
+    } else {
+      new.1 <- sample(possiblePos, size=1)
+    }
+
+    new.admat[ind.1, rand.k] <- 0
+    new.admat[new.1, rand.k] <- 1
   }
   
-  new.admat <- admat 
-  new.admat[ind.1, rand.k] <- 0
-  new.admat[new.1, rand.k] <- 1
   
   while (sum(new.admat[1, ]) == 0) {
     new.admat <- mutate.admat(admat)
@@ -432,6 +453,8 @@ mutate.admat <- function(admat) {
   new.admat
 }
 ```
+
+## SCHISM tree scoring 
 
 ```{r admat_score} 
 decide.ht <- function(pval, alpha=0.05) {
@@ -529,17 +552,7 @@ calc.tree.fitness <- function(admat, cpov, mcmc_w, scaling.coeff=5) {
 ```{r tree_mcmc}
 set.seed(1234)
 
-mcmc_vals <- summary(samps)$statistics
-mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
-mcmc_w <- matrix(mcmc_w, nrow=K)
-colnames(mcmc_w) <- paste0("sample", 1:S)
-round(mcmc_w, 2)
 
-w[c(1,2,9,5,10,8,6,3,7,4),]
-
-mcmc_w_sd <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "SD"]
-mcmc_w_sd <- matrix(mcmc_w_sd, nrow=K)
-colnames(mcmc_w_sd) <- paste0("sample", 1:S)
 
 answer <- base.admat(mcmc_w)
 answer[1,1] <- answer[2,2] <- answer[3,7] <- answer[3,8] <- 
@@ -553,21 +566,70 @@ cpov <- create.cpov(mcmc_w, mcmc_w_sd)
 calc.tree.fitness(answer, cpov, mcmc_w)
 calc.tree.fitness(answer, cpov, w[c(1,2,9,5,10,8,6,3,7,4),])
 
-admat.chain <- list(init.admat(mcmc_w, zero.thresh=0.01))
+#admat.chain <- list(init.admat(mcmc_w, zero.thresh=0.01))
+
+# start at best
+best.admat.mcmc <- base.admat(mcmc_w)
+best.admat.mcmc[1,1] <- best.admat.mcmc[2,2] <- best.admat.mcmc[3,7] <- 
+  best.admat.mcmc[3,8] <- best.admat.mcmc[5,6] <- best.admat.mcmc[8,9] <- 
+  best.admat.mcmc[9,4] <- best.admat.mcmc[9,10] <- best.admat.mcmc[10,5] <- 
+  best.admat.mcmc[11,3] <- 1
+
+admat.chain <- list(best.admat.mcmc)
+
 score.chain <- c()
-
 numAccept = 0
-
+ncol.to.mutate <- 1 
 numIter <- 1000
 for (i in 1:numIter) {
   fit.prev <- calc.tree.fitness(admat.chain[[i]], cpov, mcmc_w)
   score.chain[i] <- fit.prev
 
-  fit.star <- 0
-  while (fit.star < 0.0001) {
-    admat.star <- mutate.admat(admat.chain[[i]])
-    fit.star <- calc.tree.fitness(admat.star, cpov, mcmc_w)
+  admat.star <- mutate.admat(admat.chain[[i]], ncol.to.mutate)
+  fit.star <- calc.tree.fitness(admat.star, cpov, mcmc_w)
+
+  r <- fit.star / fit.prev
+  u <- runif(1,0,1)
+  if(u <= r) {
+    admat.chain[[i+1]] <- admat.star
+    numAccept <- numAccept + 1
+  } else {
+    admat.chain[[i+1]] <- admat.chain[[i]]
   }
+}
+score.chain[i+1] <- calc.tree.fitness(admat.chain[[i+1]], cpov, mcmc_w)
+acceptRate <- numAccept/(numIter)
+acceptRate
+
+max(score.chain)
+max.score.ind <- which(score.chain == max(score.chain))
+if(length(max.score.ind) > 1) max.score.ind <- max.score.ind[1]
+max.admat <- admat.chain[[max.score.ind]]
+max.admat
+
+
+score_chain_master <- tibble(fitness = score.chain,
+                             iter = 1:length(score.chain),
+                             label = paste0("col mutated = ", 
+                                            ncol.to.mutate, 
+                                            "; acceptance rate = ", 
+                                            acceptRate))
+```
+
+## Mutate 2 columns
+
+```{r mutate_2_col} 
+admat.chain <- list(best.admat.mcmc)
+score.chain <- c()
+numAccept = 0
+ncol.to.mutate <- 2
+numIter <- 1000
+for (i in 1:numIter) {
+  fit.prev <- calc.tree.fitness(admat.chain[[i]], cpov, mcmc_w)
+  score.chain[i] <- fit.prev
+
+    admat.star <- mutate.admat(admat.chain[[i]], ncol.to.mutate)
+    fit.star <- calc.tree.fitness(admat.star, cpov, mcmc_w)
   
   r <- fit.star / fit.prev
   u <- runif(1,0,1)
@@ -582,11 +644,95 @@ score.chain[i+1] <- calc.tree.fitness(admat.chain[[i+1]], cpov, mcmc_w)
 acceptRate <- numAccept/(numIter)
 acceptRate
 
-plot(score.chain)
-max(score.chain)
-max.score.ind <- which(score.chain == max(score.chain))
-if(length(max.score.ind) > 1) max.score.ind <- max.score.ind[1]
-max.admat <- admat.chain[[max.score.ind]]
-max.admat
+score_chain_master <- rbind(score_chain_master, 
+                            tibble(fitness = score.chain,
+                                   iter = 1:length(score.chain),
+                                   label = paste0("col mutated = ", 
+                                                  ncol.to.mutate, 
+                                                  "; acceptance rate = ", 
+                                                  acceptRate)))
+```
+
+## Mutate 3 columns
+
+```{r mutate_3_col} 
+admat.chain <- list(best.admat.mcmc)
+score.chain <- c()
+numAccept = 0
+ncol.to.mutate <- 3
+numIter <- 1000
+for (i in 1:numIter) {
+  fit.prev <- calc.tree.fitness(admat.chain[[i]], cpov, mcmc_w)
+  score.chain[i] <- fit.prev
+
+    admat.star <- mutate.admat(admat.chain[[i]], ncol.to.mutate)
+    fit.star <- calc.tree.fitness(admat.star, cpov, mcmc_w)
+  
+  r <- fit.star / fit.prev
+  u <- runif(1,0,1)
+  if(u <= r) {
+    admat.chain[[i+1]] <- admat.star
+    numAccept <- numAccept + 1
+  } else {
+    admat.chain[[i+1]] <- admat.chain[[i]]
+  }
+}
+score.chain[i+1] <- calc.tree.fitness(admat.chain[[i+1]], cpov, mcmc_w)
+acceptRate <- numAccept/(numIter)
+acceptRate
+
+score_chain_master <- rbind(score_chain_master, 
+                            tibble(fitness = score.chain,
+                                   iter = 1:length(score.chain),
+                                   label = paste0("col mutated = ", 
+                                                  ncol.to.mutate, 
+                                                  "; acceptance rate = ", 
+                                                  acceptRate)))
+```
+
+## Mutate 4 columns
+
+```{r mutate_4_col} 
+admat.chain <- list(best.admat.mcmc)
+score.chain <- c()
+numAccept = 0
+ncol.to.mutate <- 4
+numIter <- 1000
+for (i in 1:numIter) {
+  fit.prev <- calc.tree.fitness(admat.chain[[i]], cpov, mcmc_w)
+  score.chain[i] <- fit.prev
+
+    admat.star <- mutate.admat(admat.chain[[i]], ncol.to.mutate)
+    fit.star <- calc.tree.fitness(admat.star, cpov, mcmc_w)
+  
+  r <- fit.star / fit.prev
+  u <- runif(1,0,1)
+  if(u <= r) {
+    admat.chain[[i+1]] <- admat.star
+    numAccept <- numAccept + 1
+  } else {
+    admat.chain[[i+1]] <- admat.chain[[i]]
+  }
+}
+score.chain[i+1] <- calc.tree.fitness(admat.chain[[i+1]], cpov, mcmc_w)
+acceptRate <- numAccept/(numIter)
+acceptRate
+
+score_chain_master <- rbind(score_chain_master, 
+                            tibble(fitness = score.chain,
+                                   iter = 1:length(score.chain),
+                                   label = paste0("col mutated = ", 
+                                                  ncol.to.mutate, 
+                                                  "; acceptance rate = ", 
+                                                  acceptRate)))
+
+ggplot(score_chain_master, aes(x = iter, y = fitness)) +
+  geom_line() +
+  facet_wrap(~label) +
+  ylim(0,1) +
+  theme_light()
+
+ggsave(file.path(figs.dir, "schism_scoring_mutate_cols_1-4.pdf"))
+
 ```
 
