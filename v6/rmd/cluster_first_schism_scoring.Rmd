@@ -302,7 +302,7 @@ z.plot <- ggplot(z.chain.tb, aes(variant, mcmc_z)) +
              pch=21, size=3, stroke=0)
 
 z.plot
-#gsave(file.path(figs.dir, "zplot.pdf"), z.plot, width=14, height=6)
+#gsave(file.path(figs.dir, "z_plot.pdf"), z.plot, width=14, height=6)
 ```
 
 ```{r map} 
@@ -349,6 +349,7 @@ ggplot(w_master, aes(true_w, mcmc_w)) +
   xlab(expression("True "*omega)) +
   ylab(expression("Estimated "*omega)) +
   theme_light()
+#ggsave(file.path(figs.dir, "w_plot.pdf"))
 ```
 
 ## Admat functions
