@@ -266,11 +266,15 @@ z.chain.to.tb <- function(z.chain) {
     mutate(variant = as.integer(gsub(".*\\[(.*)\\].*", "\\1", z.chain.tb$variant))) %>%
     mutate(true_z = rep(1:10, each=nrow(z.chain)*10)) %>%
     group_by(variant, mcmc_z) %>% 
-    mutate(count = n())
-  z.chain.tb_simp <- distinct(select(z.chain.tb, -c(iter)))
-  z.chain.tb_simp %>% 
+    mutate(count = n()) %>%
+    ungroup() %>%
+    mutate(iter = NULL)
+  z.chain.tb_simp <- distinct(z.chain.tb)
+  z.chain.tb_simp <- z.chain.tb_simp %>% 
     group_by(variant) %>%
     mutate(prop = count/sum(count))
+  
+  z.chain.tb_simp
 }
 
 z.chain.tb <- z.chain.to.tb(z.chain)
