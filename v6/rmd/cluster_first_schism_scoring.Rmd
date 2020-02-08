@@ -349,7 +349,7 @@ ggplot(w_master, aes(true_w, mcmc_w)) +
   xlab(expression("True "*omega)) +
   ylab(expression("Estimated "*omega)) +
   theme_light()
-#ggsave(file.path(figs.dir, "w_plot.pdf"))
+#ggsave(file.path(figs.dir, "w_plot.pdf"), height = 7, width = 8)
 ```
 
 ## Admat functions
@@ -733,7 +733,7 @@ ggplot(score_chain_master, aes(x = iter, y = fitness)) +
   ylim(0,1) +
   theme_light()
 
-ggsave(file.path(figs.dir, "schism_scoring_mutate_cols_1-4.pdf"))
+#ggsave(file.path(figs.dir, "schism_scoring_mutate_cols_1-4.pdf"))
 
 ```
 
