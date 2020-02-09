@@ -333,7 +333,14 @@ mcmc_w_sd <- matrix(mcmc_w_sd, nrow=K)
 colnames(mcmc_w_sd) <- paste0("sample", 1:S)
 
 # order true w based on mcmc cluster numbering 
-w_ordered <- w[c(1,2,9,5,10,8,6,3,7,4),]
+mcmc_cluster_numbering  <- matrix(z.map, nrow = 10)
+get_mode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+mcmc_cluster_numbering <- apply(mcmc_cluster_numbering, 2, get_mode)
+true_to_mcmc_w_ordering <- match(1:K, mcmc_cluster_numbering)
+w_ordered <- w[true_to_mcmc_w_ordering, ]
 
 # scatter
 mcmc_w_tb <- mcmc_w %>%
@@ -557,19 +564,28 @@ calc.tree.fitness <- function(admat, cpov, mcmc_w, scaling.coeff=5) {
 ```{r tree_mcmc}
 set.seed(1234)
 
-
+# true_edges <- data.frame(from = c(1, 2, 3, 3, 4, 4, 5, 6, 7, 8),
+#                          to = c(1, 2, 3, 6, 4, 5, 8, 9, 7, 10))
+# true_edges_reorder <- true_edges
+# true_edges_reorder[2:(K), 1] <- match(true_edges[2:(K), 1] - 1,
+#                                       true_to_mcmc_w_ordering) + 1
+# true_edges_reorder[, 2] <- match(true_edges[, 2],
+#                                       true_to_mcmc_w_ordering)
 
 answer <- base.admat(mcmc_w)
-answer[1,1] <- answer[2,2] <- answer[3,7] <- answer[3,8] <- 
-  answer[5,3] <- answer[8,9] <- answer[9,4] <- answer[9,10] <- 
-  answer[10,5] <- answer[11,6] <- 1
+# for (i in 1:K) {
+#   from <- true_edges_reorder[i, 1]
+#   to <- true_edges_reorder[i, 2]
+#   answer[from, to] <- 1
+# }
+answer[1,1] <- answer[2,2] <- answer[5,3] <- answer[9,4] <- answer[10,5] <- answer[11,6] <-answer[3,7] <- answer[3,8] <- answer[8,9] <- answer[9,10] <- 1
 answer
 
 
 cpov <- create.cpov(mcmc_w, mcmc_w_sd)
 
 calc.tree.fitness(answer, cpov, mcmc_w)
-calc.tree.fitness(answer, cpov, w[c(1,2,9,5,10,8,6,3,7,4),])
+calc.tree.fitness(answer, cpov, w_ordered)
 
 #admat.chain <- list(init.admat(mcmc_w, zero.thresh=0.01))
 
@@ -741,3 +757,21 @@ ggplot(score_chain_master, aes(x = iter, y = fitness)) +
 
 ```
 
+```{r num_trees} 
+restrictions <- base.admat(mcmc_w)
+
+calc_possible_trees_restrictions <- function(restrictions) {
+  prod(apply(restrictions, 2, function(x) sum(!is.na(x))))
+}
+
+formatC(calc_possible_trees_restrictions(restrictions))
+
+calc_all_trees <- function(K) {
+  total_possible <- (K+1)^K
+  no_root <- K^K
+  actual_trees <- total_possible - no_root
+  actual_trees
+}
+
+formatC(calc_all_trees(K))
+```
