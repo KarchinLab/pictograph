@@ -12,6 +12,7 @@ library(coda)
 library(ggmcmc)
 library(dplyr)
 library(gridExtra)
+library(grid)
 
 working.dir <- ".."
 models.dir <- file.path(working.dir, "models")
@@ -247,12 +248,7 @@ plot.ppd <- function(samps, test.data, K) {
 plot.ppd(samps, test.data, K)
 ```
 
-## m
 
-```{r m}
-
-
-```
 
 ## Z
 
@@ -279,7 +275,7 @@ z.chain.to.tb <- function(z.chain) {
   z.chain.tb_simp <- distinct(z.chain.tb)
   z.chain.tb_simp <- z.chain.tb_simp %>% 
     group_by(variant) %>%
-    mutate(prop = count/sum(count))
+    mutate(prop = round(count/sum(count), 2))
   
   z.chain.tb_simp
 }
@@ -324,6 +320,43 @@ z.map.tb
 z.map <- z.map.tb$mcmc_z
 z.map
 z.map.ind <- which(apply(z.chain, 1, function(x) all(x == z.map)))
+```
+
+## m
+
+```{r m}
+m.tb <- m %>% 
+  as_tibble() %>%
+  mutate(variant = 1:nrow(m)) %>%
+  gather(sample, m, -c(variant)) %>%
+  mutate(sample = as.integer(gsub("sample", "", .$sample))) %>%
+  group_by(variant, sample)
+
+m.chain.tb <- m.chain %>%
+  as_tibble() %>%
+  mutate(iter = 1:nrow(m.chain)) %>%
+  gather(label, mcmc_m, -c(iter))
+m.chain.tb <- m.chain.tb %>% 
+  mutate(variant = as.integer(gsub(".*\\[(.*),.*", "\\1", m.chain.tb$label))) %>%
+  mutate(sample = as.integer(gsub(".*,(.*)\\].*", "\\1", m.chain.tb$label))) %>%
+  mutate(true_m = rep(m.tb$m, each = nrow(m.chain)))
+m.chain.tb.simp <- m.chain.tb %>%
+  group_by(variant, sample) %>%
+  mutate(prop.m.correct = round(sum(mcmc_m == true_m) / nrow(m.chain), 2)) %>%
+  ungroup() %>%
+  mutate(iter = NULL) %>%
+  mutate(mcmc_m = NULL)
+m.chain.tb.simp <- distinct(m.chain.tb.simp) %>%
+  mutate(z.map = rep(z.map, times = S))
+m.chain.tb.simp <- m.chain.tb.simp %>% mutate(sample = as.character(m.chain.tb.simp$sample))
+
+m.plot <- ggplot(m.chain.tb.simp, aes(x=variant, prop.m.correct, colour = sample)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(10,100,10), minor_breaks=NULL) +
+  theme_light()
+z.plot.2 <- z.plot + theme(axis.title.x = element_blank(), axis.text.x = element_blank())
+grid.newpage()
+grid.draw(rbind(ggplotGrob(z.plot.2), ggplotGrob(m.plot), size = "last"))
 ```
 
 ## $\omega$
