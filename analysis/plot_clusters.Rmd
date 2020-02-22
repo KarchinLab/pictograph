@@ -1,0 +1,207 @@
+---
+title: "Clustering VAFs and CCF estimation"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: false
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+library(rjags)
+library(coda)
+library(ggmcmc)
+library(dplyr)
+library(gridExtra)
+library(stringr)
+library(fs)
+devtools::load_all(file.path("code", "clone.tools"))
+outdir <- file.path("output", "plot_clusters.Rmd")
+dir_create(outdir)
+```
+
+```{r read_chains}
+I <- 100; K <- 10; S <- 3
+set.seed(123)
+test.data <- simulateData(I, K, S)
+chains <- readRDS(file.path("output",
+                            "cluster_variants.Rmd",
+                            "chains.rds"))
+```
+
+```{r simulated_vafs}
+m2 <- test.data$m %>%
+    as_tibble() %>%
+    mutate(z=factor(test.data$z),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "multiplicity", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(test.data$p)))
+p2 <- test.data$p %>%
+    as_tibble() %>%
+    mutate(z=factor(test.data$z),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "fraction", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(test.data$p))) %>%
+    left_join(m2, by=c("z", "variant_index", "sample")) %>%
+    mutate(multiplicity=factor(multiplicity)) %>%
+    mutate(sample=str_replace(sample, "sample", "Sample ")) %>%
+    mutate(sample_index=str_replace(sample, "Sample ", "")) %>%
+    mutate(Parameter=paste0("y[", variant_index, ",", sample_index, "]"))
+ggplot(p2, aes(z, fraction)) +
+    geom_jitter(width=0.15, size=2, aes(color=multiplicity)) +
+    facet_wrap(~sample) +
+    ylab("y/n") +
+    xlab("True cluster") +
+    theme(panel.background=element_rect(fill="white", color="black"),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          legend.key=element_rect(fill="white"),
+          legend.position="bottom",
+          legend.direction="horizontal")
+ggsave(file.path(outdir, "simulated_vafs.pdf"), width=10, height=6)
+```
+
+# Sample plot, but without grouping by cluster
+
+```{r notclustered}
+set.seed(123)
+ix <- sample(1:100, 100, replace=FALSE)
+p2$variant_index <- rep(ix, 3)
+ggplot(p2, aes(fraction, variant_index)) +
+    ##geom_jitter(width=0.15, size=2, aes(color=multiplicity)) +
+    geom_point(size=2) +
+    facet_wrap(~sample) +
+    xlab("y/n") +
+    ylab("Variant index") +
+    theme(panel.background=element_rect(fill="white", color="black"),
+          axis.text=element_text(size=15),
+          axis.text.x=element_blank(),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          legend.key=element_rect(fill="white"))
+ggsave(file.path(outdir, "simulated_vafs_not_grouped.pdf"),
+       width=10, height=7)
+```
+
+```{r connect_vafs_across_samples, echo=FALSE}
+## what the data looks like by sample
+## by variant
+true_w <- test.data$w %>%
+    as_tibble() %>%
+    gather("sample", "MCF") %>%
+    mutate(sample=str_replace(sample, "sample", "Sample "))
+##true_w2 <- tibble(sample=rep(true_w$sample, each=10),
+##                  MCF=rep(true_w$MCF, each=10),
+##                  )
+ggplot(p2, aes(sample, fraction, group=variant_index)) +
+    geom_point(size=1) +
+    geom_line(aes(color=z)) +
+    ylab("y/n") +
+    xlab("") +
+    theme(axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          panel.background=element_rect(fill="white",
+                                        color="black"),
+          legend.key=element_rect(fill="white")) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+ggsave(file.path(outdir, "vafs_grouped_by_clone.pdf"), width=10, height=6)
+```
+
+## Posterior predictive distribution of the VAFs
+
+```{r ppd, echo=F}
+ystar <- chains[grep("ystar", chains$Parameter), ]
+observed <- as.numeric(t(test.data$y))
+ppd.summaries <- ystar %>%
+    group_by(Parameter) %>%
+    summarize(mean=mean(value),
+              q1=quantile(value, 0.025),
+              q3=quantile(value, 0.975)) %>%
+    mutate(observed=observed) %>%
+    mutate(Parameter=as.character(Parameter),
+           sample=sapply(strsplit(Parameter, ","), "[", 2),
+           sample=str_replace(sample, "]", "")) %>%
+    mutate(sample=paste("Sample", sample)) %>%
+    arrange(sample) %>%
+    mutate(variant_index=p2$variant_index)
+ggplot(ppd.summaries, aes(y=variant_index,
+                          x=mean,
+                          xmin=q1,
+                          xmax=q3)) +
+    geom_errorbarh(color="gray") +
+    geom_point(aes(observed, variant_index),
+               size=1.5, color="steelblue") +
+    theme(axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          panel.background=element_rect(fill="white",
+                                        color="black")) +
+    xlab("Posterior predictive distribution") +
+    ylab("Variants") +
+    facet_wrap(~sample)
+ggsave(file.path(outdir, "posterior_predictive.pdf"),
+       width=10, height=7)
+```
+
+## Z
+
+```{r zplot}
+z.chain <- chains[grep("z", chains$Parameter), ]
+mcmc_z <- relabelZ(z.chain)
+mcmc_z %>%
+    filter(value==sim_cluster) %>%
+    mutate(sim_cluster=paste0("Clone ", sim_cluster),
+           sim_cluster=factor(sim_cluster, levels=paste0("Clone ", 1:10))) %>%
+    
+    ggplot(aes(Parameter, probability)) +
+    geom_point() +
+    facet_wrap(~sim_cluster, scales="free_x") +
+    ylim(c(0, 1)) +
+    theme(axis.text.x=element_blank(),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          panel.background=element_rect(fill="white", color="black")) +
+    ylab(expression(Pr(Z==truth)))  +
+    xlab("Variants") +
+    geom_hline(yintercept=0.5, linetype="dashed", color="gray")
+ggsave(file.path(outdir, "z_probs.pdf"), width=10, height=6)
+mcmc_z <- z.chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              maxiter=max(Iteration)) %>%
+    mutate(probability=n/maxiter)
+```
+
+```{r map} 
+map_z <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(value=value[probability==max(probability)])
+z.map <- map_z$value
+```
+
+## Plot cancer cell fraction ($\omega$)
+
+```{r omega} 
+w.chain <- chains[grep("w", chains$Parameter), ]
+truth <- test.data$w
+mcmc_vals <- orderW(truth, map_z)
+ggplot(mcmc_vals, aes(mean, truth)) +
+    geom_errorbar(color="gray",
+                  aes(ymin=q1, ymax=q3)) +
+    geom_point(size=2.5) +
+    geom_abline(slope=1, intercept=0, color="gray") +
+    xlab(expression("True MCF")) +
+    ylab(expression("Estimated MCF")) +
+    theme(axis.text=element_text(size=15),
+          panel.background=element_rect(fill="white",
+                                        color="black"),
+          axis.title=element_text(size=17)) +
+ggsave(file.path(outdir, "CCF.pdf"), width=10, height=7)
+```
+
