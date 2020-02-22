@@ -2,3 +2,6 @@
 *.aux
 *.synctex.gz
 *.Rhistory
+/current-status/main_lily.pdf
+/v6/figs/w_plot_rs.pdf
+cluster_first_schism_scoring_files/
