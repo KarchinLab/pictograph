@@ -60,6 +60,7 @@ answer["root", "clone7"] <- answer["clone7", "clone1"] <-
     answer["clone10", "clone4"] <- answer["clone2", "clone3"] <-
     answer["clone9", "clone6"] <- answer["clone6", "clone5"] <- 1
 truth <- plotDAG(answer)
+truth
 ##
 ## Each clone has one and only one parent. The parent can be the root.  Practically, this implies that the columns of the adjacency matrix sum to one.
 ##
@@ -149,11 +150,10 @@ length(tab)
 freq <- as.numeric(tab)
 prob <- freq/1000
 plot(prob)
-tab2 <- tab[prob > 0.015]
+tab2 <- tab[prob > 0.01]
 ## is the true tree among those with highest probability
 tr <- numericRepresentation(answer)
 tr %in% names(tab2)
-
 
 
 
@@ -166,5 +166,11 @@ if(length(max.score.ind) > 1) max.score.ind <- max.score.ind[1]
 max.admat <- admat.chain[[max.score.ind]]
 max.admat
 
+plotDAG(max.admat)
+
+
+mostFreqTree <- names(tab[which(max(prob) == prob)])
+mostFreqAdmat <- admat.chain[[which(mostFreqTree == trees)[1]]]
+plotDAG(mostFreqAdmat)
 ```
 
