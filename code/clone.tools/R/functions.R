@@ -17,15 +17,12 @@ simulateData <- function(I, K, S){
                 nrow=K, ncol=S)
 
     colnames(w) <-  paste0("sample", 1:S)
-    w
 
     tcn <- matrix(2, nrow=I, ncol=S)
     m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
                 nrow=I, ncol=S)
     W <- w[z, ]
-    calcTheta <- function(m, tcn, w) {
-      (m * w) / (tcn * w + 2*(1-w))
-    }
+
     theta <- calcTheta(m, tcn, W)
     ##
     ## Simulate altered reads
@@ -49,6 +46,10 @@ simulateData <- function(I, K, S){
                       theta=theta,
                       p=p)
     test.data
+}
+
+calcTheta <- function(m, tcn, w) {
+  (m * w) / (tcn * w + 2*(1-w))
 }
 
 runMCMC <- function(data, K, jags.file, inits, params,
@@ -77,25 +78,26 @@ reshapeW <- function(w, S, K) {
   w.mat
 }
 
-calcLogLik <- function(z.iter, w.iter, data) {
+calcLogLik <- function(z.iter, w.iter, input.data) {
   W <- w.iter[z.iter, ]
-  theta <- calcTheta(data$m, data$tcn, W)
-  sum(dbinom(data$y, data$n, theta, log=T))
+  theta <- calcTheta(input.data$m, input.data$tcn, W)
+  sum(dbinom(as.matrix(input.data$y), as.matrix(input.data$n), as.matrix(theta), log=T))
 }
 
-calcChainLogLik <- function(samps, data, K) {
+calcChainLogLik <- function(samps, input.data, K) {
   z.chain <- getParamChain(samps, "z")
   w.chain <- getParamChain(samps, "w")
   lik <- c()
   for(iter in 1:nrow(z.chain)) {
-    z.iter <- z.chain[iter,]
-    w.iter <- reshapeW(w.chain[iter,], data$S, K)
-    lik <- c(lik, calcLogLik(z.iter, w.iter, data))
+    z.iter <- z.chain[iter, ]
+    w.iter <- reshapeW(w.chain[iter, ], input.data$S, K)
+    lik <- c(lik, calcLogLik(z.iter, w.iter, input.data))
   }
   mean(lik)
 }
 
 calcBIC <- function(n, k, ll) log(n)*k - 2*ll
+
 
 relabelZ <- function(z.chain){
   mcmc_z <- z.chain %>%
@@ -192,12 +194,21 @@ mcfMatrix <- function(mcf_stats, parameter="mean"){
 }
 
 ##base.admat <- function(MCF, zero.thresh=0.01) {
-initializeAdjacencyMatrix <- function(mcf_stats, zero.thresh=0.01) {
+chec.mcf_stats.format <- function(mcf_stats) {
+  if(all.equal(colnames(mcf_stats), c("Parameter", "sd", "mean"))) TRUE
+  else FALSE
+}
+initializeAdjacencyMatrix <- function(mcf_stats=NULL, mcf_matrix=NULL, zero.thresh=0.01) {
+    if (!is.null(mcf_stats)) {
+      MCF <- mcfMatrix(mcf_stats)
+    } else if (!is.null(mcf_matrix)) {
+      MCF <- mcf_matrix
+    } else stop("must supply either mcf_stats or mcf_matrix")
+    
     ##
     ## for each row (clone) of the MCF matrix,
     ## list indices of samples for which the clone is present
     ##
-    MCF <- mcfMatrix(mcf_stats)
     K <- nrow(MCF)
     S <- ncol(MCF)
     cluster.sample.presence <- apply(MCF, 1, function(x)
@@ -262,14 +273,19 @@ mutate.admat <- function(admat, ncol.to.mutate) {
         } else {
             new.1 <- sample(possiblePos, size=1)
         }
+        
         new.admat[ind.1, k] <- 0
         new.admat[new.1, k] <- 1
+
     }
-    ## Recursion -- why?
-    ## - requires that the root be connected
-    ##    while (sum(new.admat[1, ]) == 0) {
-    ##        new.admat <- mutate.admat(admat)
-    ##    }
+    
+    # replace root edge if missing
+    if (sum(new.admat[1, ]) == 0) {
+      otherCol <- sample(seq_len(K)[-rand.ks], size = 1)
+      ind.1 <- which(admat[, otherCol] == 1)
+      new.admat[1, otherCol] <- 1
+      new.admat[ind.1, otherCol] <- 0
+    }
     new.admat
 }
 
@@ -283,10 +299,21 @@ decide.ht <- function(pval, alpha=0.05) {
 ##
 ## What is the purpose of this function?
 ##
-create.cpov <- function(mcf_stats, alpha=0.05, zero.thresh=0.01) {
-    ##cpov <- initializeAdjacencyMatrix(mcmc_w, zero.thresh = 0.01)
-    cpov <- initializeAdjacencyMatrix(mcf_stats, zero.thresh = zero.thresh)
-    MCF <- mcfMatrix(mcf_stats)
+create.cpov <- function(mcf_stats, alpha=0.05, zero.thresh=0.01, mcf_matrix = NULL, restriction.val = 1) {
+    cpov <- NA
+    MCF <- NA
+    
+    ## if mcf_matrix is supplied, use that to create cpov
+    if (is.null(mcf_matrix)) {
+      cpov <- initializeAdjacencyMatrix(mcf_stats = mcf_stats, zero.thresh = zero.thresh)
+      cpov[is.na(cpov)] <- restriction.val
+      MCF <- mcfMatrix(mcf_stats)
+    } else {
+      cpov <- initializeAdjacencyMatrix(mcf_matrix = mcf_matrix, zero.thresh = zero.thresh)
+      cpov[is.na(cpov)] <- restriction.val
+      MCF <- mcf_matrix
+    }
+    
     sds <- mcfMatrix(mcf_stats, parameter="sd")
     ##S <- ncol(mcmc_w) # number of samples
     S <- numberSamples(mcf_stats)
@@ -362,9 +389,9 @@ calc.mass.cost <- function(admat, mcmc_w) {
     sum(mc.node)
 }
 
-calc.tree.fitness <- function(admat, cpov, mcf_stats, scaling.coeff=5) {
+calc.tree.fitness <- function(admat, cpov, mcf_matrix, scaling.coeff=5) {
     TC <- calc.topology.cost(admat, cpov)
-    MC <- calc.mass.cost(admat, mcfMatrix(mcf_stats))
+    MC <- calc.mass.cost(admat, mcf_matrix)
     Z <- TC + MC
     fitness <- exp(-scaling.coeff * Z)
     fitness
@@ -372,12 +399,85 @@ calc.tree.fitness <- function(admat, cpov, mcf_stats, scaling.coeff=5) {
 
 
 plotDAG <- function(admat){
-    dimnames(admat) <- NULL
     admat <- cbind(0, admat) ## add column for root
+    dimnames(admat)[[2]][1] <- "root"
+    dimnames(admat) <- lapply(dimnames(admat), function(x) gsub("clone", "", x))
+
     admat[is.na(admat)] <- 0
-    ## directed graph is not possible without removing root
-    ##admat2 <- admat2[-1, ]
+
     net <- network(admat, directed=TRUE)
     ggnet2(net, label=TRUE, arrow.size=12,
-           arrow.gap=0.025)
+           arrow.gap=0.025, mode = get.DAG.coords(admat))
 }
+
+get.DAG.coords <- function(admat) {
+  dat <- data.frame(label = rownames(admat), 
+                    x = 0,
+                    y = 0)
+  
+  # fix root position
+  dat[dat$label=="root", ]$x <- 0.5
+  dat[dat$label=="root", ]$y <- 1
+  
+  
+  lvls <- getNodesInLevels(admat)
+  #lvls <- lapply(lvls, function(x) gsub("clone", "", x))
+  
+  yvals <- seq(1, 0, by = -1/length(lvls))[-1]
+  for (i in 1:length(lvls)) {
+    nodes <- lvls[[i]]
+    dat[match(nodes, dat$label), ]$y <- yvals[i]
+    
+    xvals <- seq(0, 1, by = 1/(length(nodes) + 1))[-c(1, length(nodes) + 2)]
+    dat[match(nodes, dat$label), ]$x <- xvals
+  }
+  cbind(dat$x, dat$y)
+}
+
+getLevels <- function(admat) {
+  nodeNames <- rownames(admat)
+  numNodes <- nrow(admat)
+  
+  lvl <- data.frame(node = nodeNames,
+                    level = 0)
+  
+  currParents <- "root"
+  currKids <- unname(unlist(sapply(currParents, function(x) names(which(admat[x, ] == 1)))))
+  currlvl <- 1
+  
+  while (length(currKids) > 0) {
+    lvl[match(currKids, lvl$node), ]$level <- currlvl
+    currParents <- currKids
+    currKids <- unname(unlist(sapply(currParents, function(x) names(which(admat[x, ] == 1)))))
+    
+    currlvl <- currlvl + 1
+  }
+  lvl
+}
+
+getNodesInLevels <- function(admat) {
+  nodeNames <- rownames(admat)
+  numNodes <- nrow(admat)
+  
+  lvls <- list()
+  
+  currParents <- "root"
+  currKids <- unname(unlist(lapply(currParents, function(x) names(which(admat[x, ] == 1)))))
+  currlvl <- 1
+  
+  while (length(currKids) > 0) {
+    lvls[[currlvl]] <- currKids
+    currParents <- currKids
+    currKids <- unname(unlist(lapply(currParents, function(x) names(which(admat[x, ] == 1)))))
+    currlvl <- currlvl + 1
+  }
+  lvls
+}
+
+sample.w <- function(w.chain, K) {
+    numIter <- max(w.chain$Iteration)
+    randIter <- sample(numIter, size = 1)
+    w.sample <- w.chain[w.chain$Iteration == randIter, ]
+    matrix(w.sample$value, nrow = K, byrow = T)
+}
+
