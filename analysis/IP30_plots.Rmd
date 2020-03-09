@@ -1,0 +1,77 @@
+---
+title: "IP30 analysis -- plots"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rjags)
+library(coda)
+library(ggmcmc)
+library(gridExtra)
+library(stringr)
+library(fs)
+library(devtools)
+library(tidyverse)
+library(ggnet)
+library(network)
+library(sna)
+devtools::load_all(file.path("..", "code", "clone.tools"))
+
+outdir <- file.path("..", "output", "IP30.Rmd")
+dir_create(outdir)
+
+data.dir <- file.path("..", "data")
+
+```
+
+```{r chains}
+samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
+K <- 10
+samps <- samps.list[[which(kToTest == K)]]
+chains <- ggs(samps) 
+z.chain <- chains[grep("z", chains$Parameter), ]
+w.chain <- chains[grep("w", chains$Parameter), ]
+mcmc_w <- group_by(w.chain, Parameter) %>%
+    summarize(mean=mean(value))
+# chains <- readRDS(file.path("output",
+#                             "IP30.Rmd",
+#                             "chains.rds"))
+
+mcmc_z <- z.chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              maxiter=max(Iteration)) %>%
+    mutate(probability=n/maxiter)
+
+mcf_stats <- w.chain %>%
+    group_by(Parameter) %>%
+    summarize(sd=sd(value),
+              mean=mean(value))
+map_z <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(value=value[probability==max(probability)])
+##mcmc_vals <- orderW(truth, map_z)
+##mcmc_w <- matrix(mcmc_vals$mean, 10, 3, byrow=TRUE)
+
+# plot w traces
+w.traces.plot <- ggplot(w.chain, aes(x = Iteration, y = value)) +
+  geom_line() +
+  facet_wrap(~Parameter, nrow = K) +
+  theme_light()
+w.traces.plot
+ggsave(file.path(outdir, paste0("w.traces.K", K, ".pdf")),
+       w.traces.plot, 
+       height = 15, width = 15)
+
+# plot z traces
+z.traces.plot <- ggplot(z.chain, aes(x = Iteration, y = value)) +
+  geom_line() +
+  facet_wrap(~Parameter, nrow = K) +
+  theme_light()
+ggsave(file.path(outdir, paste0("z.traces.K", K, ".pdf")),
+       z.traces.plot, 
+       height = 15, width = 15)
+
+
+```
