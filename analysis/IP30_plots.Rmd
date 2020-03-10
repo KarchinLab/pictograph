@@ -19,7 +19,6 @@ library(sna)
 devtools::load_all(file.path("..", "code", "clone.tools"))
 
 outdir <- file.path("..", "output", "IP30.Rmd")
-dir_create(outdir)
 
 data.dir <- file.path("..", "data")
 
@@ -27,7 +26,7 @@ data.dir <- file.path("..", "data")
 
 ```{r chains}
 samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
-K <- 10
+K <- 15
 samps <- samps.list[[which(kToTest == K)]]
 chains <- ggs(samps) 
 z.chain <- chains[grep("z", chains$Parameter), ]
@@ -54,6 +53,10 @@ map_z <- mcmc_z %>%
 ##mcmc_vals <- orderW(truth, map_z)
 ##mcmc_w <- matrix(mcmc_vals$mean, 10, 3, byrow=TRUE)
 
+
+```
+
+```{r plot_traces}
 # plot w traces
 w.traces.plot <- ggplot(w.chain, aes(x = Iteration, y = value)) +
   geom_line() +
@@ -72,6 +75,18 @@ z.traces.plot <- ggplot(z.chain, aes(x = Iteration, y = value)) +
 ggsave(file.path(outdir, paste0("z.traces.K", K, ".pdf")),
        z.traces.plot, 
        height = 15, width = 15)
-
-
 ```
+
+```{r z}
+z.plot <- ggplot(mcmc_z, aes(x = Parameter, y = value, color = probability)) +
+  geom_point() +
+  theme_light() +
+  scale_x_discrete(labels = 1:89, name = "Variant") +
+  scale_y_continuous(breaks = 1:K, name = "Cluster")
+
+ggsave(file.path(outdir, paste0("z.plot.K", K, ".pdf")),
+       z.plot, 
+       height = K/2, width = 15)
+```
+
+
