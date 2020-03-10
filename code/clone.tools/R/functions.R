@@ -321,7 +321,7 @@ create.cpov <- function(mcf_stats, alpha=0.05, zero.thresh=0.01, mcf_matrix = NU
     ## root can go to anyone -- all 0's (default base admat value)
     for (r in 2:nrow(cpov)) {
         for (c in 1:ncol(cpov)) {
-            if (is.na(cpov[r,c])) next # skip restricted position
+            if (cpov[r,c] == restriction.val) next # skip restricted position
             from <- r-1 # 'from' cluster node
             to <- c # 'to' cluster node
             statistic <- 0
