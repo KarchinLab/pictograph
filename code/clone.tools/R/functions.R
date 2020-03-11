@@ -583,3 +583,8 @@ sample.w <- function(w.chain, K) {
     matrix(w.sample$value, nrow = K, byrow = T)
 }
 
+numericRepresentation <- function(x){
+  x[is.na(x)] <- 0
+  x <- as.numeric(x)
+  paste(x, collapse="")
+}
