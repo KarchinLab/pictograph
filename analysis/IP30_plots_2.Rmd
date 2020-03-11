@@ -18,7 +18,7 @@ library(network)
 library(sna)
 devtools::load_all(file.path("..", "code", "clone.tools"))
 
-outdir <- file.path("..", "output", "IP30.Rmd")
+outdir <- file.path("..", "output", "IP30_2.Rmd")
 
 data.dir <- file.path("..", "data")
 
@@ -55,7 +55,7 @@ input.data <- list("I" = I, "S" = S,
 
 ```{r chains}
 samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
-K <- 15
+K <- 14
 kToTest <- 5:15
 samps <- samps.list[[which(kToTest == K)]]
 chains <- ggs(samps) 
@@ -108,15 +108,23 @@ ggsave(file.path(outdir, paste0("z.traces.K", K, ".pdf")),
 ```
 
 ```{r z}
+z.seg.tb <- mcmc_z %>%
+  group_by(Parameter) %>%
+  summarize(z1 = min(value), z2 = max(value))
+
 z.plot <- ggplot(mcmc_z, aes(x = Parameter, y = value, color = probability)) +
-  geom_point() +
   theme_light() +
   scale_x_discrete(labels = 1:89, name = "Variant") +
-  scale_y_continuous(breaks = 1:K, name = "Cluster")
+  scale_y_continuous(breaks = 1:K, name = "Cluster") +
+  geom_segment(data = z.seg.tb, 
+           aes(x=Parameter, xend=Parameter,
+           y=z1, yend=z2),
+           color="black", linetype=2) +
+  geom_point()
 
 ggsave(file.path(outdir, paste0("z.plot.K", K, ".pdf")),
        z.plot, 
-       height = K/2, width = 15)
+       height = K/3, width = 15)
 ```
 
 ```{r vafs}
@@ -149,5 +157,29 @@ ggplot(p2, aes(z, fraction)) +
           legend.key=element_rect(fill="white"),
           legend.position="bottom",
           legend.direction="horizontal")
+ggsave(file.path(outdir, paste0("simulated_vafs.K", K, ".pdf")),
+       width=10, height=7)
+```
+
+```{r connect_vafs_across_samples, echo=FALSE}
+## what the data looks like by sample
+## by variant
+
+ggplot(p2, aes(sample, fraction, group=variant_index)) +
+    geom_point(size=1) +
+    geom_line(aes(color=z)) +
+    ylab("y/n") +
+    xlab("") +
+    theme(axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          panel.background=element_rect(fill="white",
+                                        color="black"),
+          legend.key=element_rect(fill="white")) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+ggsave(file.path(outdir, paste0("vafs_grouped_by_clone.K", K, ".pdf")), width=10, height=6)
+```
+
+```{r mcf}
+
 
 ```

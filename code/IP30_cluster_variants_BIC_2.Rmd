@@ -18,7 +18,7 @@ library(network)
 library(sna)
 devtools::load_all(file.path("..", "code", "clone.tools"))
 
-outdir <- file.path("..", "output", "IP30.Rmd")
+outdir <- file.path("..", "output", "IP30_2.Rmd")
 dir_create(outdir)
 
 data.dir <- file.path("..", "data")
@@ -43,6 +43,7 @@ n <- mut.data %>%
 m <- mut.data %>%
   select(sample, mut_id, m) %>%
   spread(sample, m)
+m[m == 0] <- 1
 
 tcn <- mut.data %>%
   select(sample, mut_id, tcn) %>%
@@ -60,7 +61,7 @@ input.data <- list("I" = I, "S" = S,
 ```{r}
 all(input.data$tcn > 0)
 all(input.data$tcn >= input.data$m)
-all(which(input.data$m == 0) == which(input.data$y) == 0)
+all.equal(which(input.data$m == 0), which(input.data$y == 0))
 ```
 
 ## Cluster variants, BIC
@@ -92,8 +93,8 @@ BIC.plot <- ggplot(BIC_tb, aes(x = k, y = BIC)) +
   scale_x_continuous(breaks = kToTest)
 BIC.plot
 
-# ggsave(file.path(outdir, "IP30_BIC_k5to15.pdf"),
-#        BIC.plot)
+ggsave(file.path(outdir, "IP30_BIC_k5to15.pdf"),
+       BIC.plot)
 
 best <- which.min(BIC)
 best.k <- kToTest[best]
