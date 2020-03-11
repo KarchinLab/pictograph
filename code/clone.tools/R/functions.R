@@ -48,6 +48,57 @@ simulateData <- function(I, K, S){
     test.data
 }
 
+simulateData2 <- function(I, K, S){
+  pi <- rep(0.1, 10)
+  ##z <- sample(1:K, size = I, replace = T, prob = pi)
+  ## True cancer cell fraction
+  z <- rep(1:10, each=10)
+  w <- matrix(c(0.98, 0.99, 0.97, 
+                0.98, 0.90, 0.82,
+                0.55, 0.00, 0.80, 
+                0.20, 0.00, 0.50,
+                0.30, 0.00, 0.30, 
+                0.43, 0.90, 0.00,
+                0.30, 0.70, 0.00,
+                0.20, 0.00, 0.00,
+                0.00, 0.00, 0.30,
+                0.00, 0.50, 0.00),
+              byrow=T,
+              nrow=K, ncol=S)
+  
+  colnames(w) <-  paste0("sample", 1:S)
+  
+  tcn <- matrix(2, nrow=I, ncol=S)
+  m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
+              nrow=I, ncol=S)
+  W <- w[z, ]
+  m[w==0] <- 0
+  
+  theta <- calcTheta(m, tcn, W)
+  ##
+  ## Simulate altered reads
+  ##
+  n <- replicate(S, rpois(I, 100))
+  y <- matrix(NA, nrow=I, ncol=S)
+  for (i in 1:I) {
+    for (s in 1:S) {
+      y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+    }
+  }
+  
+  p <- y/n
+  colnames(w) <- colnames(p) <- paste0("sample", 1:S)
+  colnames(m) <- colnames(p)
+  test.data <- list("I" = I, "S" = S, "K" = K, 
+                    "y" = y, "n" = n,
+                    "m" = m, "tcn" = tcn,
+                    z=z,
+                    w=w,
+                    theta=theta,
+                    p=p)
+  test.data
+}
+
 calcTheta <- function(m, tcn, w) {
   (m * w) / (tcn * w + 2*(1-w))
 }
@@ -399,6 +450,7 @@ calc.tree.fitness <- function(admat, cpov, mcf_matrix, scaling.coeff=5) {
 
 
 plotDAG <- function(admat){
+    admat.untouched <- admat
     admat <- cbind(0, admat) ## add column for root
     dimnames(admat)[[2]][1] <- "root"
     dimnames(admat) <- lapply(dimnames(admat), function(x) gsub("clone", "", x))
@@ -407,7 +459,7 @@ plotDAG <- function(admat){
 
     net <- network(admat, directed=TRUE)
     ggnet2(net, label=TRUE, arrow.size=12,
-           arrow.gap=0.025, mode = get.DAG.coords(admat))
+           arrow.gap=0.025, mode = get.DAG.coords.2(admat.untouched))
 }
 
 get.DAG.coords <- function(admat) {
@@ -434,12 +486,62 @@ get.DAG.coords <- function(admat) {
   cbind(dat$x, dat$y)
 }
 
+
+get.DAG.coords.2 <- function(admat) {
+  nodeInfo <- getNodeInfo(admat)
+  nodeInfo$x <- 0
+  nodeInfo$y <- 0
+  
+  # fix root position
+  nodeInfo[nodeInfo$node=="root", ]$x <- 0.5
+  nodeInfo[nodeInfo$node=="root", ]$y <- 1
+  
+  yvals <- seq(1, 0, by = -1/max(nodeInfo$level))[-1]
+
+  
+  for (i in 1:max(nodeInfo$level)-1) {
+    
+    parents <- nodeInfo[nodeInfo$level == i, ]$node 
+    for (parent in parents) {
+      if(nodeInfo[nodeInfo$node == parent, ]$numKids == 0) next
+      kids <- nodeInfo[which(nodeInfo$parent == parent), ]$node
+      
+      # set y vals
+      nodeInfo[match(kids, nodeInfo$node), ]$y <- yvals[i+1]
+      
+      # set x vals
+      if (parent == "root") {
+        xvals <- seq(0, 1, by = 1/(length(kids) + 1))[-c(1, length(kids) + 2)]
+        nodeInfo[match(kids, nodeInfo$node), ]$x <- xvals
+      } else {
+        p.x <- nodeInfo[which(nodeInfo$node == parent), ]$x
+        r <- 0.05 * length(kids)
+        xvals <- seq(p.x - (r/2), p.x + (r/2), length.out = length(kids))
+        nodeInfo[match(kids, nodeInfo$node), ]$x <- xvals
+      }
+    }
+  }
+  cbind(nodeInfo$x, nodeInfo$y)
+}
+
+getNodeInfo <- function(admat) {
+  nodeInfo <- getLevels(admat)
+  nodeInfo$parent <- NA
+  for (r in 2:nrow(nodeInfo)) {
+    nodeInfo$parent[r] <- names(which(admat[, r-1] == 1))
+    
+  }
+  nodeInfo$numKids <- rowSums(admat, na.rm = T)
+  nodeInfo
+}
+
 getLevels <- function(admat) {
   nodeNames <- rownames(admat)
   numNodes <- nrow(admat)
   
   lvl <- data.frame(node = nodeNames,
-                    level = 0)
+                    level = 0, 
+                    stringsAsFactors = F)
   
   currParents <- "root"
   currKids <- unname(unlist(sapply(currParents, function(x) names(which(admat[x, ] == 1)))))
