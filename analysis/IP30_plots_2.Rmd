@@ -248,6 +248,39 @@ mostFreqAdmat <- admat.chain.thinned[[which(mostFreqTree[1] == trees)[1]]]
 plotDAG(mostFreqAdmat)
 
 
-order(admat.chain.thinned, scores.chain.thinned)
+sc <- tibble(score = score.chain.thinned,
+             index = 1:length(score.chain.thinned)) %>%
+  arrange(desc(score))
+top.10.score <- sc[1:10, ]
+
+pr <- tibble(prob = prob,
+             tree = names(tab)) %>%
+  arrange(desc(prob))
+top.10.freq <- pr[1:10, ] 
+
+
+
+tree.plot.dir <- file.path(outdir, "trees")
+dir_create(tree.plot.dir)
+
+for (i in 1:nrow(top.10.score)) {
+  adm <- admat.chain.thinned[[top.10.score$index[i]]]
+  score <- top.10.score$score[i]
+  dag <- plotDAG(adm)
+  dag.file <- file.path(tree.plot.dir, 
+                        paste0("top.score_", i, ".score_", score, ".pdf"))
+  ggsave(dag.file, dag)
+}
+
+
+
+for (i in 1:10) {
+  adm <- admat.chain.thinned[[match(pr[1:10, ]$tree, trees)[i]]]
+  f <- top.10.freq$prob[i]
+  dag <- plotDAG(adm)
+  dag.file <- file.path(tree.plot.dir, 
+                        paste0("top.freq_", i, ".freq_", f, ".pdf"))
+  ggsave(dag.file, dag)
+}
 
 ```
