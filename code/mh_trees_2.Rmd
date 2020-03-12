@@ -93,42 +93,36 @@ score.chain <- calc.tree.fitness(admat.chain[[1]], cpov.chain[[1]], sampled.w.ch
 
 numAccept  <-  0
 ncol.to.mutate <- 1 
-numIter <- 1000
-N <- 10
-THIN <- 1
-#probs <- rep(0, N)
-#accept <- rep(0, N)
+numIter <- 10000
+
 for (i in seq_len(numIter)) {
-#    for(j in seq_len(THIN)){
-        fit.prev <- score.chain[i]
-        ##
-        ## Propose edge
-        ##
-        admat.star <- mutate.admat(admat.chain[[i]], ncol.to.mutate)
-        proposed <- plotDAG(admat.star)
-        if(FALSE){
-            fig <- arrangeGrob(truth, proposed)
-            grid.draw(fig)
-        }
-        sampled.w.star <- sample.w(w.chain, K)
-        cpov.star <- create.cpov(mcf_stats, mcf_matrix = sampled.w.star)
-        fit.star <- calc.tree.fitness(admat.star, cpov, sampled.w.star)
-        r <- fit.star / fit.prev
-        u <- runif(1, 0, 1)
-        if(u <= r) {
-            
-            admat.chain[[i+1]] <- admat.star
-            numAccept <- numAccept + 1
-            score.chain <- c(score.chain, fit.star)
-            cpov.chain[[i+1]] <- cpov.star
-            sampled.w.chain[[i+1]] <- sampled.w.star
-        } else {
-            admat.chain[[i+1]] <- admat.chain[[i]]
-            score.chain <- c(score.chain, fit.prev)
-            cpov.chain[[i+1]] <- cpov.chain[[i]]
-            sampled.w.chain[[i+1]] <- sampled.w.chain[[i]]
-        }
-#    }
+    fit.prev <- score.chain[i]
+    ##
+    ## Propose edge
+    ##
+    admat.star <- mutate.admat(admat.chain[[i]], ncol.to.mutate)
+    proposed <- plotDAG(admat.star)
+    if(FALSE){
+        fig <- arrangeGrob(truth, proposed)
+        grid.draw(fig)
+    }
+    sampled.w.star <- sample.w(w.chain, K)
+    cpov.star <- create.cpov(mcf_stats, mcf_matrix = sampled.w.star)
+    fit.star <- calc.tree.fitness(admat.star, cpov, sampled.w.star)
+    r <- fit.star / fit.prev
+    u <- runif(1, 0, 1)
+    if(u <= r) {
+        admat.chain[[i+1]] <- admat.star
+        numAccept <- numAccept + 1
+        score.chain <- c(score.chain, fit.star)
+        cpov.chain[[i+1]] <- cpov.star
+        sampled.w.chain[[i+1]] <- sampled.w.star
+    } else {
+        admat.chain[[i+1]] <- admat.chain[[i]]
+        score.chain <- c(score.chain, fit.prev)
+        cpov.chain[[i+1]] <- cpov.chain[[i]]
+        sampled.w.chain[[i+1]] <- sampled.w.chain[[i]]
+    }
 }
 results <- list(admat.chain=admat.chain,
                 score.chain=score.chain,
@@ -136,41 +130,5 @@ results <- list(admat.chain=admat.chain,
                 sampled.w.chain=sampled.w.chain,
                 numAccept=numAccept)
 saveRDS(results, file.path("..", "output", "mh_trees_2.Rmd", "trees.rds"))
-##
-## posterior distribution of trees
-##
-numericRepresentation <- function(x){
-    x[is.na(x)] <- 0
-    x <- as.numeric(x)
-    paste(x, collapse="")
-}
-trees <- sapply(admat.chain, numericRepresentation)
-tab <- table(trees)
-length(tab)
-freq <- as.numeric(tab)
-prob <- freq/1000
-plot(prob)
-tab2 <- tab[prob > 0.01]
-## is the true tree among those with highest probability
-tr <- numericRepresentation(answer)
-tr %in% names(tab2)
-
-
-
-acceptRate <- numAccept/(numIter)
-acceptRate
-
-max(score.chain)
-max.score.ind <- which(score.chain == max(score.chain))
-if(length(max.score.ind) > 1) max.score.ind <- max.score.ind[1]
-max.admat <- admat.chain[[max.score.ind]]
-max.admat
-
-plotDAG(max.admat)
-
-
-mostFreqTree <- names(tab[which(max(prob) == prob)])
-mostFreqAdmat <- admat.chain[[which(mostFreqTree == trees)[1]]]
-plotDAG(mostFreqAdmat)
 ```
 
