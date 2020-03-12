@@ -86,6 +86,8 @@ map_z <- mcmc_z %>%
 
 ```
 
+# Traces of w and z chains
+
 ```{r plot_traces}
 # plot w traces
 w.traces.plot <- ggplot(w.chain, aes(x = Iteration, y = value)) +
@@ -107,6 +109,8 @@ ggsave(file.path(outdir, paste0("z.traces.K", K, ".pdf")),
        height = 15, width = 15)
 ```
 
+# Variant z plot
+
 ```{r z}
 z.seg.tb <- mcmc_z %>%
   group_by(Parameter) %>%
@@ -126,6 +130,8 @@ ggsave(file.path(outdir, paste0("z.plot.K", K, ".pdf")),
        z.plot, 
        height = K/3, width = 15)
 ```
+
+# VAFs 
 
 ```{r vafs}
 m2 <- input.data$m %>%
@@ -157,7 +163,7 @@ ggplot(p2, aes(z, fraction)) +
           legend.key=element_rect(fill="white"),
           legend.position="bottom",
           legend.direction="horizontal")
-ggsave(file.path(outdir, paste0("simulated_vafs.K", K, ".pdf")),
+ggsave(file.path(outdir, paste0("IP30_vafs.K", K, ".pdf")),
        width=10, height=7)
 ```
 
@@ -179,7 +185,69 @@ ggplot(p2, aes(sample, fraction, group=variant_index)) +
 ggsave(file.path(outdir, paste0("vafs_grouped_by_clone.K", K, ".pdf")), width=10, height=6)
 ```
 
-```{r mcf}
+# Trees results
 
+```{r thin}
+results <- readRDS(file.path("..", "output", "IP30_2.Rmd", "trees.rds"))
+numIter <- length(results$score.chain)
+
+thin <- 10
+
+thin_chain <- function(thin, x) {
+  if (thin > 1) {
+    # keep only thinned rows
+    x_thinned <- x[(seq_len(length(x)) %% thin) == 1]
+  } else {
+    x_thinned <- x
+  }
+  x_thinned
+}
+
+score.chain.thinned <- thin_chain(thin, results$score.chain)
+
+thinned.tb <- tibble(score = score.chain.thinned, 
+                     iter = seq_len(length(score.chain.thinned)),
+                     log.score = log(score.chain.thinned))
+
+ggplot(thinned.tb, aes(x = iter, y = log.score)) +
+  geom_line() +
+  theme_light()
+
+full.tb <- tibble(score = results$score.chain, 
+                  iter = seq_len(length(results$score.chain)),
+                  log.score = log(results$score.chain))
+ggplot(full.tb, aes(x = iter, y = log.score)) +
+  geom_line() +
+  theme_light()
+
+
+admat.chain.thinned <- thin_chain(thin, results$admat.chain)
+sampled.w.chain.thinned <- thin_chain(thin, results$sampled.w.chain)
+```
+
+# Posterior distribution of trees
+
+```{r trees}
+trees <- sapply(admat.chain.thinned, numericRepresentation)
+tab <- table(trees)
+length(tab)
+freq <- as.numeric(tab)
+prob <- freq/sum(tab)
+plot(prob)
+#tab2 <- tab[prob > 0.01]
+
+max(score.chain.thinned)
+max.score.ind <- which(score.chain.thinned == max(score.chain.thinned))
+if(length(max.score.ind) > 1) max.score.ind <- max.score.ind[1]
+max.admat <- admat.chain.thinned[[max.score.ind]]
+max.admat
+plotDAG(max.admat)
+
+mostFreqTree <- names(tab[which(max(prob) == prob)])
+mostFreqAdmat <- admat.chain.thinned[[which(mostFreqTree[1] == trees)[1]]]
+plotDAG(mostFreqAdmat)
+
+
+order(admat.chain.thinned, scores.chain.thinned)
 
 ```
