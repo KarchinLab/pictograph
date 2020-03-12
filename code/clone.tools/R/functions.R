@@ -515,9 +515,14 @@ get.DAG.coords.2 <- function(admat) {
         nodeInfo[match(kids, nodeInfo$node), ]$x <- xvals
       } else {
         p.x <- nodeInfo[which(nodeInfo$node == parent), ]$x
-        r <- 0.05 * length(kids)
-        xvals <- seq(p.x - (r/2), p.x + (r/2), length.out = length(kids))
-        nodeInfo[match(kids, nodeInfo$node), ]$x <- xvals
+        if (length(kids) == 1) {
+          nodeInfo[match(kids, nodeInfo$node), ]$x <- p.x
+        } else {
+          r <- 0.05*(max(nodeInfo$level)-i)* length(kids)
+          xvals <- seq(p.x - (r/2), p.x + (r/2), length.out = length(kids))
+          nodeInfo[match(kids, nodeInfo$node), ]$x <- xvals
+        }
+        
       }
     }
   }
