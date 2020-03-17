@@ -13,7 +13,7 @@ library(stringr)
 library(fs)
 library(devtools)
 library(tidyverse)
-library(ggnet)
+library(GGally)
 library(network)
 library(sna)
 devtools::load_all(file.path("..", "code", "clone.tools"))
@@ -35,17 +35,9 @@ numIter <- length(results$score.chain)
 
 thin <- 10
 
-thin_chain <- function(thin, x) {
-  if (thin > 1) {
-    # keep only thinned rows
-    x_thinned <- x[(seq_len(length(x)) %% thin) == 1]
-  } else {
-    x_thinned <- x
-  }
-  x_thinned
-}
+thin.ind <- seq(1, numIter, length.out = round(numIter/thin, 1))
 
-score.chain.thinned <- thin_chain(thin, results$score.chain)
+score.chain.thinned <- results$score.chain[thin.ind]
 
 thinned.tb <- tibble(score = score.chain.thinned, 
                      iter = seq_len(length(score.chain.thinned)),
@@ -63,8 +55,8 @@ ggplot(full.tb, aes(x = iter, y = log.score)) +
   theme_light()
 
 
-admat.chain.thinned <- thin_chain(thin, results$admat.chain)
-sampled.w.chain.thinned <- thin_chain(thin, results$sampled.w.chain)
+admat.chain.thinned <- results$admat.chain[thin.ind]
+sampled.w.chain.thinned <- results$sampled.w.chain[thin.ind]
 ```
 
 # Posterior distribution of trees
@@ -74,55 +66,52 @@ trees <- sapply(admat.chain.thinned, numericRepresentation)
 tab <- table(trees)
 length(tab)
 freq <- as.numeric(tab)
-prob <- freq/sum(tab)
+prob <- freq/sum(freq)
 plot(prob)
-#tab2 <- tab[prob > 0.01]
-
-max(score.chain.thinned)
-max.score.ind <- which(score.chain.thinned == max(score.chain.thinned))
-if(length(max.score.ind) > 1) max.score.ind <- max.score.ind[1]
-max.admat <- admat.chain.thinned[[max.score.ind]]
-max.admat
-plotDAG(max.admat)
-
-mostFreqTree <- names(tab[which(max(prob) == prob)])
-mostFreqAdmat <- admat.chain.thinned[[which(mostFreqTree[1] == trees)[1]]]
-plotDAG(mostFreqAdmat)
 
 
-sc <- tibble(score = score.chain.thinned,
-             index = 1:length(score.chain.thinned)) %>%
-  arrange(desc(score))
-top.10.score <- sc[1:10, ]
 
-pr <- tibble(prob = prob,
-             tree = names(tab)) %>%
-  arrange(desc(prob))
-top.10.freq <- pr[1:10, ] 
+tb <- tibble(prob = prob,
+             tree = names(tab))
+tb <- tb %>%
+  mutate(index = match(tb$tree, trees)) 
+tb <- tb %>%
+  mutate(score = score.chain.thinned[tb$index])
 
 
 
 tree.plot.dir <- file.path(outdir, "trees")
 dir_create(tree.plot.dir)
 
-for (i in 1:nrow(top.10.score)) {
-  adm <- admat.chain.thinned[[top.10.score$index[i]]]
-  score <- top.10.score$score[i]
-  dag <- plotDAG(adm)
-  dag.file <- file.path(tree.plot.dir, 
-                        paste0("top.score_", i, ".score_", score, ".pdf"))
-  ggsave(dag.file, dag)
-}
-
-
-
+tb <- tb %>%
+  arrange(desc(score))
+top.score.plots <- list()
 for (i in 1:10) {
-  adm <- admat.chain.thinned[[match(pr[1:10, ]$tree, trees)[i]]]
-  f <- top.10.freq$prob[i]
-  dag <- plotDAG(adm)
-  dag.file <- file.path(tree.plot.dir, 
-                        paste0("top.freq_", i, ".freq_", f, ".pdf"))
-  ggsave(dag.file, dag)
+  adm <- admat.chain.thinned[[tb$index[i]]]
+  dag <- plotDAG(adm) + 
+    ggtitle(paste0("Rank ", i, 
+                   ", freq = ", round(tb$prob[i], 4),
+                   ", score = ", round(tb$score[i], 3)))
+  top.score.plots[[i]] <- dag
 }
 
+tb <- tb %>%
+  arrange(desc(prob))
+top.freq.plots <- list()
+for (i in 1:10) {
+  adm <- admat.chain.thinned[[tb$index[i]]]
+  dag <- plotDAG(adm) + 
+    ggtitle(paste0("Rank ", i, 
+                   ", freq = ", round(tb$prob[i], 4),
+                   ", score = ", round(tb$score[i], 3)))
+  top.freq.plots[[i]] <- dag
+
+}
+
+
+score.plots <- do.call(grid.arrange, c(top.score.plots, nrow=4))
+ggsave(file.path(tree.plot.dir, "top.10.score.trees.pdf"), score.plots, width = 15, height = 20)
+
+freq.plots <- do.call(grid.arrange, c(top.freq.plots, nrow=4))
+ggsave(file.path(tree.plot.dir, "top.10.freq.trees.pdf"), freq.plots, width = 15, height = 20)
 ```
