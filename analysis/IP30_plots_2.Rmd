@@ -13,7 +13,7 @@ library(stringr)
 library(fs)
 library(devtools)
 library(tidyverse)
-library(ggnet)
+library(GGally)
 library(network)
 library(sna)
 devtools::load_all(file.path("..", "code", "clone.tools"))
@@ -193,17 +193,9 @@ numIter <- length(results$score.chain)
 
 thin <- 10
 
-thin_chain <- function(thin, x) {
-  if (thin > 1) {
-    # keep only thinned rows
-    x_thinned <- x[(seq_len(length(x)) %% thin) == 1]
-  } else {
-    x_thinned <- x
-  }
-  x_thinned
-}
+thin.ind <- seq(1, numIter, length.out = round(numIter/thin, 1))
 
-score.chain.thinned <- thin_chain(thin, results$score.chain)
+score.chain.thinned <- results$score.chain[thin.ind]
 
 thinned.tb <- tibble(score = score.chain.thinned, 
                      iter = seq_len(length(score.chain.thinned)),
@@ -221,8 +213,8 @@ ggplot(full.tb, aes(x = iter, y = log.score)) +
   theme_light()
 
 
-admat.chain.thinned <- thin_chain(thin, results$admat.chain)
-sampled.w.chain.thinned <- thin_chain(thin, results$sampled.w.chain)
+admat.chain.thinned <- results$admat.chain[thin.ind]
+sampled.w.chain.thinned <- results$sampled.w.chain[thin.ind]
 ```
 
 # Posterior distribution of trees
