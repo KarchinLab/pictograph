@@ -5,7 +5,7 @@ output: pdf_document
 
 
 ```{r setup, include=FALSE}
-library(ggnet)
+library(GGally)
 library(network)
 library(sna)
 ##library(rjags)

@@ -337,7 +337,54 @@ mutate.admat <- function(admat, ncol.to.mutate) {
       new.admat[1, otherCol] <- 1
       new.admat[ind.1, otherCol] <- 0
     }
+    
+    # fix bidirectional edge if present
+    while (is.bidirectional(new.admat)) {
+      new.admat <- fix.bidirectional(new.admat)
+    }
+    
     new.admat
+}
+
+is.bidirectional <- function(admat) {
+  numClones <- ncol(admat)
+  for (i in seq_len(numClones)) {
+    for (j in seq_len(numClones)) {
+      s <- sum(admat[i+1, j], admat[j+1, i], na.rm = TRUE)
+      if (s == 2) return(TRUE)
+    }
+  }
+  
+  FALSE
+}
+
+fix.bidirectional <- function(admat) {
+  numClones <- ncol(admat)
+  for (i in seq_len(numClones)) {
+    for (j in seq_len(numClones)) {
+      s <- sum(admat[i+1, j], admat[j+1, i], na.rm = TRUE)
+      if (s == 2) {
+        # pick one edge to change
+        to <- sample(c(i,j), size = 1)
+        
+        new.admat <- admat
+        ## possible positions (0's)
+        possiblePos <- which(!is.na(admat[, to]) & admat[, to] != 1)
+        ## current position with 1
+        ind.1 <- which(admat[, to] == 1)
+        ## select new position
+        if (length(possiblePos) == 1) {
+          new.1 <- possiblePos
+        } else {
+          new.1 <- sample(possiblePos, size=1)
+        }
+        
+        new.admat[ind.1, to] <- 0
+        new.admat[new.1, to] <- 1
+        return(new.admat)
+      }
+    }
+  }
 }
 
 decide.ht <- function(pval, alpha=0.05) {
