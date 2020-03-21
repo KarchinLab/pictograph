@@ -86,6 +86,18 @@ map_z <- mcmc_z %>%
 
 ```
 
+# Variants in each cluster
+
+```{r}
+muts <- y$mut_id
+muts.z <- map_z %>%
+  mutate(Mutation = muts) %>%
+  arrange(value) %>%
+  rename(Cluster = value)
+write.table(muts.z, file.path(outdir, "mutations_map_z.tsv"),
+            sep = "\t", quote = F, col.names = T, row.names = F)
+```
+
 # Traces of w and z chains
 
 ```{r plot_traces}
