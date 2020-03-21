@@ -1,8 +1,8 @@
-simulateData <- function(I, K, S){
-    pi <- rep(0.1, 10)
+simulateData <- function(I, K, S, avg.cov=100){
+    pi <- rep(1/K, K)
     ##z <- sample(1:K, size = I, replace = T, prob = pi)
     ## True cancer cell fraction
-    z <- rep(1:10, each=10)
+    z <- rep(1:K, each=I/K)
     w <- matrix(c(0.98, 0.99, 0.97, 
                   0.98, 0.90, 0.82,
                   0.55, 0.00, 0.80, 
@@ -27,7 +27,7 @@ simulateData <- function(I, K, S){
     ##
     ## Simulate altered reads
     ##
-    n <- replicate(S, rpois(I, 100))
+    n <- replicate(S, rpois(I, avg.cov))
     y <- matrix(NA, nrow=I, ncol=S)
     for (i in 1:I) {
       for (s in 1:S) {
@@ -150,7 +150,7 @@ calcChainLogLik <- function(samps, input.data, K) {
 calcBIC <- function(n, k, ll) log(n)*k - 2*ll
 
 
-relabelZ <- function(z.chain){
+relabelZ <- function(z.chain, I, K){
   mcmc_z <- z.chain %>%
       group_by(Parameter, value) %>%
       summarize(n=n(),
@@ -159,7 +159,7 @@ relabelZ <- function(z.chain){
   map_z  <- mcmc_z %>%
       group_by(Parameter) %>%
       summarize(map=value[probability==max(probability)]) %>%
-      mutate(original_label=rep(1:10, each=10)) %>%
+      mutate(original_label=rep(1:K, each=I/K)) %>%
       ungroup() %>%
       group_by(original_label) %>%
       summarize(value=names(sort(table(map), decreasing=TRUE))[1],
@@ -168,7 +168,7 @@ relabelZ <- function(z.chain){
   sim_cluster <- mcmc_z %>%
       group_by(Parameter) %>%
       summarize(n=n()) %>%
-      mutate(sim_cluster=rep(1:10, each=10)) %>%
+      mutate(sim_cluster=rep(1:K, each=I/K)) %>%
       select(-n)
   mcmc_z <- z.chain %>%
       left_join(map_z, by="value") %>%
