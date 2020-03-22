@@ -213,6 +213,10 @@ rand.admat <- function(admat) {
     admat <- mutate.admat(admat)
   }
   
+  while (is.bidirectional(admat)) {
+    admat <- fix.bidirectional(admat)
+  }
+  
   admat
 }
 
