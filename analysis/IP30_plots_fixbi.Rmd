@@ -54,7 +54,8 @@ input.data <- list("I" = I, "S" = S,
 ```
 
 ```{r chains}
-samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
+samps.list <- readRDS(file.path("..", "output", "IP30_2.Rmd",
+                                "samps.list.rds"))
 K <- 14
 kToTest <- 5:15
 samps <- samps.list[[which(kToTest == K)]]

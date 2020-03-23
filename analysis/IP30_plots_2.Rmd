@@ -55,7 +55,7 @@ input.data <- list("I" = I, "S" = S,
 
 ```{r chains}
 samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
-K <- 14
+K <- 12
 kToTest <- 5:15
 samps <- samps.list[[which(kToTest == K)]]
 chains <- ggs(samps) 
@@ -94,7 +94,16 @@ muts.z <- map_z %>%
   mutate(Mutation = muts) %>%
   arrange(value) %>%
   rename(Cluster = value)
-write.table(muts.z, file.path(outdir, "mutations_map_z.tsv"),
+write.table(muts.z, file.path(outdir, paste0("mutations_map_z_K", K, ".tsv")),
+            sep = "\t", quote = F, col.names = T, row.names = F)
+```
+
+# Mean w
+```{r}
+mcf_matrix <- round(mcfMatrix(mcf_stats),2)
+colnames(mcf_matrix) <- colnames(input.data$y)
+write.table(mcf_matrix,
+            file.path(outdir, paste0("mean_mcf_matrix_K", K, ".tsv")),
             sep = "\t", quote = F, col.names = T, row.names = F)
 ```
 
