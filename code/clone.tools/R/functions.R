@@ -220,7 +220,7 @@ rand.admat <- function(admat) {
   admat
 }
 
-numberClones <- function(mcf_stats){
+numberClusters <- function(mcf_stats){
     params <- as.character(mcf_stats$Parameter)
     K <- strsplit(params, ",") %>%
         sapply("[", 1) %>%
@@ -239,7 +239,7 @@ numberSamples <- function(mcf_stats){
 }
 
 mcfMatrix <- function(mcf_stats, parameter="mean"){
-    K <- numberClones(mcf_stats)
+    K <- numberClusters(mcf_stats)
     S <- numberSamples(mcf_stats)
     if(parameter=="mean")
         MCF <- matrix(mcf_stats$mean, K, S, byrow=TRUE)
@@ -261,8 +261,8 @@ initializeAdjacencyMatrix <- function(mcf_stats=NULL, mcf_matrix=NULL, zero.thre
     } else stop("must supply either mcf_stats or mcf_matrix")
     
     ##
-    ## for each row (clone) of the MCF matrix,
-    ## list indices of samples for which the clone is present
+    ## for each row (cluster) of the MCF matrix,
+    ## list indices of samples for which the cluster is present
     ##
     K <- nrow(MCF)
     S <- ncol(MCF)
@@ -299,8 +299,8 @@ initializeAdjacencyMatrix <- function(mcf_stats=NULL, mcf_matrix=NULL, zero.thre
     ## Add root
     ## can go from root to anyone
     admat <- rbind(0, admat)
-    dimnames(admat) <- list(c("root", paste0("clone", seq_len(K))),
-                            paste0("clone", seq_len(K)))
+    dimnames(admat) <- list(c("root", paste0("cluster", seq_len(K))),
+                            paste0("cluster", seq_len(K)))
     admat
 }
 
@@ -351,9 +351,9 @@ mutate.admat <- function(admat, ncol.to.mutate) {
 }
 
 is.bidirectional <- function(admat) {
-  numClones <- ncol(admat)
-  for (i in seq_len(numClones)) {
-    for (j in seq_len(numClones)) {
+  numClusters <- ncol(admat)
+  for (i in seq_len(numClusters)) {
+    for (j in seq_len(numClusters)) {
       s <- sum(admat[i+1, j], admat[j+1, i], na.rm = TRUE)
       if (s == 2) return(TRUE)
     }
@@ -363,9 +363,9 @@ is.bidirectional <- function(admat) {
 }
 
 fix.bidirectional <- function(admat) {
-  numClones <- ncol(admat)
-  for (i in seq_len(numClones)) {
-    for (j in seq_len(numClones)) {
+  numClusters <- ncol(admat)
+  for (i in seq_len(numClusters)) {
+    for (j in seq_len(numClusters)) {
       s <- sum(admat[i+1, j], admat[j+1, i], na.rm = TRUE)
       if (s == 2) {
         # pick one edge to change
@@ -504,7 +504,7 @@ plotDAG <- function(admat){
     admat.untouched <- admat
     admat <- cbind(0, admat) ## add column for root
     dimnames(admat)[[2]][1] <- "root"
-    dimnames(admat) <- lapply(dimnames(admat), function(x) gsub("clone", "", x))
+    dimnames(admat) <- lapply(dimnames(admat), function(x) gsub("cluster", "", x))
 
     admat[is.na(admat)] <- 0
 
@@ -524,7 +524,7 @@ get.DAG.coords <- function(admat) {
   
   
   lvls <- getNodesInLevels(admat)
-  #lvls <- lapply(lvls, function(x) gsub("clone", "", x))
+  #lvls <- lapply(lvls, function(x) gsub("cluster", "", x))
   
   yvals <- seq(1, 0, by = -1/length(lvls))[-1]
   for (i in 1:length(lvls)) {
