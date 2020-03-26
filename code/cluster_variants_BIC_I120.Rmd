@@ -84,7 +84,7 @@ BIC.plot <- ggplot(BIC_tb, aes(x = k, y = BIC)) +
   geom_line() +
   theme_light() +
   scale_x_continuous(breaks = kToTest) +
-  geom_point(data = min.BIC.tb, color = "blue")
+  geom_point(data = min.BIC.tb, color = "blue", size = 3)
 BIC.plot
 
 ggsave(file.path(outdir, "BIC_k5to15.pdf"),
