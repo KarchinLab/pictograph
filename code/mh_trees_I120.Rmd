@@ -23,14 +23,25 @@ dir_create(outdir)
 # MH-sampler for tree
 
 ```{r chains}
-I <- 120; K <- 11; S <- 3
-# I <- 120; K <- 10; S <- 3
+# I <- 120; K <- 11; S <- 3
+I <- 120; K <- 10; S <- 3
 # set.seed(123)
 # input.data <- simulateData(I, K, S)
-chains <- readRDS(file.path("..",
-                                "output",
-                                "cluster_variants_BIC_I120.Rmd",
-                                "chains_K11.rds"))
+# chains <- readRDS(file.path("..",
+#                                 "output",
+#                                 "cluster_variants_BIC_I120.Rmd",
+#                                 "chains_K11.rds"))
+
+samps.list <- readRDS(file.path("..", "output", 
+                                "cluster_variants_BIC_I120.Rmd", 
+                                "samps.list.rds"))
+kToTest <- 5:15
+samps <- samps.list[[match(10, kToTest)]]
+chains <- ggs(samps)
+saveRDS(chains, file.path("..", "output", 
+                                "cluster_variants_BIC_I120.Rmd", 
+                                paste0("chains_K", K, ".rds")))
+
 w.chain <- chains[grep("w", chains$Parameter), ]
 # truth <- input.data$w
 z.chain <- chains[grep("z", chains$Parameter), ]
@@ -122,6 +133,6 @@ results <- list(admat.chain=admat.chain,
                 cpov.chain=cpov.chain,
                 sampled.w.chain=sampled.w.chain,
                 numAccept=numAccept)
-saveRDS(results, file.path("..", "output", "mh_trees_I120.Rmd", "trees_50k_notThinned.rds"))
+saveRDS(results, file.path("..", "output", "mh_trees_I120.Rmd", paste0("trees_50k_notThinned_K", K ,".rds")))
 ```
 

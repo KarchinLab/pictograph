@@ -26,7 +26,7 @@ dir_create(outdir)
 I <- 100; K <- 10; S <- 3
 #set.seed(123)
 #test.data <- simulateData(I, K, S)
-results <- readRDS(file.path("..", "output", "mh_trees_I120.Rmd", "trees_50k_notThinned.rds"))
+results <- readRDS(file.path("..", "output", "mh_trees_I120.Rmd", "trees_50k_notThinned_K10.rds"))
 ```
 
 # thin chains
@@ -106,8 +106,8 @@ for (i in 1:10) {
 
 
 score.plots <- do.call(grid.arrange, c(top.score.plots, nrow=4))
-ggsave(file.path(outdir, "top.10.score.trees.pdf"), score.plots, width = 15, height = 20)
+ggsave(file.path(outdir, paste0("K", K, "_top.10.score.trees.pdf")), score.plots, width = 15, height = 20)
 
 freq.plots <- do.call(grid.arrange, c(top.freq.plots, nrow=4))
-ggsave(file.path(outdir, "top.10.freq.trees.pdf"), freq.plots, width = 15, height = 20)
+ggsave(file.path(outdir, paste0("K", K, "_top.10.freq.trees.pdf")), freq.plots, width = 15, height = 20)
 ```

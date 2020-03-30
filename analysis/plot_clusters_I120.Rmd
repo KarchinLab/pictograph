@@ -26,9 +26,12 @@ dir_create(outdir)
 I <- 120; K <- 10; S <- 3
 set.seed(123)
 test.data <- simulateData(I, K, S)
+# chains <- readRDS(file.path("..", "output",
+#                             "cluster_variants_BIC_I120.Rmd",
+#                             "chains_K11.rds"))
 chains <- readRDS(file.path("..", "output",
                             "cluster_variants_BIC_I120.Rmd",
-                            "chains_K11.rds"))
+                            "chains_K10.rds"))
 
 z.chain <- chains[grep("z", chains$Parameter), ]
 w.chain <- chains[grep("w", chains$Parameter), ]
@@ -36,7 +39,7 @@ w.chain <- chains[grep("w", chains$Parameter), ]
 
 ```{r plot_traces}
 # plot w traces
-K=11
+K=10
 w.traces.plot <- ggplot(w.chain, aes(x = Iteration, y = value)) +
   geom_line() +
   facet_wrap(~Parameter, nrow = K) +
@@ -248,7 +251,7 @@ mcmc_z <- mcmc_z %>%
 z.plot <- ggplot(mcmc_z, aes(x = Variant, y = value, color = probability)) +
   theme_light() +
   scale_x_continuous(breaks = 1:I, name = "Variant") +
-  scale_y_continuous(breaks = 1:11, name = "Cluster") +
+  scale_y_continuous(breaks = 1:K, name = "Cluster") +
   geom_segment(data = z.seg.tb, 
            aes(x=Variant, xend=Variant,
            y=z1, yend=z2),
@@ -257,7 +260,6 @@ z.plot <- ggplot(mcmc_z, aes(x = Variant, y = value, color = probability)) +
   facet_wrap(~true_z, scales = "free_x")
 
 z.plot
-K=11
 ggsave(file.path(outdir, paste0("z.plot.K", K, ".pdf")),
        z.plot, 
        height = 8, width = 15)
