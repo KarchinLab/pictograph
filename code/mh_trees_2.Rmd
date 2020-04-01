@@ -1,5 +1,5 @@
 ---
-title: "MH-sampler for clone trees"
+title: "MH-sampler for cluster trees"
 output: pdf_document
 ---
 
@@ -15,7 +15,7 @@ library(dplyr)
 library(gridExtra)
 library(stringr)
 library(fs)
-devtools::load_all(file.path("..", "code", "clone.tools"))
+devtools::load_all(file.path("..", "code", "cluster.tools"))
 outdir <- file.path("..", "output", "mh_trees_2.Rmd")
 dir_create(outdir)
 ```
@@ -54,15 +54,15 @@ map_z <- mcmc_z %>%
 set.seed(1234)
 ## construct adjacency matrix
 answer <- initializeAdjacencyMatrix(mcf_stats, 0.01)
-answer["root", "clone7"] <- answer["clone7", "clone1"] <-
-    answer["clone1", "clone8"] <- answer["clone1", "clone9"] <-
-    answer["clone8", "clone10"] <- answer["clone8", "clone2"] <-
-    answer["clone10", "clone4"] <- answer["clone2", "clone3"] <-
-    answer["clone9", "clone6"] <- answer["clone6", "clone5"] <- 1
+answer["root", "cluster7"] <- answer["cluster7", "cluster1"] <-
+    answer["cluster1", "cluster8"] <- answer["cluster1", "cluster9"] <-
+    answer["cluster8", "cluster10"] <- answer["cluster8", "cluster2"] <-
+    answer["cluster10", "cluster4"] <- answer["cluster2", "cluster3"] <-
+    answer["cluster9", "cluster6"] <- answer["cluster6", "cluster5"] <- 1
 truth <- plotDAG(answer)
 truth
 ##
-## Each clone has one and only one parent. The parent can be the root.  Practically, this implies that the columns of the adjacency matrix sum to one.
+## Each cluster has one and only one parent. The parent can be the root.  Practically, this implies that the columns of the adjacency matrix sum to one.
 ##
 stopifnot(all(colSums(answer, na.rm=TRUE) == 1))
 ## cluster precedence order violation matrix

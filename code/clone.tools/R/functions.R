@@ -644,3 +644,9 @@ numericRepresentation <- function(x){
   x <- as.numeric(x)
   paste(x, collapse="")
 }
+
+plainAdmat <- function(admat) {
+  plain <- cbind(root = rep(0, nrow(admat)), admat)
+  plain[is.na(plain)] <- 0
+  plain
+}

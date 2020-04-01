@@ -16,6 +16,7 @@ library(tidyverse)
 library(GGally)
 library(network)
 library(sna)
+library(pcalg)
 devtools::load_all(file.path("..", "code", "clone.tools"))
 
 outdir <- file.path("..", "output", "plot_trees_I120.Rmd")
