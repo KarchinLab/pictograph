@@ -1,0 +1,294 @@
+---
+title: "IP30 analysis -- plots"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rjags)
+library(coda)
+library(ggmcmc)
+library(gridExtra)
+library(stringr)
+library(fs)
+library(devtools)
+library(tidyverse)
+library(GGally)
+library(network)
+library(sna)
+devtools::load_all(file.path("..", "code", "clone.tools"))
+
+outdir <- file.path("..", "output", "IP30_spikenslab.Rmd")
+
+data.dir <- file.path("..", "data")
+
+```
+
+```{r data}
+data.file <- file.path(data.dir, "IP30_test_input.tsv")
+mut.data <- read.table(data.file, sep = "\t", header = T, stringsAsFactors = F) %>%
+  as_tibble()
+
+y <- mut.data %>%
+  select(sample, mut_id, y) %>%
+  spread(sample, y)
+
+n <- mut.data %>%
+  select(sample, mut_id, n) %>%
+  spread(sample, n)
+
+m <- mut.data %>%
+  select(sample, mut_id, m) %>%
+  spread(sample, m)
+
+tcn <- mut.data %>%
+  select(sample, mut_id, tcn) %>%
+  spread(sample, tcn)
+
+S <- length(unique(mut.data$sample))
+I <- length(unique(mut.data$mut_id))
+
+input.data <- list("I" = I, "S" = S,
+                   "y" = y[, 2:(S+1)], "n" = n[, 2:(S+1)],
+                   "m" = m[, 2:(S+1)], "tcn" = tcn[, 2:(S+1)])
+```
+
+```{r chains}
+samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
+K <- 15
+kToTest <- 5:20
+samps <- samps.list[[which(kToTest == K)]]
+chains <- ggs(samps) 
+z.chain <- chains[grep("z\\[", chains$Parameter), ]
+w.chain <- chains[grep("w", chains$Parameter), ]
+mcmc_w <- group_by(w.chain, Parameter) %>%
+    summarize(mean=mean(value))
+# chains <- readRDS(file.path("output",
+#                             "IP30.Rmd",
+#                             "chains.rds"))
+
+mcmc_z <- z.chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              maxiter=max(Iteration)) %>%
+    mutate(probability=n/maxiter)
+
+mcf_stats <- w.chain %>%
+    group_by(Parameter) %>%
+    summarize(sd=sd(value),
+              mean=mean(value))
+map_z <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(value=value[probability==max(probability)])
+##mcmc_vals <- orderW(truth, map_z)
+##mcmc_w <- matrix(mcmc_vals$mean, 10, 3, byrow=TRUE)
+
+round(mcfMatrix(mcf_stats),2)
+```
+
+# Variants in each cluster
+
+```{r}
+muts <- y$mut_id
+muts.z <- map_z %>%
+  mutate(Mutation = muts) %>%
+  arrange(value) %>%
+  rename(Cluster = value)
+write.table(muts.z, file.path(outdir, paste0("mutations_map_z_K", K, ".tsv")),
+            sep = "\t", quote = F, col.names = T, row.names = F)
+```
+
+# Mean w
+```{r}
+mcf_matrix <- round(mcfMatrix(mcf_stats),2)
+colnames(mcf_matrix) <- colnames(input.data$y)
+write.table(mcf_matrix,
+            file.path(outdir, paste0("mean_mcf_matrix_K", K, ".tsv")),
+            sep = "\t", quote = F, col.names = T, row.names = F)
+```
+
+# Traces of w and z chains
+
+```{r plot_traces}
+# plot w traces
+w.traces.plot <- ggplot(w.chain, aes(x = Iteration, y = value)) +
+  geom_line() +
+  facet_wrap(~Parameter, nrow = K) +
+  theme_light()
+w.traces.plot
+ggsave(file.path(outdir, paste0("w.traces.K", K, ".pdf")),
+       w.traces.plot, 
+       height = 15, width = 15)
+
+# plot z traces
+z.traces.plot <- ggplot(z.chain, aes(x = Iteration, y = value)) +
+  geom_line() +
+  facet_wrap(~Parameter, nrow = K) +
+  theme_light()
+ggsave(file.path(outdir, paste0("z.traces.K", K, ".pdf")),
+       z.traces.plot, 
+       height = 15, width = 15)
+```
+
+# Variant z plot
+
+```{r z}
+z.seg.tb <- mcmc_z %>%
+  group_by(Parameter) %>%
+  summarize(z1 = min(value), z2 = max(value))
+
+z.plot <- ggplot(mcmc_z, aes(x = Parameter, y = value, color = probability)) +
+  theme_light() +
+  scale_x_discrete(labels = 1:89, name = "Variant") +
+  scale_y_continuous(breaks = 1:K, name = "Cluster") +
+  geom_segment(data = z.seg.tb, 
+           aes(x=Parameter, xend=Parameter,
+           y=z1, yend=z2),
+           color="black", linetype=2) +
+  geom_point()
+
+ggsave(file.path(outdir, paste0("z.plot.K", K, ".pdf")),
+       z.plot, 
+       height = K/3, width = 15)
+```
+
+# VAFs 
+
+```{r vafs}
+m2 <- input.data$m %>%
+    as_tibble() %>%
+    mutate(z=factor(map_z$value),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "multiplicity", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(input.data$m)))
+p2 <- (input.data$y / input.data$n) %>%
+    as_tibble() %>%
+    mutate(z=factor(map_z$value),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "fraction", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(input.data$m))) %>%
+    left_join(m2, by=c("z", "variant_index", "sample")) %>%
+    mutate(multiplicity=factor(multiplicity)) %>%
+    #mutate(sample=str_replace(sample, "sample", "Sample ")) %>%
+    mutate(sample_index=match(sample, levels(m2$sample))) %>%
+    mutate(Parameter=paste0("y[", variant_index, ",", sample_index, "]"))
+ggplot(p2, aes(z, fraction)) +
+    geom_jitter(width=0.15, size=2, aes(color=multiplicity)) +
+    facet_wrap(~sample) +
+    ylab("y/n") +
+    xlab("Cluster") +
+    theme(panel.background=element_rect(fill="white", color="black"),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          legend.key=element_rect(fill="white"),
+          legend.position="bottom",
+          legend.direction="horizontal")
+ggsave(file.path(outdir, paste0("IP30_vafs.K", K, ".pdf")),
+       width=10, height=7)
+```
+
+```{r connect_vafs_across_samples, echo=FALSE}
+## what the data looks like by sample
+## by variant
+
+ggplot(p2, aes(sample, fraction, group=variant_index)) +
+    geom_point(size=1) +
+    geom_line(aes(color=z)) +
+    ylab("y/n") +
+    xlab("") +
+    theme(axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          panel.background=element_rect(fill="white",
+                                        color="black"),
+          legend.key=element_rect(fill="white")) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+ggsave(file.path(outdir, paste0("vafs_grouped_by_clone.K", K, ".pdf")), width=10, height=6)
+```
+
+# Trees results
+
+```{r thin}
+results <- readRDS(file.path("..", "output", "IP30_2.Rmd", "trees.rds"))
+numIter <- length(results$score.chain)
+
+thin <- 10
+
+thin.ind <- seq(1, numIter, length.out = round(numIter/thin, 1))
+
+score.chain.thinned <- results$score.chain[thin.ind]
+
+thinned.tb <- tibble(score = score.chain.thinned, 
+                     iter = seq_len(length(score.chain.thinned)),
+                     log.score = log(score.chain.thinned))
+
+ggplot(thinned.tb, aes(x = iter, y = log.score)) +
+  geom_line() +
+  theme_light()
+
+full.tb <- tibble(score = results$score.chain, 
+                  iter = seq_len(length(results$score.chain)),
+                  log.score = log(results$score.chain))
+ggplot(full.tb, aes(x = iter, y = log.score)) +
+  geom_line() +
+  theme_light()
+
+
+admat.chain.thinned <- results$admat.chain[thin.ind]
+sampled.w.chain.thinned <- results$sampled.w.chain[thin.ind]
+```
+
+# Posterior distribution of trees
+
+```{r trees}
+trees <- sapply(admat.chain.thinned, numericRepresentation)
+tab <- table(trees)
+length(tab)
+freq <- as.numeric(tab)
+prob <- freq/sum(freq)
+plot(prob)
+
+
+tb <- tibble(prob = prob,
+             tree = names(tab))
+tb <- tb %>%
+  mutate(index = match(tb$tree, trees)) 
+tb <- tb %>%
+  mutate(score = score.chain.thinned[tb$index])
+
+
+tree.plot.dir <- file.path(outdir, "trees")
+dir_create(tree.plot.dir)
+
+
+tb <- tb %>%
+  arrange(desc(score))
+top.score.plots <- list()
+for (i in 1:10) {
+  adm <- admat.chain.thinned[[tb$index[i]]]
+  dag <- plotDAG(adm) + 
+    ggtitle(paste0("Rank ", i, 
+                   ", freq = ", round(tb$prob[i], 4),
+                   ", score = ", round(tb$score[i], 3)))
+  top.score.plots[[i]] <- dag
+}
+
+tb <- tb %>%
+  arrange(desc(prob))
+top.freq.plots <- list()
+for (i in 1:10) {
+  adm <- admat.chain.thinned[[tb$index[i]]]
+  dag <- plotDAG(adm) + 
+    ggtitle(paste0("Rank ", i, 
+                   ", freq = ", round(tb$prob[i], 4),
+                   ", score = ", round(tb$score[i], 3)))
+  top.freq.plots[[i]] <- dag
+}
+
+score.plots <- do.call(grid.arrange, c(top.score.plots, nrow=4))
+ggsave(file.path(tree.plot.dir, "top.10.score.trees.pdf"), score.plots, width = 15, height = 20)
+
+freq.plots <- do.call(grid.arrange, c(top.freq.plots, nrow=4))
+ggsave(file.path(tree.plot.dir, "top.10.freq.trees.pdf"), freq.plots, width = 15, height = 20)
+
+```

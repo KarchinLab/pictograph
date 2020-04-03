@@ -1,0 +1,116 @@
+---
+title: "MH-sampler for cluster trees"
+output: pdf_document
+---
+
+
+```{r setup, include=FALSE}
+library(GGally)
+library(network)
+library(sna)
+##library(rjags)
+library(coda)
+library(ggmcmc)
+library(dplyr)
+library(gridExtra)
+library(stringr)
+library(fs)
+devtools::load_all(file.path("..", "code", "clone.tools"))
+outdir <- file.path("..", "output", "mh_trees_spikenslab.Rmd")
+dir_create(outdir)
+```
+
+# MH-sampler for tree
+
+```{r chains}
+I <- 120; K <- 10; S <- 3
+set.seed(123)
+input.data <- readRDS(file.path("..", "output",
+                                "cluster_variants_BIC_spikenslab.Rmd",
+                                "input.data.rds"))
+# chains <- readRDS(file.path("..", "output",
+#                             "cluster_variants_BIC_spikenslab.Rmd",
+#                             "chains_K10.rds"))
+# w.chain <- chains[grep("w", chains$Parameter), ]
+# z.chain <- chains[grep("z", chains$Parameter), ]
+w.chain <- readRDS(file.path("..", "output",
+                            "cluster_variants_BIC_spikenslab.Rmd",
+                            "K10_w_chain_relabeled.rds"))
+z.chain <- readRDS(file.path("..", "output",
+                            "cluster_variants_BIC_spikenslab.Rmd",
+                            "K10_z_chain_relabeled.rds"))
+
+truth <- input.data$w
+mcmc_z <- z.chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              maxiter=max(Iteration)) %>%
+    mutate(probability=n/maxiter)
+
+mcf_stats <- w.chain %>%
+    group_by(Parameter) %>%
+    summarize(sd=sd(value),
+              mean=mean(value))
+map_z <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(value=value[probability==max(probability)])
+##mcmc_vals <- orderW(truth, map_z)
+##mcmc_w <- matrix(mcmc_vals$mean, 10, 3, byrow=TRUE)
+```
+
+```{r}
+set.seed(1234)
+## construct adjacency matrix
+# answer <- initializeAdjacencyMatrix(mcf_stats, 0.01)
+# answer["root", "cluster7"] <- answer["cluster7", "cluster1"] <-
+#     answer["cluster1", "cluster8"] <- answer["cluster1", "cluster9"] <-
+#     answer["cluster8", "cluster10"] <- answer["cluster8", "cluster2"] <-
+#     answer["cluster10", "cluster4"] <- answer["cluster2", "cluster3"] <-
+#     answer["cluster9", "cluster6"] <- answer["cluster6", "cluster5"] <- 1
+# truth <- plotDAG(answer)
+# truth
+
+
+sampled.w.chain <- list(sample.w(w.chain, K))
+init_admat <- initializeAdjacencyMatrix(mcf_stats = mcf_stats, mcf_matrix = sampled.w.chain[[1]])
+admat.chain <- list(rand.admat(init_admat))
+cpov.chain <- list(create.cpov(mcf_stats = mcf_stats, mcf_matrix = sampled.w.chain[[1]]))
+score.chain <- calc.tree.fitness(admat.chain[[1]], cpov.chain[[1]], sampled.w.chain[[1]])
+
+numAccept  <-  0
+ncol.to.mutate <- 1 
+numIter <- 50000
+
+for (i in seq_len(numIter)) {
+    fit.prev <- score.chain[i]
+    ##
+    ## Propose edge
+    ##
+    admat.star <- mutate.admat(admat.chain[[i]], ncol.to.mutate)
+
+    sampled.w.star <- sample.w(w.chain, K)
+    cpov.star <- create.cpov(mcf_stats, mcf_matrix = sampled.w.star)
+    fit.star <- calc.tree.fitness(admat.star, cpov.star, sampled.w.star)
+    r <- fit.star / fit.prev
+    u <- runif(1, 0, 1)
+    if(u <= r) {
+        admat.chain[[i+1]] <- admat.star
+        numAccept <- numAccept + 1
+        score.chain <- c(score.chain, fit.star)
+        cpov.chain[[i+1]] <- cpov.star
+        sampled.w.chain[[i+1]] <- sampled.w.star
+    } else {
+        admat.chain[[i+1]] <- admat.chain[[i]]
+        score.chain <- c(score.chain, fit.prev)
+        cpov.chain[[i+1]] <- cpov.chain[[i]]
+        sampled.w.chain[[i+1]] <- sampled.w.chain[[i]]
+    }
+}
+results <- list(admat.chain=admat.chain,
+                score.chain=score.chain,
+                cpov.chain=cpov.chain,
+                sampled.w.chain=sampled.w.chain,
+                numAccept=numAccept)
+saveRDS(results, file.path(outdir, paste0("trees_50k_notThinned_K", K ,".rds")))
+```
+

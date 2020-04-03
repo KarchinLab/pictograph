@@ -1,0 +1,369 @@
+---
+title: "Clustering VAFs and CCF estimation"
+site: workflowr::wflow_site
+output:
+  workflowr::wflow_html:
+    toc: false
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+library(rjags)
+library(coda)
+library(ggmcmc)
+library(dplyr)
+library(gridExtra)
+library(stringr)
+library(fs)
+devtools::load_all(file.path("..", "code", "clone.tools"))
+outdir <- file.path("..", "output", "plot_clusters_spikenslab_mapclusters.Rmd")
+dir_create(outdir)
+```
+
+```{r read_chains}
+I <- 120; K <- 10; S <- 3
+set.seed(123)
+input.data <- readRDS(file.path("..", "output",
+                                "cluster_variants_BIC_spikenslab.Rmd",
+                                "input.data.rds"))
+# chains <- readRDS(file.path("..", "output",
+#                             "cluster_variants_BIC_I120.Rmd",
+#                             "chains_K11.rds"))
+chains <- readRDS(file.path("..", "output",
+                            "cluster_variants_BIC_spikenslab.Rmd",
+                            "chains_K10.rds"))
+
+z.chain <- chains[grep("z\\[", chains$Parameter), ]
+w.chain <- chains[grep("w", chains$Parameter), ]
+```
+
+
+```{r z_mappings}
+mcmc_z <- z.chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              maxiter=max(Iteration)) %>%
+    mutate(probability=n/maxiter) %>%
+    ungroup()
+
+map_z <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(value=value[probability==max(probability)]) %>%
+    mutate(Variant = 1:I, true_z = rep(1:10, each=12))
+
+z_mappings <- map_z %>%
+  select(Variant, true_z, value) %>%
+  rename("mcmc_z" = "value")
+
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+z_mappings <- z_mappings %>%
+  group_by(true_z) %>%
+  summarize(mcmc_z = getmode(mcmc_z))
+```
+
+```{r relabel}
+w.chain.relabeled <- w.chain %>%
+  mutate(k = as.numeric(gsub("w\\[", "", sapply(w.chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
+  mutate(s = gsub("\\]", "", sapply(w.chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][2])))
+w.chain.relabeled <- w.chain.relabeled %>%
+  mutate(new_k = match(w.chain.relabeled$k, z_mappings$mcmc_z)) 
+w.chain.relabeled <- w.chain.relabeled %>%
+  mutate(new_Parameter = paste0("w[", new_k, ",", s, "]")) %>%
+  arrange(new_k, s)
+w.chain.relabeled <- w.chain.relabeled %>%
+  select(Iteration, Chain, new_Parameter, value) %>%
+  rename("Parameter" = "new_Parameter")
+w.chain.relabeled <- w.chain.relabeled %>%
+  mutate(Parameter = factor(w.chain.relabeled$Parameter, levels = unique(w.chain.relabeled$Parameter)))
+
+z.chain.relabeled <- z.chain %>%
+  mutate(new_value = match(value, z_mappings$mcmc_z))
+z.chain.relabeled <- z.chain.relabeled %>%
+  select(Iteration, Chain, Parameter, new_value) %>%
+  rename("value" = "new_value")
+```
+
+
+```{r replace_chains}
+z.chain <- z.chain.relabeled
+w.chain <- w.chain.relabeled
+
+
+saveRDS(z.chain, file.path("..", "output",
+                            "cluster_variants_BIC_spikenslab.Rmd",
+                            "K10_z_chain_relabeled.rds"))
+saveRDS(w.chain, file.path("..", "output",
+                            "cluster_variants_BIC_spikenslab.Rmd",
+                            "K10_w_chain_relabeled.rds"))
+```
+
+```{r plot_traces}
+# plot w traces
+w.traces.plot <- ggplot(w.chain, aes(x = Iteration, y = value)) +
+  geom_line() +
+  facet_wrap(~Parameter, nrow = K) +
+  theme_light()
+w.traces.plot
+ggsave(file.path(outdir, paste0("w.traces.K", K, ".pdf")),
+       w.traces.plot, 
+       height = 15, width = 15)
+
+# plot z traces
+z.traces.plot <- ggplot(z.chain, aes(x = Iteration, y = value)) +
+  geom_line() +
+  facet_wrap(~Parameter, nrow = K) +
+  theme_light()
+ggsave(file.path(outdir, paste0("z.traces.K", K, ".pdf")),
+       z.traces.plot, 
+       height = 15, width = 15)
+```
+
+## Z
+
+```{r zplot}
+mcmc_z <- relabelZ(z.chain, I, K)
+mcmc_z %>%
+    filter(value==sim_cluster) %>%
+    mutate(sim_cluster=paste0("Cluster ", sim_cluster),
+           sim_cluster=factor(sim_cluster, levels=paste0("Cluster ", 1:K))) %>%
+    
+    ggplot(aes(Parameter, probability)) +
+    geom_point() +
+    facet_wrap(~sim_cluster, scales="free_x") +
+    ylim(c(0, 1)) +
+    theme(axis.text.x=element_blank(),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          panel.background=element_rect(fill="white", color="black")) +
+    ylab(expression(Pr(Z==truth)))  +
+    xlab("Variants") +
+    geom_hline(yintercept=0.5, linetype="dashed", color="gray")
+ggsave(file.path(outdir, "z_probs.pdf"), width=10, height=6)
+
+```
+
+# Variant z plot
+
+```{r z}
+true_z_tb <- tibble(true_z = rep(1:K, each=I/K),
+                    Parameter = paste0("z[", 1:I, "]"))
+
+mcmc_z <- z.chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              maxiter=max(Iteration)) %>%
+    mutate(probability=n/maxiter) %>%
+    ungroup()
+
+map_z <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(value=value[probability==max(probability)]) %>%
+    mutate(Variant = 1:I, true_z = rep(1:K, each=I/K))
+z.map <- map_z$value
+
+z.seg.tb <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(z1 = min(value), z2 = max(value)) %>%
+    ungroup() %>%
+    mutate(true_z = rep(1:K, each=I/K),
+           Variant = 1:I)
+
+mcmc_z <- mcmc_z %>%
+    inner_join(., true_z_tb) %>%
+    mutate(Variant = as.numeric(gsub("\\]", "", gsub("z\\[", "", mcmc_z$Parameter))))
+
+z.plot <- ggplot(mcmc_z, aes(x = Variant, y = value, color = probability)) +
+  theme_light() +
+  scale_x_continuous(breaks = 1:I, name = "Variant") +
+  scale_y_continuous(breaks = 1:K, name = "Cluster") +
+  geom_segment(data = z.seg.tb, 
+           aes(x=Variant, xend=Variant,
+           y=z1, yend=z2),
+           color="black", linetype=2) +
+  geom_point() +
+  facet_wrap(~true_z, scales = "free_x")
+
+z.plot
+ggsave(file.path(outdir, paste0("z.plot.K", K, ".pdf")),
+       z.plot, 
+       height = 8, width = 15)
+
+
+# map z plot 
+map.z.plot <- ggplot(map_z, aes(x = Variant, y = value)) +
+  theme_light() +
+  scale_x_continuous(breaks = 1:I, name = "Variant") +
+  scale_y_continuous(breaks = 1:K, name = "Cluster") +
+  geom_point() +
+  facet_wrap(~true_z, scales = "free_x")
+ggsave(file.path(outdir, paste0("map.z.plot.K", K, ".pdf")),
+       map.z.plot, 
+       height = 8, width = 15)
+```
+
+
+
+
+
+```{r simulated_vafs}
+
+m2 <- input.data$m %>%
+    as_tibble() %>%
+    mutate(z=factor(input.data$z),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "multiplicity", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(input.data$p)))
+p2 <- input.data$p %>%
+    as_tibble() %>%
+    mutate(z=factor(input.data$z),
+           variant_index=seq_len(nrow(.))) %>%
+    gather("sample", "fraction", -c(z, variant_index)) %>%
+    mutate(sample=factor(sample, levels=colnames(input.data$p))) %>%
+    left_join(m2, by=c("z", "variant_index", "sample")) %>%
+    mutate(multiplicity=factor(multiplicity)) %>%
+    mutate(sample=str_replace(sample, "sample", "Sample ")) %>%
+    mutate(sample_index=str_replace(sample, "Sample ", "")) %>%
+    mutate(Parameter=paste0("y[", variant_index, ",", sample_index, "]"))
+ggplot(p2, aes(z, fraction)) +
+    geom_jitter(width=0.15, size=2, aes(color=multiplicity)) +
+    facet_wrap(~sample) +
+    ylab("y/n") +
+    xlab("True cluster") +
+    theme(panel.background=element_rect(fill="white", color="black"),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          legend.key=element_rect(fill="white"),
+          legend.position="bottom",
+          legend.direction="horizontal")
+ggsave(file.path(outdir, "simulated_vafs_true_cluster.pdf"), width=10, height=6)
+
+p2 <- p2 %>% 
+  mutate(map_z = map_z[match(p2$variant_index, map_z$Variant), ]$value)
+
+ggplot(p2, aes(map_z, fraction)) +
+    geom_jitter(width=0.15, size=2, aes(color=multiplicity)) +
+    facet_wrap(~sample) +
+    ylab("y/n") +
+    xlab("True cluster") +
+    theme(panel.background=element_rect(fill="white", color="black"),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          legend.key=element_rect(fill="white"),
+          legend.position="bottom",
+          legend.direction="horizontal")
+ggsave(file.path(outdir, "simulated_vafs_map_z.pdf"), width=10, height=6)
+```
+
+# Sample plot, but without grouping by cluster
+
+```{r notclustered}
+set.seed(123)
+ix <- sample(1:I, I, replace=FALSE)
+p2$variant_index <- rep(ix, 3)
+ggplot(p2, aes(fraction, variant_index)) +
+    ##geom_jitter(width=0.15, size=2, aes(color=multiplicity)) +
+    geom_point(size=2) +
+    facet_wrap(~sample) +
+    xlab("y/n") +
+    ylab("Variant index") +
+    theme(panel.background=element_rect(fill="white", color="black"),
+          axis.text=element_text(size=15),
+          axis.text.x=element_blank(),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          legend.key=element_rect(fill="white"))
+ggsave(file.path(outdir, "simulated_vafs_not_grouped.pdf"),
+       width=10, height=7)
+```
+
+```{r connect_vafs_across_samples, echo=FALSE}
+## what the data looks like by sample
+## by variant
+true_w <- input.data$w %>%
+    as_tibble() %>%
+    gather("sample", "MCF") %>%
+    mutate(sample=str_replace(sample, "sample", "Sample "))
+##true_w2 <- tibble(sample=rep(true_w$sample, each=10),
+##                  MCF=rep(true_w$MCF, each=10),
+##                  )
+ggplot(p2, aes(sample, fraction, group=variant_index)) +
+    geom_point(size=1) +
+    geom_line(aes(color=z)) +
+    ylab("y/n") +
+    xlab("") +
+    theme(axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          panel.background=element_rect(fill="white",
+                                        color="black"),
+          legend.key=element_rect(fill="white")) +
+    guides(color=guide_legend(title="Variant cluster\n(z)"))
+ggsave(file.path(outdir, "vafs_grouped_by_clone.pdf"), width=10, height=6)
+```
+
+## Posterior predictive distribution of the VAFs
+
+```{r ppd, echo=F}
+ystar <- chains[grep("ystar", chains$Parameter), ]
+observed <- as.numeric(t(input.data$y))
+ppd.summaries <- ystar %>%
+    group_by(Parameter) %>%
+    summarize(mean=mean(value),
+              q1=quantile(value, 0.025),
+              q3=quantile(value, 0.975)) %>%
+    mutate(observed=observed) %>%
+    mutate(Parameter=as.character(Parameter),
+           sample=sapply(strsplit(Parameter, ","), "[", 2),
+           sample=str_replace(sample, "]", "")) %>%
+    mutate(sample=paste("Sample", sample)) %>%
+    arrange(sample) %>%
+    mutate(variant_index=p2$variant_index)
+ggplot(ppd.summaries, aes(y=variant_index,
+                          x=mean,
+                          xmin=q1,
+                          xmax=q3)) +
+    geom_errorbarh(color="gray") +
+    geom_point(aes(observed, variant_index),
+               size=1.5, color="steelblue") +
+    theme(axis.text.x=element_blank(),
+          axis.ticks.x=element_blank(),
+          axis.text=element_text(size=15),
+          axis.title=element_text(size=17),
+          strip.text=element_text(size=17),
+          panel.background=element_rect(fill="white",
+                                        color="black")) +
+    xlab("Posterior predictive distribution") +
+    ylab("Variants") +
+    facet_wrap(~sample)
+ggsave(file.path(outdir, "posterior_predictive.pdf"),
+       width=10, height=7)
+```
+
+
+## Plot cancer cell fraction ($\omega$)
+
+```{r omega} 
+# truth <- input.data$w
+# mcmc_vals <- orderW(truth, map_z)
+# ggplot(mcmc_vals, aes(mean, truth)) +
+#     geom_errorbar(color="gray",
+#                   aes(ymin=q1, ymax=q3)) +
+#     geom_point(size=2.5) +
+#     geom_abline(slope=1, intercept=0, color="gray") +
+#     xlab(expression("True MCF")) +
+#     ylab(expression("Estimated MCF")) +
+#     theme(axis.text=element_text(size=15),
+#           panel.background=element_rect(fill="white",
+#                                         color="black"),
+#           axis.title=element_text(size=17)) +
+# ggsave(file.path(outdir, "CCF.pdf"), width=10, height=7)
+```
+
