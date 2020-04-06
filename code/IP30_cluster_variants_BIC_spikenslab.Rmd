@@ -71,11 +71,11 @@ set.seed(1234)
 jags.file <- file.path("..", "code", "spike_and_slab.jags")
 inits <- list(".RNG.name" = "base::Wichmann-Hill", 
               ".RNG.seed" = 123)
-params <- c("z", "w", "ystar", "z.p")
+params <- c("z", "w", "ystar", "z.p", "p")
 n.iter = 1000
 thin = 7
 
-kToTest <- 5:20
+kToTest <- 15:25
 samps.list <- list()
 for(i in 1:length(kToTest)) {
   samps.list[[i]] <- runMCMC(input.data, kToTest[i], jags.file, inits, params, n.iter, thin)
@@ -102,4 +102,10 @@ ggsave(file.path(outdir, paste0("IP30_BIC_k", kToTest[1], "to", kToTest[length(k
 
 best <- which.min(BIC)
 best.k <- kToTest[best]
+```
+
+```{r}
+samps <- samps.list[[min.ind]]
+chains <- ggs(samps)
+saveRDS(chains, file.path(outdir, paste0("chains_K", kToTest[min.ind], ".rds")))
 ```

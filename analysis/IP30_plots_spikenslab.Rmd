@@ -54,11 +54,12 @@ input.data <- list("I" = I, "S" = S,
 ```
 
 ```{r chains}
-samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
-K <- 15
-kToTest <- 5:20
-samps <- samps.list[[which(kToTest == K)]]
-chains <- ggs(samps) 
+# samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
+# K <- 21
+# kToTest <- 15:25
+# samps <- samps.list[[which(kToTest == K)]]
+# chains <- ggs(samps) 
+chains <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", "chains_K21.rds"))
 z.chain <- chains[grep("z\\[", chains$Parameter), ]
 w.chain <- chains[grep("w", chains$Parameter), ]
 mcmc_w <- group_by(w.chain, Parameter) %>%
@@ -209,7 +210,7 @@ ggsave(file.path(outdir, paste0("vafs_grouped_by_clone.K", K, ".pdf")), width=10
 # Trees results
 
 ```{r thin}
-results <- readRDS(file.path("..", "output", "IP30_2.Rmd", "trees.rds"))
+results <- readRDS(file.path(outdir, "trees_50k_notThinned_K21.rds"))
 numIter <- length(results$score.chain)
 
 thin <- 10

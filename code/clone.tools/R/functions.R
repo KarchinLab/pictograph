@@ -619,7 +619,7 @@ get.DAG.coords.2 <- function(admat) {
         if (length(kids) == 1) {
           nodeInfo[match(kids, nodeInfo$node), ]$x <- p.x
         } else {
-          r <- 0.05*(max(nodeInfo$level)-i)* length(kids)
+          r <- 0.025*(max(nodeInfo$level)-i)* length(kids)
           xvals <- seq(p.x - (r/2), p.x + (r/2), length.out = length(kids))
           nodeInfo[match(kids, nodeInfo$node), ]$x <- xvals
         }
