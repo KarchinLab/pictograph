@@ -700,3 +700,16 @@ plainAdmat <- function(admat) {
   plain[is.na(plain)] <- 0
   plain
 }
+
+calc.tree.prop.true <- function(admat, true.admat) {
+  # inputs:
+  #   - admat = an adjacency matrix
+  #   - true.admat = the true adjacency matrix 
+  # output: proportion of edges that are correct [0,1]
+  true.edges <- which(true.admat == 1)
+  admat.edges <- which(admat == 1)
+  sum(admat.edges %in% true.edges) / length(true.edges)
+}
+
+
+
