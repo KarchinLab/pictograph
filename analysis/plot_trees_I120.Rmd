@@ -61,6 +61,26 @@ admat.chain.thinned <- results$admat.chain[thin.ind]
 sampled.w.chain.thinned <- results$sampled.w.chain[thin.ind]
 ```
 
+
+# True Tree
+```{r}
+w.chain <- readRDS(file.path("..", "output", "cluster_variants_BIC_I120.Rmd", "K10_w_chain_relabeled.rds"))
+mcf_stats <- w.chain %>%
+    group_by(Parameter) %>%
+    summarize(sd=sd(value),
+              mean=mean(value))
+
+answer <- initializeAdjacencyMatrix(mcf_stats, 0.01)
+answer["root", "cluster1"] <- answer["cluster1", "cluster2"] <-
+    answer["cluster2", "cluster3"] <- answer["cluster2", "cluster6"] <-
+    answer["cluster3", "cluster4"] <- answer["cluster3", "cluster5"] <-
+    answer["cluster4", "cluster8"] <- answer["cluster5", "cluster9"] <-
+    answer["cluster6", "cluster7"] <- answer["cluster7", "cluster10"] <- 1
+true.graphNEL <- as(plainAdmat(answer), "graphNEL")
+
+
+```
+
 # Posterior distribution of trees
 
 ```{r trees}
@@ -88,7 +108,8 @@ for (i in 1:10) {
   dag <- plotDAG(adm) + 
     ggtitle(paste0("Rank ", i, 
                    ", freq = ", round(tb$prob[i], 4),
-                   ", score = ", round(tb$score[i], 3)))
+                   ", score = ", round(tb$score[i], 3),
+                   ", prop_true = ", round(calc.tree.prop.true(adm, answer), 2)))
   top.score.plots[[i]] <- dag
 }
 
@@ -100,7 +121,8 @@ for (i in 1:10) {
   dag <- plotDAG(adm) + 
     ggtitle(paste0("Rank ", i, 
                    ", freq = ", round(tb$prob[i], 4),
-                   ", score = ", round(tb$score[i], 3)))
+                   ", score = ", round(tb$score[i], 3),
+                   ", prop_true = ", round(calc.tree.prop.true(adm, answer), 2)))
   top.freq.plots[[i]] <- dag
 
 }

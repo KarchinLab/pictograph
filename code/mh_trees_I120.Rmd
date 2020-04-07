@@ -30,21 +30,27 @@ I <- 120; K <- 10; S <- 3
 # chains <- readRDS(file.path("..",
 #                                 "output",
 #                                 "cluster_variants_BIC_I120.Rmd",
-#                                 "chains_K11.rds"))
+#                                 "chains_K10.rds"))
 
-samps.list <- readRDS(file.path("..", "output", 
-                                "cluster_variants_BIC_I120.Rmd", 
-                                "samps.list.rds"))
-kToTest <- 5:15
-samps <- samps.list[[match(10, kToTest)]]
-chains <- ggs(samps)
-saveRDS(chains, file.path("..", "output", 
-                                "cluster_variants_BIC_I120.Rmd", 
-                                paste0("chains_K", K, ".rds")))
+# samps.list <- readRDS(file.path("..", "output", 
+#                                 "cluster_variants_BIC_I120.Rmd", 
+#                                 "samps.list.rds"))
+# kToTest <- 5:15
+# samps <- samps.list[[match(10, kToTest)]]
+# chains <- ggs(samps)
 
-w.chain <- chains[grep("w", chains$Parameter), ]
-# truth <- input.data$w
-z.chain <- chains[grep("z", chains$Parameter), ]
+# w.chain <- chains[grep("w", chains$Parameter), ]
+# # truth <- input.data$w
+# z.chain <- chains[grep("z\\[", chains$Parameter), ]
+
+
+# read in re-labeled chains
+w.chain <- readRDS(file.path("..", "output", 
+                                "cluster_variants_BIC_I120.Rmd",
+                                "K10_w_chain_relabeled.rds"))
+z.chain <- readRDS(file.path("..", "output", 
+                                "cluster_variants_BIC_I120.Rmd",
+                                "K10_z_chain_relabeled.rds"))
 mcmc_z <- z.chain %>%
     group_by(Parameter, value) %>%
     summarize(n=n(),
@@ -112,7 +118,7 @@ for (i in seq_len(numIter)) {
     }
     sampled.w.star <- sample.w(w.chain, K)
     cpov.star <- create.cpov(mcf_stats, mcf_matrix = sampled.w.star)
-    fit.star <- calc.tree.fitness(admat.star, cpov, sampled.w.star)
+    fit.star <- calc.tree.fitness(admat.star, cpov.star, sampled.w.star)
     r <- fit.star / fit.prev
     u <- runif(1, 0, 1)
     if(u <= r) {

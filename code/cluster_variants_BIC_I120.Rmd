@@ -24,6 +24,7 @@ dir_create(outdir)
 I <- 120; K <- 10; S <- 3
 set.seed(123)
 input.data <- simulateData(I, K, S)
+saveRDS(input.data, file.path(outdir, "input.data.rds"))
 ```
 
 ## Connect $\omega$ by cluster
@@ -55,10 +56,10 @@ fig2
 # Bayesian model: cluster mutations
 
 ```{r JAGS}
-jags.file <- file.path("..", "code", "w.jags")
+jags.file <- file.path("..", "code", "spike_and_slab.jags")
 inits <- list(".RNG.name" = "base::Wichmann-Hill", 
               ".RNG.seed" = 123)
-params <- c("z", "w", "ystar")
+params <- c("z", "w", "ystar", "z.p", "p")
 n.iter = 10000
 thin = 7
 
