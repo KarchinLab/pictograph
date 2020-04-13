@@ -210,7 +210,8 @@ ggsave(file.path(outdir, paste0("vafs_grouped_by_clone.K", K, ".pdf")), width=10
 # Trees results
 
 ```{r thin}
-results <- readRDS(file.path(outdir, "trees_50k_notThinned_K21.rds"))
+results <- readRDS(file.path("..", "output", "IP30_spikenslab_2.Rmd", 
+                             "trees_50k_notThinned_K21.rds"))
 numIter <- length(results$score.chain)
 
 thin <- 10
@@ -257,7 +258,7 @@ tb <- tb %>%
 tb <- tb %>%
   mutate(score = score.chain.thinned[tb$index])
 
-
+outdir <- file.path("..", "output", "IP30_spikenslab_2.Rmd")
 tree.plot.dir <- file.path(outdir, "trees")
 dir_create(tree.plot.dir)
 
@@ -270,7 +271,7 @@ for (i in 1:10) {
   dag <- plotDAG(adm) + 
     ggtitle(paste0("Rank ", i, 
                    ", freq = ", round(tb$prob[i], 4),
-                   ", score = ", round(tb$score[i], 3)))
+                   ", log_score = ", round(log(tb$score[i]), 3)))
   top.score.plots[[i]] <- dag
 }
 
@@ -282,7 +283,7 @@ for (i in 1:10) {
   dag <- plotDAG(adm) + 
     ggtitle(paste0("Rank ", i, 
                    ", freq = ", round(tb$prob[i], 4),
-                   ", score = ", round(tb$score[i], 3)))
+                   ", log_score = ", round(log(tb$score[i]), 3)))
   top.freq.plots[[i]] <- dag
 }
 

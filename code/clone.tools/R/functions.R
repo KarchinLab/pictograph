@@ -259,8 +259,12 @@ rand.admat <- function(admat) {
     admat[rand.ind,col] <- 1
   }
   
-  while (sum(admat[1, ]) == 0) {
-    admat <- mutate.admat(admat)
+  if (sum(admat[1, ]) == 0) {
+    # pick random cluster to be connected to root
+    rand.k <- sample(1:ncol(admat), size = 1)
+    curr.1 <- which(admat[, rand.k] == 1)
+    admat[curr.1, rand.k] <- 0
+    admat[1, rand.k] <- 1
   }
   
   while (is.bidirectional(admat)) {
@@ -366,22 +370,14 @@ mutate.admat <- function(admat, ncol.to.mutate) {
     rand.ks <- sample(seq_len(K), size=ncol.to.mutate)
     ## mutate columns
     new.admat <- admat 
-    ##for(rand.k in rand.ks) {
     for(k in rand.ks){
-        ## possible positions (0's)
-        possiblePos <- which(!is.na(admat[, k]) & admat[, k] != 1)
-        ## current position with 1
-        ind.1 <- which(admat[, k] == 1)
-        ## select new position
-        if (length(possiblePos) == 1) {
-            new.1 <- possiblePos
-        } else {
-            new.1 <- sample(possiblePos, size=1)
+      
+        temp.admat <- mutate.column(new.admat, k)
+        # make sure admat is fully connected
+        while (!is.fully.connected(temp.admat)) {
+          temp.admat <- mutate.column(new.admat, k)
         }
-        
-        new.admat[ind.1, k] <- 0
-        new.admat[new.1, k] <- 1
-
+        new.admat <- temp.admat
     }
     
     # replace root edge if missing
@@ -398,6 +394,67 @@ mutate.admat <- function(admat, ncol.to.mutate) {
     }
     
     new.admat
+}
+
+mutate.admat.2 <- function(admat, ncol.to.mutate) {
+  
+  new.admat <- mutate.n.columns(admat, ncol.to.mutate)
+
+  # make sure admat is fully connected
+  while (!is.fully.connected(new.admat)) {
+    new.admat <- mutate.n.columns(admat, ncol.to.mutate)
+  }
+
+  new.admat
+}
+
+mutate.n.columns <- function(admat, ncol.to.mutate) {
+  K <- ncol(admat)
+  rand.ks <- sample(seq_len(K), size=ncol.to.mutate)
+  for(k in rand.ks){
+    admat <- mutate.column(admat, k)
+  }
+  admat
+}
+
+mutate.column <- function(admat, k) {
+  ## possible positions (0's)
+  possiblePos <- which(!is.na(admat[, k]) & admat[, k] != 1)
+  ## current position with 1
+  ind.1 <- which(admat[, k] == 1)
+  ## select new position
+  if (length(possiblePos) == 1) {
+    new.1 <- possiblePos
+  } else {
+    new.1 <- sample(possiblePos, size=1)
+  }
+  
+  admat[ind.1, k] <- 0
+  admat[new.1, k] <- 1
+  admat
+}
+
+is.fully.connected <- function(admat) {
+  # checks if admat is fully connected
+  numClusters <- nrow(admat)
+  nodesInMainTree <- bfs(admat)
+  numNodesInMainTree <- length(nodesInMainTree)
+  numClusters == numNodesInMainTree
+}
+
+bfs <- function(admat) {
+  # starting at root
+  children <- names(which(admat[1, ] == 1))
+  nodes <- c("root", children)
+  
+  while(length(children) > 0) {
+    c <- children[1]
+    children <- children[-1]
+    temp.children <- names(which(admat[c, ] == 1))
+    children <- c(children, temp.children)
+    nodes <- c(nodes, temp.children)
+  }
+  nodes
 }
 
 is.bidirectional <- function(admat) {
@@ -440,6 +497,8 @@ fix.bidirectional <- function(admat) {
     }
   }
 }
+
+
 
 decide.ht <- function(pval, alpha=0.05) {
   # 1 signals rejection event for null of i -> j

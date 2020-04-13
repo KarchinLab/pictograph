@@ -274,8 +274,8 @@ ggsave(file.path(outdir, "posterior_predictive.pdf"),
 mcmc_z <- relabelZ(z.chain, I, K)
 mcmc_z %>%
     filter(value==sim_cluster) %>%
-    mutate(sim_cluster=paste0("Clone ", sim_cluster),
-           sim_cluster=factor(sim_cluster, levels=paste0("Clone ", 1:K))) %>%
+    mutate(sim_cluster=paste0("Cluster ", sim_cluster),
+           sim_cluster=factor(sim_cluster, levels=paste0("Cluster ", 1:K))) %>%
     
     ggplot(aes(Parameter, probability)) +
     geom_point() +
