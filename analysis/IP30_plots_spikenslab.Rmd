@@ -18,7 +18,7 @@ library(network)
 library(sna)
 devtools::load_all(file.path("..", "code", "clone.tools"))
 
-outdir <- file.path("..", "output", "IP30_spikenslab.Rmd")
+outdir <- file.path("..", "output", "IP30_spikenslab_2.Rmd")
 
 data.dir <- file.path("..", "data")
 
@@ -54,20 +54,16 @@ input.data <- list("I" = I, "S" = S,
 ```
 
 ```{r chains}
-# samps.list <- readRDS(file.path(outdir, "samps.list.rds"))
-# K <- 21
-# kToTest <- 15:25
-# samps <- samps.list[[which(kToTest == K)]]
-# chains <- ggs(samps) 
-chains <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", "chains_K21.rds"))
+K <- 20
+chains <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", paste0("chains_K", K, ".rds")))
 z.chain <- chains[grep("z\\[", chains$Parameter), ]
 w.chain <- chains[grep("w", chains$Parameter), ]
+
+z.p.chain <- chains[grep("z.p\\[", chains$Parameter), ]
+p.chain <- chains[grep("p\\[", chains$Parameter), ]
+
 mcmc_w <- group_by(w.chain, Parameter) %>%
     summarize(mean=mean(value))
-# chains <- readRDS(file.path("output",
-#                             "IP30.Rmd",
-#                             "chains.rds"))
-
 mcmc_z <- z.chain %>%
     group_by(Parameter, value) %>%
     summarize(n=n(),
@@ -81,8 +77,6 @@ mcf_stats <- w.chain %>%
 map_z <- mcmc_z %>%
     group_by(Parameter) %>%
     summarize(value=value[probability==max(probability)])
-##mcmc_vals <- orderW(truth, map_z)
-##mcmc_w <- matrix(mcmc_vals$mean, 10, 3, byrow=TRUE)
 
 round(mcfMatrix(mcf_stats),2)
 ```
@@ -211,7 +205,7 @@ ggsave(file.path(outdir, paste0("vafs_grouped_by_clone.K", K, ".pdf")), width=10
 
 ```{r thin}
 results <- readRDS(file.path("..", "output", "IP30_spikenslab_2.Rmd", 
-                             "trees_50k_notThinned_K21.rds"))
+                             paste0("trees_50k_notThinned_K", K, ".rds")))
 numIter <- length(results$score.chain)
 
 thin <- 10
@@ -227,6 +221,7 @@ thinned.tb <- tibble(score = score.chain.thinned,
 ggplot(thinned.tb, aes(x = iter, y = log.score)) +
   geom_line() +
   theme_light()
+ggsave(file.path(outdir, paste0("log_score_chain_K", K, ".pdf")), width = 7, height = 4)
 
 full.tb <- tibble(score = results$score.chain, 
                   iter = seq_len(length(results$score.chain)),
@@ -288,9 +283,31 @@ for (i in 1:10) {
 }
 
 score.plots <- do.call(grid.arrange, c(top.score.plots, nrow=4))
-ggsave(file.path(tree.plot.dir, "top.10.score.trees.pdf"), score.plots, width = 15, height = 20)
+ggsave(file.path(tree.plot.dir, paste0("top.10.score.trees.K", K, ".pdf")), 
+       score.plots, width = 15, height = 20)
 
 freq.plots <- do.call(grid.arrange, c(top.freq.plots, nrow=4))
-ggsave(file.path(tree.plot.dir, "top.10.freq.trees.pdf"), freq.plots, width = 15, height = 20)
+ggsave(file.path(tree.plot.dir, paste0("top.10.freq.trees.K", K, ".pdf")), 
+       freq.plots, width = 15, height = 20)
 
 ```
+
+```{r}
+# posterior probability that KRAS/GNAS is connected to root (cluster15)
+
+check_edge <- function(admat, from, to) {
+  # inputs: 
+  #   - admat = adjacency matrix of graph
+  #   - from = name of 'from' cluster; e.g. "root"
+  #   - to = name of 'to' cluster; e.g. "cluster1"
+  # output: TRUE/FALSE edge is in graph
+  
+  adm[from, to] == 1
+}
+
+root_to_15 <- sapply(admat.chain.thinned, function(adm) check_edge(adm, "root", "cluster15"))
+sum(root_to_15) / length(root_to_15)
+
+```
+
+

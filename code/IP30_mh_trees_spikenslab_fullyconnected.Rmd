@@ -32,9 +32,9 @@ data.dir <- file.path("..", "data")
 # kToTest <- 15:25
 # samps <- samps.list[[which(kToTest == K)]] 
 # chains <- ggs(samps) 
+K <- 20
+chains <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", paste0("chains_K", K, ".rds")))
 
-chains <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", "chains_K21.rds"))
-K <- 21
 
 z.chain <- chains[grep("z\\[", chains$Parameter), ]
 w.chain <- chains[grep("w", chains$Parameter), ]
