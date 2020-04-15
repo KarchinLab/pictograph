@@ -148,6 +148,54 @@ mutate.column <- function(admat, k) {
   admat
 }
 
+mutate.admat.3 <- function(admat, ncol.to.mutate, mcf_matrix) {
+
+  mutate.prob.tb <- get.cluster.mutate.prob(mcf_matrix)
+  
+  new.admat <- mutate.n.columns.clusterprob(admat, ncol.to.mutate, mutate.prob.tb)
+  
+  # make sure admat is fully connected
+  while (!is.fully.connected(new.admat)) {
+    new.admat <- mutate.n.columns(admat, ncol.to.mutate)
+  }
+  
+  new.admat
+}
+
+mutate.n.columns.clusterprob <- function(admat, ncol.to.mutate, mutate.prob.tb) {
+  K <- ncol(admat)
+  rand.ks <- sample(seq_len(K), size=ncol.to.mutate, prob = mutate.prob.tb$cluster_prob)
+  for(k in rand.ks){
+    admat <- mutate.column(admat, k)
+  }
+  admat
+}
+
+get.cluster.mutate.prob <- function(mcf_matrix) {
+  sample.presence <- get.sample.presence(mcf_matrix)
+  tiers <- sort(unique(sample.presence$num_samples))
+  tier.prob <- get.tier.probs(tiers)
+  mutate.prob.tb <- sample.presence %>%
+    mutate(tier_prob = tier.prob$tier_prob[match(sample.presence$num_samples, tier.prob$num_samples)])
+  mutate.prob.tb <- mutate.prob.tb %>%
+    group_by(num_samples) %>%
+    mutate(cluster_prob = tier_prob / n())
+  mutate.prob.tb
+}
+
+get.sample.presence <- function(mcf_matrix) {
+  mcf <- round(mcf_matrix, 2)
+  sample.presence <- tibble(cluster = paste0("cluster", 1:nrow(mcf_matrix)),
+                            num_samples = rowSums(mcf > 0))
+  sample.presence
+}
+
+get.tier.probs <- function(tiers) {
+  numTiers <- length(tiers)
+  tibble(num_samples = tiers, 
+         tier_prob = rev(1:numTiers / sum(1:numTiers)))
+}
+
 is.fully.connected <- function(admat) {
   # checks if admat is fully connected
   numClusters <- nrow(admat)
