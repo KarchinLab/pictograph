@@ -156,7 +156,7 @@ mutate.admat.3 <- function(admat, ncol.to.mutate, mcf_matrix) {
   
   # make sure admat is fully connected
   while (!is.fully.connected(new.admat)) {
-    new.admat <- mutate.n.columns(admat, ncol.to.mutate)
+    new.admat <- mutate.n.columns.clusterprob(admat, ncol.to.mutate, mutate.prob.tb)
   }
   
   new.admat
@@ -193,7 +193,8 @@ get.sample.presence <- function(mcf_matrix) {
 get.tier.probs <- function(tiers) {
   numTiers <- length(tiers)
   tibble(num_samples = tiers, 
-         tier_prob = rev(1:numTiers / sum(1:numTiers)))
+         tier_prob = round(rev(10^(numTiers))/sum(10^(numTiers)), 5))
+         #tier_prob = rev(1:numTiers / sum(1:numTiers)))
 }
 
 is.fully.connected <- function(admat) {

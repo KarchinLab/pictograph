@@ -1,0 +1,136 @@
+---
+title: "IP30 analysis -- plots"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rjags)
+library(coda)
+library(ggmcmc)
+library(gridExtra)
+library(stringr)
+library(fs)
+library(devtools)
+library(tidyverse)
+library(GGally)
+library(network)
+library(sna)
+devtools::load_all(file.path("..", "code", "clone.tools"))
+
+outdir <- file.path("..", "output", "IP30_weighted_mutate.Rmd")
+
+data.dir <- file.path("..", "data")
+
+```
+
+# Trees results
+
+```{r thin}
+seed <- 2
+results <- readRDS(file.path("..", "output", "IP30_weighted_mutate.Rmd", 
+                             paste0("trees_50k_notThinned_K", K, "_seed", seed, ".rds")))
+numIter <- length(results$score.chain)
+
+thin <- 10
+
+thin.ind <- seq(1, numIter, length.out = round(numIter/thin, 1))
+
+score.chain.thinned <- results$score.chain[thin.ind]
+
+thinned.tb <- tibble(score = score.chain.thinned, 
+                     iter = seq_len(length(score.chain.thinned)),
+                     log.score = log(score.chain.thinned))
+
+ggplot(thinned.tb, aes(x = iter, y = log.score)) +
+  geom_line() +
+  theme_light()
+ggsave(file.path(outdir, paste0("log_score_chain_K", K, "_seed", seed, ".pdf")), width = 7, height = 4)
+
+full.tb <- tibble(score = results$score.chain, 
+                  iter = seq_len(length(results$score.chain)),
+                  log.score = log(results$score.chain))
+ggplot(full.tb, aes(x = iter, y = log.score)) +
+  geom_line() +
+  theme_light()
+
+
+admat.chain.thinned <- results$admat.chain[thin.ind]
+sampled.w.chain.thinned <- results$sampled.w.chain[thin.ind]
+```
+
+# Posterior distribution of trees
+
+```{r trees}
+trees <- sapply(admat.chain.thinned, numericRepresentation)
+tab <- table(trees)
+length(tab)
+freq <- as.numeric(tab)
+prob <- freq/sum(freq)
+plot(prob)
+
+
+tb <- tibble(prob = prob,
+             tree = names(tab))
+tb <- tb %>%
+  mutate(index = match(tb$tree, trees)) 
+tb <- tb %>%
+  mutate(score = score.chain.thinned[tb$index])
+
+tree.plot.dir <- file.path(outdir, "trees")
+dir_create(tree.plot.dir)
+
+
+tb <- tb %>%
+  arrange(desc(score))
+top.score.plots <- list()
+for (i in 1:10) {
+  adm <- admat.chain.thinned[[tb$index[i]]]
+  dag <- plotDAG(adm) + 
+    ggtitle(paste0("Rank ", i, 
+                   ", freq = ", round(tb$prob[i], 4),
+                   ", log_score = ", round(log(tb$score[i]), 3)))
+  top.score.plots[[i]] <- dag
+}
+
+tb <- tb %>%
+  arrange(desc(prob))
+top.freq.plots <- list()
+for (i in 1:10) {
+  adm <- admat.chain.thinned[[tb$index[i]]]
+  dag <- plotDAG(adm) + 
+    ggtitle(paste0("Rank ", i, 
+                   ", freq = ", round(tb$prob[i], 4),
+                   ", log_score = ", round(log(tb$score[i]), 3)))
+  top.freq.plots[[i]] <- dag
+}
+
+score.plots <- do.call(grid.arrange, c(top.score.plots, nrow=4))
+ggsave(file.path(tree.plot.dir, paste0("top.10.score.trees.K", K, "_seed", seed, ".pdf")), 
+       score.plots, width = 15, height = 20)
+
+freq.plots <- do.call(grid.arrange, c(top.freq.plots, nrow=4))
+ggsave(file.path(tree.plot.dir, paste0("top.10.freq.trees.K", K, "_seed", seed, ".pdf")), 
+       freq.plots, width = 15, height = 20)
+
+```
+
+```{r}
+# posterior probability that KRAS/GNAS is connected to root (cluster15)
+
+check_edge <- function(admat, from, to) {
+  # inputs: 
+  #   - admat = adjacency matrix of graph
+  #   - from = name of 'from' cluster; e.g. "root"
+  #   - to = name of 'to' cluster; e.g. "cluster1"
+  # output: TRUE/FALSE edge is in graph
+  
+  adm[from, to] == 1
+}
+
+root_to_15 <- sapply(admat.chain.thinned, function(adm) check_edge(adm, "root", "cluster15"))
+sum(root_to_15) / length(root_to_15)
+
+```
+
+

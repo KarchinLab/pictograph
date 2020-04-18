@@ -33,8 +33,9 @@ data.dir <- file.path("..", "data")
 # samps <- samps.list[[which(kToTest == K)]] 
 # chains <- ggs(samps) 
 
-chains <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", "chains_K21.rds"))
-K <- 21
+K <- 20
+chains <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", paste0("chains_K", K, ".rds")))
+
 
 z.chain <- chains[grep("z\\[", chains$Parameter), ]
 w.chain <- chains[grep("w", chains$Parameter), ]
@@ -124,6 +125,6 @@ thinned.tb <- tibble(score = score.chain.thinned,
 ggplot(thinned.tb, aes(x = iter, y = log.score)) +
   geom_line() +
   theme_light()
-ggsave(file.path(outdir, paste0("log_score_chain_seed", seed, ".pdf")), width = 7, height = 4)
+ggsave(file.path(outdir, paste0("log_score_chain_K", K, "_seed", seed, ".pdf")), width = 7, height = 4)
 
 ```
