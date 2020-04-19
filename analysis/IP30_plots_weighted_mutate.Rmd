@@ -27,6 +27,7 @@ data.dir <- file.path("..", "data")
 # Trees results
 
 ```{r thin}
+K <- 20
 seed <- 2
 results <- readRDS(file.path("..", "output", "IP30_weighted_mutate.Rmd", 
                              paste0("trees_50k_notThinned_K", K, "_seed", seed, ".rds")))

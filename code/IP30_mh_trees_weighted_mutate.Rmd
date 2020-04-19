@@ -33,12 +33,35 @@ data.dir <- file.path("..", "data")
 # samps <- samps.list[[which(kToTest == K)]] 
 # chains <- ggs(samps) 
 
-K <- 20
+K <- 21
 chains <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", paste0("chains_K", K, ".rds")))
 
 
 z.chain <- chains[grep("z\\[", chains$Parameter), ]
 w.chain <- chains[grep("w", chains$Parameter), ]
+
+
+K <- 20
+# remove cluster4
+new.w.chain <- w.chain %>%
+  mutate(k = as.numeric(gsub("w\\[", "", sapply(w.chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
+  mutate(s = gsub("\\]", "", sapply(w.chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][2])))
+# relabel clusters 5-21 to 4-20
+new.w.chain <- new.w.chain %>% 
+  filter(k != 4) %>%
+  mutate(k = ifelse(k>3, k-1, k))
+# change parameter 
+new.w.chain <- new.w.chain %>%
+  mutate(Parameter = factor(paste0("w[", k, ",", s, "]"), levels = levels(w.chain$Parameter)))
+
+new.z.chain <- z.chain %>%
+  mutate(value = ifelse(value>3, value-1, value))
+
+w.chain <- new.w.chain
+z.chain <- new.z.chain
+
+saveRDS(w.chain, file.path("..", "output", "IP30_spikenslab_2.Rmd", paste0("w_chain_K", K, "_fixedfromK21.rds")))
+saveRDS(z.chain, file.path("..", "output", "IP30_spikenslab_2.Rmd", paste0("z_chain_K", K, "_fixedfromK21.rds")))
 
 mcf_stats <- w.chain %>%
     group_by(Parameter) %>%
