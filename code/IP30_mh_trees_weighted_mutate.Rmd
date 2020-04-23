@@ -26,7 +26,7 @@ data.dir <- file.path("..", "data")
 ```
 
 ## Clustering data
-```{r}
+```{r, eval=F}
 # samps.list <- readRDS(file.path("..", "output", "IP30_spikenslab.Rmd", "samps.list.rds"))
 # K <- 21
 # kToTest <- 15:25
@@ -69,15 +69,43 @@ mcf_stats <- w.chain %>%
               mean=mean(value))
 ```
 
+
+```{r readFixedChains}
+K <- 20
+w.chain <- readRDS(file.path("..", "output", "IP30_spikenslab_2.Rmd", paste0("w_chain_K", K, "_fixedfromK21.rds")))
+z.chain <- readRDS(file.path("..", "output", "IP30_spikenslab_2.Rmd", paste0("z_chain_K", K, "_fixedfromK21.rds")))
+mcf_stats <- w.chain %>%
+    group_by(Parameter) %>%
+    summarize(sd=sd(value),
+              mean=mean(value))
+```
+
+```{r guess_tree}
+guess <- initializeAdjacencyMatrix(mcf_stats = mcf_stats, zero.thresh = 0.01)
+guess["root", "cluster14"] <- guess["cluster14", "cluster3"] <-
+  guess["cluster3", "cluster8"] <- guess["cluster8", "cluster18"] <- 
+  guess["cluster8", "cluster7"] <- guess["cluster7", "cluster12"] <- 
+  guess["cluster7", "cluster11"] <- guess["cluster12", "cluster13"] <- 
+  guess["cluster13", "cluster9"] <- guess["cluster13", "cluster20"] <- 
+  guess["cluster20", "cluster15"] <- guess["cluster15", "cluster4"] <- 
+  guess["cluster4", "cluster10"] <- guess["cluster4", "cluster17"] <- 
+  guess["cluster11", "cluster6"] <- guess["cluster6", "cluster1"] <- 
+  guess["cluster1", "cluster19"] <- guess["cluster19", "cluster2"] <- 
+  guess["cluster19", "cluster16"] <- guess["cluster18", "cluster5"] <- 1
+
+```
+
+
 # MH-sampler for tree
 
 ```{r tree_mcmc}
-seed = 2
+seed = 1
 set.seed(seed)
 
 # Initialize chain ------------------------------------------------------------
 
-admat.chain <- list(rand.admat(initializeAdjacencyMatrix(mcf_stats = mcf_stats, zero.thresh = 0.01)))
+#admat.chain <- list(rand.admat(initializeAdjacencyMatrix(mcf_stats = mcf_stats, zero.thresh = 0.01)))
+admat.chain <- list(guess)
 sampled.w.chain <- list(sample.w(w.chain, K))
 cpov.chain <- list(create.cpov(mcf_stats = mcf_stats, mcf_matrix = sampled.w.chain[[1]]))
 score.chain <- calc.tree.fitness(admat.chain[[1]], cpov.chain[[1]], sampled.w.chain[[1]])
@@ -88,6 +116,7 @@ score.chain <- calc.tree.fitness(admat.chain[[1]], cpov.chain[[1]], sampled.w.ch
 numAccept  <-  0
 ncol.to.mutate <- 1
 numIter <- 50000
+weight.mass <- 5
 
 for (i in seq_len(numIter)) {
     fit.prev <- score.chain[i]
@@ -99,7 +128,7 @@ for (i in seq_len(numIter)) {
     #proposed <- plotDAG(admat.star)
     sampled.w.star <- sample.w(w.chain, K)
     cpov.star <- create.cpov(mcf_stats, mcf_matrix = sampled.w.star)
-    fit.star <- calc.tree.fitness(admat.star, cpov.star, sampled.w.star)
+    fit.star <- calc.tree.fitness(admat.star, cpov.star, sampled.w.star, weight.mass=weight.mass)
     
     r <- fit.star / fit.prev
     u <- runif(1, 0, 1)    
@@ -122,19 +151,22 @@ acceptRate <- numAccept/numIter
 acceptRate
 
 
-```
+#```
 
 
-```{r}
+#```{r}
 results <- list(admat.chain=admat.chain,
                 score.chain=score.chain,
                 cpov.chain=cpov.chain,
                 sampled.w.chain=sampled.w.chain,
                 numAccept=numAccept)
-saveRDS(results, file.path(outdir, paste0("trees_50k_notThinned_K", K ,"_seed", seed, ".rds")))
-```
+saveRDS(results, file.path(outdir, paste0("trees_50k_notThinned_K", K ,"_seed", seed,
+                                          "_startAtGuess_",
+                                          weight.mass,
+                                          "MC.rds")))
+#```
 
-```{r }
+#```{r }
 thin <- 10
 
 thin.ind <- seq(1, numIter, length.out = round(numIter/thin, 1))
@@ -147,7 +179,12 @@ thinned.tb <- tibble(score = score.chain.thinned,
 
 ggplot(thinned.tb, aes(x = iter, y = log.score)) +
   geom_line() +
-  theme_light()
-ggsave(file.path(outdir, paste0("log_score_chain_K", K, "_seed", seed, ".pdf")), width = 7, height = 4)
+  theme_light() +
+  ggtitle(paste0("Acceptance rate = ", round(results$numAccept / length(results$score.chain), 2)))
+ggsave(file.path(outdir, paste0("log_score_chain_K", K, "_seed", seed, 
+                                "_startAtGuess_", 
+                                weight.mass,
+                                "MC.pdf")), 
+       width = 7, height = 4)
 
 ```

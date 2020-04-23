@@ -335,7 +335,7 @@ calc.topology.cost <- function(admat, cpov) {
   TC
 }
 
-calc.mass.cost <- function(admat, mcmc_w) {
+calc.mass.cost <- function(admat, mcf_matrix) {
   numChildren <- rowSums(admat, na.rm = T)
   nodes <- which(numChildren > 0, arr.ind = T) # not leaves
   mc.node <- rep(0, length(nodes))
@@ -344,17 +344,17 @@ calc.mass.cost <- function(admat, mcmc_w) {
     node <- nodes[i]
     
     # root node: MCF = 1
-    parent.w <- rep(1, ncol(mcmc_w))
-    # not root node: look up MCF in mcmc_w
+    parent.w <- rep(1, ncol(mcf_matrix))
+    # not root node: look up MCF in mcf_matrix
     if (node != 1) { 
-      parent.w <- mcmc_w[node-1,]
+      parent.w <- mcf_matrix[node-1,]
     }
     
     kids <- which(admat[node,] == 1, arr.ind = T)
     if (numChildren[node] > 1) {
-      children.w <- colSums(mcmc_w[kids,])
+      children.w <- colSums(mcf_matrix[kids,])
     } else {
-      children.w <- mcmc_w[kids,]
+      children.w <- mcf_matrix[kids,]
     }
     
     mc.s <- ifelse(parent.w >= children.w, 0, children.w - parent.w)
@@ -363,10 +363,10 @@ calc.mass.cost <- function(admat, mcmc_w) {
   sum(mc.node)
 }
 
-calc.tree.fitness <- function(admat, cpov, mcf_matrix, scaling.coeff=5) {
+calc.tree.fitness <- function(admat, cpov, mcf_matrix, weight.mass = 1, weight.topology = 1, scaling.coeff=5) {
   TC <- calc.topology.cost(admat, cpov)
   MC <- calc.mass.cost(admat, mcf_matrix)
-  Z <- TC + MC
+  Z <- weight.topology * TC + weight.mass * MC
   fitness <- exp(-scaling.coeff * Z)
   fitness
 }
