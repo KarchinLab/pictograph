@@ -1,0 +1,20 @@
+name: pictograph
+dependencies:
+  - python=3.6
+  - jags
+  - r-rjags
+  - r-tidyverse
+  - r-ggally
+  - r-ggmcmc
+  - r-coda
+  - r-fs
+  - r-stringr
+  - r-gridextra
+  - r-devtools
+  - r-network
+  - r-sna
+  - r-optparse
+channels:
+  - conda-forge
+  - r
+  - bioconda
