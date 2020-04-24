@@ -15,8 +15,9 @@ library(dplyr)
 library(gridExtra)
 library(stringr)
 library(fs)
-devtools::load_all(file.path("..", "code", "clone.tools"))
-outdir <- file.path("..", "output", "mh_trees_spikenslab.Rmd")
+pictograph_path <- ".."
+devtools::load_all(file.path(pictograph_path, "code", "clone.tools"))
+outdir <- file.path(pictograph_path, "output", "mh_trees_spikenslab.Rmd")
 dir_create(outdir)
 ```
 
@@ -25,7 +26,7 @@ dir_create(outdir)
 ```{r chains}
 I <- 120; K <- 10; S <- 3
 set.seed(123)
-input.data <- readRDS(file.path("..", "output",
+input.data <- readRDS(file.path(pictograph_path, "output",
                                 "cluster_variants_BIC_spikenslab.Rmd",
                                 "input.data.rds"))
 # chains <- readRDS(file.path("..", "output",
@@ -33,10 +34,10 @@ input.data <- readRDS(file.path("..", "output",
 #                             "chains_K10.rds"))
 # w.chain <- chains[grep("w", chains$Parameter), ]
 # z.chain <- chains[grep("z", chains$Parameter), ]
-w.chain <- readRDS(file.path("..", "output",
+w.chain <- readRDS(file.path(pictograph_path, "output",
                             "cluster_variants_BIC_spikenslab.Rmd",
                             "K10_w_chain_relabeled.rds"))
-z.chain <- readRDS(file.path("..", "output",
+z.chain <- readRDS(file.path(pictograph_path, "output",
                             "cluster_variants_BIC_spikenslab.Rmd",
                             "K10_z_chain_relabeled.rds"))
 
