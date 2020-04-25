@@ -13,7 +13,7 @@ library(stringr)
 library(fs)
 library(devtools)
 library(tidyverse)
-library(ggnet)
+library(GGally)
 library(network)
 library(sna)
 devtools::load_all(file.path("..", "code", "clone.tools"))
@@ -87,10 +87,14 @@ BIC
 
 BIC_tb <- tibble(k = kToTest,
                  BIC = BIC)
+min.ind <- which(BIC == min(BIC))
+min.BIC.tb <- tibble(k = kToTest[min.ind],
+                     BIC = min(BIC))
 BIC.plot <- ggplot(BIC_tb, aes(x = k, y = BIC)) +
   geom_line() +
   theme_light() +
-  scale_x_continuous(breaks = kToTest)
+  scale_x_continuous(breaks = kToTest) +
+  geom_point(data = min.BIC.tb, color = "blue", size = 3)
 BIC.plot
 
 ggsave(file.path(outdir, "IP30_BIC_k5to15.pdf"),
