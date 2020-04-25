@@ -96,8 +96,7 @@ for (i in seq_len(opt$numIter)) {
 	
 	# propse new admat
     sampled.w.star <- sample.w(w.chain, K)
-    admat.star <- mutate.admat.2(admat.prev, ncol.to.mutate)
-	print(admat.star)
+    admat.star <- mutate.admat.3(admat.prev, ncol.to.mutate, sampled.w.star)
     cpov.star <- create.cpov(mcf_stats, mcf_matrix = sampled.w.star)
     fit.star <- calc.tree.fitness(admat.star, cpov.star, sampled.w.star)
 
