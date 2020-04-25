@@ -130,8 +130,8 @@ for (i in seq_len(numIter)) {
     cpov.star <- create.cpov(mcf_stats, mcf_matrix = sampled.w.star)
     fit.star <- calc.tree.fitness(admat.star, cpov.star, sampled.w.star, weight.mass=weight.mass)
     
-    r <- fit.star / fit.prev
-    u <- runif(1, 0, 1)    
+    r <- log(fit.star / fit.prev)
+    u <- log(runif(1, 0, 1))
     if(u <= r) {
         admat.chain[[i+1]] <- admat.star
         numAccept <- numAccept + 1
