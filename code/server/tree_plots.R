@@ -108,7 +108,7 @@ print("plotting posterior adjacency matrix")
 adm.chain <- rapply(results$admat.chain, f=function(x) ifelse(is.na(x),0,x), how="replace")
 post.admat <- Reduce("+", adm.chain)/length(adm.chain)
 print("post.admat:")
-print(post.admat)
+print(round(post.admat,2))
 
 post.admat.tb <- post.admat %>%
   as_tibble() %>%

@@ -6,6 +6,7 @@ logdir=log/$script
 mkdir -p $logdir
 
 mh_trees_script=mh_trees_sim1_mutate10.R
+mh_trees_script=IP30_mh_trees_weightedMutate10.R
 #outdir=~/GitHub/pictograph/output/$script
 resultsdir=~/GitHub/pictograph/output/${mh_trees_script}
 
