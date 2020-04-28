@@ -80,7 +80,6 @@ init_admat <- initializeAdjacencyMatrix(mcf_stats = mcf_stats,
                                         mcf_matrix = sampled.w.chain[[1]])
 admat.chain <- list(rand.admat(init_admat))
 cpov.temp <- create.cpov(mcf_stats = mcf_stats, mcf_matrix = sampled.w.chain[[1]])
-#cpov.chain <- list(create.cpov(mcf_stats = mcf_stats, mcf_matrix = sampled.w.chain[[1]]))
 score.chain <- calc.tree.fitness(admat.chain[[1]], cpov.temp, sampled.w.chain[[1]])
 
 numAccept  <-  0
@@ -101,15 +100,13 @@ for (i in seq_len(opt$numIter)) {
     cpov.star <- create.cpov(mcf_stats, mcf_matrix = sampled.w.star)
     fit.star <- calc.tree.fitness(admat.star, cpov.star, sampled.w.star)
 
-    r <- fit.star / fit.prev
-    u <- runif(1, 0, 1)
+    r <- log(fit.star) - log(fit.prev)
+    u <- log(runif(1, 0, 1))
 
     if(u <= r) {
         admat.prev <- admat.star
         numAccept <- numAccept + 1
         fit.prev <- fit.star
-        #cpov.chain[[i+1]] <- cpov.star
-        #sampled.w.chain[[i+1]] <- sampled.w.star
     } # else stay the same
 
     # keep thinned obs
@@ -120,9 +117,6 @@ for (i in seq_len(opt$numIter)) {
 }
 results <- list(admat.chain=admat.chain,
                 score.chain=score.chain,
-                #cpov.chain=cpov.chain,
-                #sampled.w.chain=sampled.w.chain,
-                #numAccept=numAccept,
                 acceptRate=numAccept/opt$numIter)
 print(paste0("acceptance rate = ", results$acceptRate))
 

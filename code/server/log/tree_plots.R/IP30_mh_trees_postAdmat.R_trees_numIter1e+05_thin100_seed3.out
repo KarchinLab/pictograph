@@ -1,0 +1,75 @@
+Loading clone.tools
+[1] "plotting score chain"
+[1] "plotting most frequent trees"
+[1] "plotting posterior adjacency matrix"
+[1] "post.admat:"
+          cluster1 cluster2 cluster3 cluster4 cluster5 cluster6 cluster7
+root          0.00     0.10        0     0.00     0.21     0.00        0
+cluster1      0.00     0.12        0     0.00     0.00     0.00        0
+cluster2      0.00     0.00        0     0.00     0.00     0.00        0
+cluster3      0.00     0.11        0     0.00     0.20     0.00        1
+cluster4      0.00     0.00        0     0.00     0.00     0.00        0
+cluster5      0.00     0.00        0     0.00     0.00     0.00        0
+cluster6      0.72     0.11        0     0.00     0.00     0.00        0
+cluster7      0.12     0.12        0     0.00     0.00     0.07        0
+cluster8      0.00     0.11        0     0.00     0.21     0.00        0
+cluster9      0.00     0.00        0     0.32     0.00     0.00        0
+cluster10     0.00     0.00        0     0.00     0.00     0.00        0
+cluster11     0.16     0.12        0     0.00     0.00     0.93        0
+cluster12     0.00     0.00        0     0.00     0.00     0.00        0
+cluster13     0.00     0.00        0     0.00     0.00     0.00        0
+cluster14     0.00     0.09        1     0.00     0.19     0.00        0
+cluster15     0.00     0.00        0     0.36     0.00     0.00        0
+cluster16     0.00     0.00        0     0.00     0.00     0.00        0
+cluster17     0.00     0.00        0     0.00     0.00     0.00        0
+cluster18     0.00     0.00        0     0.00     0.19     0.00        0
+cluster19     0.00     0.13        0     0.00     0.00     0.00        0
+cluster20     0.00     0.00        0     0.32     0.00     0.00        0
+          cluster8 cluster9 cluster10 cluster11 cluster12 cluster13 cluster14
+root             0        0      0.06         0       0.0      0.00         1
+cluster1         0        0      0.00         0       0.0      0.00         0
+cluster2         0        0      0.00         0       0.0      0.00         0
+cluster3         0        0      0.07         0       0.0      0.00         0
+cluster4         0        0      0.11         0       0.0      0.00         0
+cluster5         0        0      0.00         0       0.0      0.00         0
+cluster6         0        0      0.00         0       0.0      0.00         0
+cluster7         0        0      0.10         1       0.4      0.87         0
+cluster8         0        0      0.12         0       0.0      0.00         0
+cluster9         0        0      0.10         0       0.0      0.00         0
+cluster10        0        0      0.00         0       0.0      0.00         0
+cluster11        0        0      0.00         0       0.0      0.00         0
+cluster12        0        0      0.07         0       0.0      0.13         0
+cluster13        0        1      0.08         0       0.6      0.00         0
+cluster14        1        0      0.07         0       0.0      0.00         0
+cluster15        0        0      0.10         0       0.0      0.00         0
+cluster16        0        0      0.00         0       0.0      0.00         0
+cluster17        0        0      0.00         0       0.0      0.00         0
+cluster18        0        0      0.00         0       0.0      0.00         0
+cluster19        0        0      0.00         0       0.0      0.00         0
+cluster20        0        0      0.12         0       0.0      0.00         0
+          cluster15 cluster16 cluster17 cluster18 cluster19 cluster20
+root              0      0.10      0.08         0      0.07         0
+cluster1          0      0.10      0.00         0      0.21         0
+cluster2          0      0.00      0.00         0      0.00         0
+cluster3          0      0.07      0.09         0      0.06         0
+cluster4          0      0.00      0.10         0      0.00         0
+cluster5          0      0.00      0.00         0      0.00         0
+cluster6          0      0.10      0.00         0      0.18         0
+cluster7          0      0.05      0.09         0      0.05         0
+cluster8          0      0.10      0.12         1      0.26         0
+cluster9          0      0.07      0.10         0      0.00         0
+cluster10         0      0.00      0.00         0      0.00         0
+cluster11         0      0.09      0.00         0      0.07         0
+cluster12         0      0.09      0.08         0      0.00         1
+cluster13         0      0.07      0.10         0      0.00         0
+cluster14         0      0.07      0.06         0      0.09         0
+cluster15         0      0.00      0.10         0      0.00         0
+cluster16         0      0.00      0.00         0      0.00         0
+cluster17         0      0.00      0.00         0      0.00         0
+cluster18         0      0.00      0.00         0      0.00         0
+cluster19         0      0.08      0.00         0      0.00         0
+cluster20         1      0.00      0.08         0      0.00         0
+
+real	0m4.839s
+user	0m4.261s
+sys	0m0.358s

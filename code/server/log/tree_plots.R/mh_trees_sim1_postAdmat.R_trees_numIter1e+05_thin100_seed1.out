@@ -1,0 +1,33 @@
+Loading clone.tools
+[1] "plotting score chain"
+[1] "plotting most frequent trees"
+[1] "plotting posterior adjacency matrix"
+[1] "post.admat:"
+          cluster1 cluster2 cluster3 cluster4 cluster5 cluster6 cluster7
+root             1        0        0        0        0        0        0
+cluster1         0        1        0        0        0        0        0
+cluster2         0        0        1        0        0        1        0
+cluster3         0        0        0        1        1        0        0
+cluster4         0        0        0        0        0        0        0
+cluster5         0        0        0        0        0        0        0
+cluster6         0        0        0        0        0        0        1
+cluster7         0        0        0        0        0        0        0
+cluster8         0        0        0        0        0        0        0
+cluster9         0        0        0        0        0        0        0
+cluster10        0        0        0        0        0        0        0
+          cluster8 cluster9 cluster10
+root          0.12     0.15      0.18
+cluster1      0.13     0.18      0.21
+cluster2      0.10     0.15      0.18
+cluster3      0.11     0.17      0.00
+cluster4      0.13     0.18      0.00
+cluster5      0.13     0.17      0.00
+cluster6      0.14     0.00      0.20
+cluster7      0.14     0.00      0.23
+cluster8      0.00     0.00      0.00
+cluster9      0.00     0.00      0.00
+cluster10     0.00     0.00      0.00
+
+real	0m4.239s
+user	0m3.881s
+sys	0m0.295s

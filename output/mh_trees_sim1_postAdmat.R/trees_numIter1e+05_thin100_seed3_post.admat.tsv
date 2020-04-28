@@ -1,0 +1,12 @@
+cluster1	cluster2	cluster3	cluster4	cluster5	cluster6	cluster7	cluster8	cluster9	cluster10
+root	1	0	0	0	0	0	0	0.11	0.15	0.15
+cluster1	0	1	0	0	0	0	0	0.11	0.17	0.2
+cluster2	0	0	1	0	0	1	0	0.12	0.12	0.19
+cluster3	0	0	0	1	1	0	0	0.12	0.18	0
+cluster4	0	0	0	0	0	0	0	0.15	0.18	0
+cluster5	0	0	0	0	0	0	0	0.13	0.19	0
+cluster6	0	0	0	0	0	0	1	0.13	0	0.23
+cluster7	0	0	0	0	0	0	0	0.13	0	0.22
+cluster8	0	0	0	0	0	0	0	0	0	0
+cluster9	0	0	0	0	0	0	0	0	0	0
+cluster10	0	0	0	0	0	0	0	0	0	0

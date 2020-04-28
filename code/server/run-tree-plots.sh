@@ -20,5 +20,5 @@ for seed in {1..5}; do
 	jobname=$name
 	opts="-r $treeResults -o $resultsdir -n $name"
 
-	sbatch -c 8 --job-name=$jobname --output=$logdir/${mh_trees_script}_${jobname}.out --export=ALL,script=$script,opts="$opts" slurm-run-rscript.sh
+	sbatch --job-name=$jobname --output=$logdir/${mh_trees_script}_${jobname}.out --export=ALL,script=$script,opts="$opts" slurm-run-rscript.sh
 done

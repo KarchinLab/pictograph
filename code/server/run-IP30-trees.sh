@@ -1,6 +1,7 @@
 #!/bin/bash
 
-script=IP30_mh_trees_weightedMutate10.R
+#script=IP30_mh_trees_weightedMutate10.R
+script=IP30_mh_trees.R
 logdir=log/$script
 
 mkdir -p $logdir
