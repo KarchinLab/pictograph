@@ -20,6 +20,15 @@ rand.admat <- function(admat) {
   admat
 }
 
+restrictions.from.post.admat <- function(post.admat, threshold=0.1) {
+  # input: posterior adjacency matrix
+  # output: adjacency matrix with restrictions (0's in allowed positions, NAs in restricted positions)
+  # For each column, posible positions are the position with the max posterior 
+  #     probability and those within the threshold of the max (> (max - 0.1))
+  
+  thresh <- apply(post.admat, 2, max) - threshold
+  apply(post.admat, 2, function(x) ifelse(x > (max(x)-threshold), 0, NA))
+}
 
 initializeAdjacencyMatrix <- function(mcf_stats=NULL, mcf_matrix=NULL, zero.thresh=0.01) {
   if (!is.null(mcf_stats)) {
