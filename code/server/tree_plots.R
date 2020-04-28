@@ -109,6 +109,9 @@ adm.chain <- rapply(results$admat.chain, f=function(x) ifelse(is.na(x),0,x), how
 post.admat <- Reduce("+", adm.chain)/length(adm.chain)
 print("post.admat:")
 print(round(post.admat,2))
+write.table(round(post.admat,2), 
+            file = file.path(opt$outdir, paste0(opt$name, "_post.admat.tsv")), 
+            sep = "\t", row.names = T, col.names = T, quote = F)
 
 post.admat.tb <- post.admat %>%
   as_tibble() %>%
