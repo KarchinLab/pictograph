@@ -12,7 +12,7 @@ suppressMessages(library(GGally))
 suppressMessages(library(network))
 suppressMessages(library(sna))
 
-pictograph_path <- "/home/lzheng/GitHub/pictograph"
+pictograph_path <- "~/GitHub/pictograph"
 
 devtools::load_all(file.path(pictograph_path, "code", "clone.tools"))
 
