@@ -13,6 +13,7 @@ suppressMessages(library(network))
 suppressMessages(library(sna))
 
 pictograph_path <- "~/GitHub/pictograph"
+#pictograph_path <- file.path("..", "..")
 
 devtools::load_all(file.path(pictograph_path, "code", "clone.tools"))
 
