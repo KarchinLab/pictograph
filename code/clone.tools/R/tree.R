@@ -1,11 +1,18 @@
 rand.admat <- function(admat) {
   for(col in 1:ncol(admat)) {
     ind.0 <- which(admat[,col] == 0) # possible positions (0's)
-    rand.ind <- sample(ind.0, size=1)
-    admat[rand.ind,col] <- 1
+    
+    # place 1 if only 1 position available
+    if (length(ind.0) == 1) {
+      admat[ind.0, col] <- 1
+      
+    } else { # else randomly pick which position to place 1
+      rand.ind <- sample(ind.0, size=1)
+      admat[rand.ind,col] <- 1
+    }
   }
   
-  if (sum(admat[1, ]) == 0) {
+  if (sum(admat[1, ], na.rm=TRUE) == 0) {
     # pick random cluster to be connected to root
     rand.k <- sample(1:ncol(admat), size = 1)
     curr.1 <- which(admat[, rand.k] == 1)
@@ -133,7 +140,10 @@ mutate.admat.2 <- function(admat, ncol.to.mutate) {
 
 mutate.n.columns <- function(admat, ncol.to.mutate) {
   K <- ncol(admat)
-  rand.ks <- sample(seq_len(K), size=ncol.to.mutate)
+  # columns with more than 1 possible position
+  columns.to.choose.from <- seq_len(K)[apply(admat, 2, function(x) sum(is.na(x)) < K)]
+  # sample columns from those with more than 1 possible position
+  rand.ks <- sample(columns.to.choose.from, size=ncol.to.mutate)
   for(k in rand.ks){
     admat <- mutate.column(admat, k)
   }
