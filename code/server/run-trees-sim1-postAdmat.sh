@@ -1,7 +1,7 @@
 #!/bin/bash
 
 burninscript=mh_trees_sim1.R
-script=mh_trees_sim1_postAdmat.R
+script=mh_trees_sim1_postAdmat_MC3.R
 logdir=log/$script
 
 mkdir -p $logdir

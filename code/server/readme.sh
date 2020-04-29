@@ -16,3 +16,8 @@ mh_trees_sim1.R
 # IP30 tree mh 
 IP30_mh_trees_weightedMutate10.R
 ./run-IP30-trees.sh
+
+# Using posterior adjacency matrix from burn-in run (mh_trees_sim1.R) to update restrictions
+mh_trees_sim1_postAdmat.R
+# weight mass cost by 3
+mh_trees_sim1_postAdmat_MC3.R

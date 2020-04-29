@@ -5,9 +5,7 @@ logdir=log/$script
 
 mkdir -p $logdir
 
-mh_trees_script=mh_trees_sim1.R
-#mh_trees_script=IP30_mh_trees_weightedMutate10.R
-#outdir=~/GitHub/pictograph/output/$script
+mh_trees_script=mh_trees_sim1_postAdmat_MC3.R
 resultsdir=~/GitHub/pictograph/output/${mh_trees_script}
 
 numIter=100000
