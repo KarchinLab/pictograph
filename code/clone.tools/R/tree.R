@@ -546,3 +546,32 @@ calc.tree.prop.true <- function(admat, true.admat) {
   admat.edges <- which(admat == 1)
   sum(admat.edges %in% true.edges) / length(true.edges)
 }
+
+plotEnsembleDAG <- function(post.admat, threshold = 0.1) {
+  admat <- cbind(0, post.admat) ## add column for root
+  dimnames(admat)[[2]][1] <- "root"
+  dimnames(admat) <- lapply(dimnames(admat), function(x) gsub("cluster", "", x))
+  admat <- as.matrix(admat)
+  
+  # filter edges
+  thresh <- apply(admat, 2, max) - threshold
+  ad <- apply(admat, 2, function(x) ifelse(x > (max(x)-threshold), x, 0))
+  
+  ig <- graph_from_adjacency_matrix(ad, mode = "directed", weighted = TRUE,
+                                    diag = FALSE, add.row = TRUE) 
+  
+  E(ig)$lty <- ifelse(E(ig)$weight < 0.25, 2, 1)
+  
+  # make edge black if only 1 edge to vertex
+  e <- ends(ig, E(ig))
+  numTo <- table(e[,2])
+  edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
+  E(ig)$color <- edgeColors
+  
+  V(ig)$label.cex <- 0.5
+  
+  plot.igraph(ig, layout = layout_as_tree(ig),
+              vertex.color = "white", vertex.label.family = "Helvetica",
+              edge.arrow.size = 0.2, edge.arrow.width = 2,
+              edge.width = E(ig)$weight*3)
+}
