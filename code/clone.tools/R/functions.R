@@ -109,6 +109,7 @@ numberClusters <- function(mcf_stats){
         str_replace("w\\[", "") %>%
         as.numeric() %>%
         max()
+    K
 }
 
 numberSamples <- function(mcf_stats){
@@ -118,6 +119,7 @@ numberSamples <- function(mcf_stats){
         str_replace("\\]", "") %>%
         as.numeric() %>%
         max()
+    nSamples
 }
 
 mcfMatrix <- function(mcf_stats, parameter="mean"){
