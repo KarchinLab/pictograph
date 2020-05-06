@@ -35,7 +35,7 @@ calcLogLik <- function(z.iter, w.iter, input.data) {
 
 calcChainLogLik <- function(samps, input.data, K) {
   z.chain <- getParamChain(samps, "z\\[")
-  w.chain <- getParamChain(samps, "w")
+  w.chain <- getParamChain(samps, "w\\[")
   lik <- c()
   for(iter in 1:nrow(z.chain)) {
     z.iter <- z.chain[iter, ]

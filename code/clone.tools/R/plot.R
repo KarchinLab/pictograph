@@ -9,14 +9,6 @@ get.parameter.chain <- function(param, chains) {
   chains[grep(paste0(param, "\\["), chains$Parameter), ]
 }
 
-get.K.from.w.chain <- function(w.chain) {
-  params <- as.character(unique(w.chain$Parameter))
-  inds <- gsub("\\]", "", gsub("w\\[", "", params))
-  Ks <- as.numeric(sapply(strsplit(inds, ","), "[", 1))
-  max(Ks)
-}
-
-
 plot.variant.z <- function(mcmc_z, I, K) {
   z.seg.tb <- mcmc_z %>%
     group_by(Parameter) %>%

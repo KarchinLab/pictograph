@@ -547,16 +547,18 @@ calc.tree.prop.true <- function(admat, true.admat) {
   sum(admat.edges %in% true.edges) / length(true.edges)
 }
 
-plotEnsembleDAG <- function(post.admat, threshold = 0.1) {
+plotEnsembleDAG <- function(post.admat, threshold = 0.1, filter = TRUE) {
   admat <- cbind(0, post.admat) ## add column for root
   dimnames(admat)[[2]][1] <- "root"
   dimnames(admat) <- lapply(dimnames(admat), function(x) gsub("cluster", "", x))
   admat <- as.matrix(admat)
   
   # filter edges
-  thresh <- apply(admat, 2, max) - threshold
-  ad <- apply(admat, 2, function(x) ifelse(x > (max(x)-threshold), x, 0))
-  
+  if (filter) {
+    thresh <- apply(admat, 2, max) - threshold
+    ad <- apply(admat, 2, function(x) ifelse(x > (max(x)-threshold), x, 0))
+  }
+
   ig <- graph_from_adjacency_matrix(ad, mode = "directed", weighted = TRUE,
                                     diag = FALSE, add.row = TRUE) 
   
