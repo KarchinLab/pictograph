@@ -10,8 +10,11 @@ library(coda)
 library(ggmcmc)
 library(dplyr)
 library(gridExtra)
+library(stringr)
 library(fs)
+devtools::load_all("clone.tools")
 outdir <- file.path("..", "output", "dat_likelihood.Rmd")
+modeldir <- file.path("..", "archive", "v6", "models")
 dir_create(outdir)
 ```
 
@@ -172,30 +175,59 @@ calcBIC <- function(n, k, ll) log(n)*k - 2*ll
 ## Cluster -- JAGS
 
 ```{r JAGS}
-stop()
-jags.file <- file.path(models.dir, "w.jags")
+jags.file <- file.path(modeldir, "w.jags")
 inits <- list(".RNG.name" = "base::Wichmann-Hill", 
               ".RNG.seed" = 123)
 test.data <- list("I" = I, "S" = S, 
                   "y" = y, "n" = n,
                   "m" = m, "tcn" = tcn)
 params <- c("z", "w", "ystar")
-
 n.iter = 10000
 thin = 7
 K <- 10
-
+untrace(runMCMC, browser)
 samps <- runMCMC(test.data, K, jags.file, inits, params, n.iter, thin)
+
+clusterIndex <- function(x){
+    as.character(x) %>%
+        strsplit("[", fixed=TRUE) %>%
+        sapply("[", 2) %>%
+        strsplit(",") %>%
+        sapply("[", 1) %>%
+        as.integer()
+}
+sampleIndex <- function(x){
+    as.character(x) %>%
+        strsplit(",", fixed=TRUE) %>%
+        sapply("[", 2) %>%
+        str_replace("]", "") %>%
+        as.integer()
+}
+
+mutationIndex <- function(x){
+    as.character(x) %>%
+        strsplit("[", fixed=TRUE) %>%
+        sapply("[", 2) %>%
+        str_replace("]", "") %>%
+        as.integer()
+}
+
+## w indices:  cluster, sample
+jags_df <- ggs(samps)
+w.chain <- jags_df[grep("w", jags_df$Parameter), ] %>%
+    mutate(cluster_index=clusterIndex(Parameter),
+           sample_index=sampleIndex(Parameter))
+z.chain <- jags_df[grep("z", jags_df$Parameter), ] %>%
+    mutate(mutation_index=mutationIndex(Parameter))
 z.chain <- getParamChain(samps, "z")
 w.chain <- getParamChain(samps, "w")
-
 mcmc_vals <- summary(samps)$statistics
 mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
 mcmc_w <- matrix(mcmc_w, nrow=K)
 colnames(mcmc_w) <- paste0("sample", 1:S)
 ```
 
-## PPD
+## Posterior predictive distribution
 
 ```{r ppd, echo=F}
 plot.ppd <- function(samps, test.data, K) {
@@ -232,7 +264,6 @@ plot.ppd <- function(samps, test.data, K) {
       facet_wrap(~sample) +
       ggtitle(paste0("K = ", K))
 }
-
 plot.ppd(samps, test.data, K)
 ```
 

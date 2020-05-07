@@ -6,7 +6,6 @@ runMCMC <- function(data, K, jags.file, inits, params,
                     n.iter, thin, n.chains=1,
                     n.adapt=1000) {
     data$K <- K
-
     jags.m <- jags.model(jags.file,
                          data,
                          n.chains = n.chains,
