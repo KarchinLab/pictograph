@@ -276,7 +276,6 @@ plot.z <- function(samps, z) {
   plot(z, mcmc_z, type = "p")
   z_comp <- data.frame(z, mcmc_z)
 }
-
 z.chain.to.tb <- function(z.chain) {
   z.chain.tb <- z.chain %>%
     as_tibble() %>%
@@ -292,21 +291,21 @@ z.chain.to.tb <- function(z.chain) {
     group_by(variant) %>%
     mutate(prop = count/sum(count))
 }
-
 z.chain.tb <- z.chain.to.tb(z.chain)
 z.chain.tb
 
-z.seg.tb <- tibble(variant = numeric(),
-                    mcmc_z_1 = numeric(),
-                    mcmc_z_2 = numeric()) 
+nc <- ncol(z.chain)
+z.seg.tb <- matrix(NA, nrow=nc, ncol=3)
+colnames(z.seg.tb) <- c("variant", "mcmc_z_1", "mcmc_z_2")
 for (i in 1:ncol(z.chain)) {
   z.vals <- as.integer(names(table(z.chain[,i])))
   if (length(z.vals) > 1) {
-    z.seg.tb[i, ] <- c(i, z.vals[1], z.vals[2]) 
+      z.seg.tb[i, ] <- c(i, z.vals[1], z.vals[2])
   } else {
     z.seg.tb[i, ] <- c(i, z.vals, z.vals) 
   }
 }
+z.seg.tb <- as_tibble(z.seg.tb)
 #z.seg.tb
 z.plot <- ggplot(z.chain.tb, aes(variant, mcmc_z)) +
   ylab("mcmc z") + 
@@ -320,14 +319,7 @@ z.plot <- ggplot(z.chain.tb, aes(variant, mcmc_z)) +
                    color="gray", linetype=2) +
   geom_point(aes(y=mcmc_z, fill=prop), 
              pch=21, size=3, stroke=0)
-
 z.plot
-#gsave(file.path(figs.dir, "zplot.pdf"), z.plot, width=14, height=6)
-
-# mcmc_vals <- summary(samps)$statistics
-# mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
-# plot.z(samps, z)
-
 ```
 
 ```{r map} 
