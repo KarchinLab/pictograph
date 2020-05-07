@@ -156,33 +156,32 @@ rule.chain.freq <- function(parent.chain, child.chain) {
 }
 
 score.admat.chain <- function(admat, w.chain) {
-  w.ind <- colnames(w.chain)
-  k.vec <- gsub("^w\\[(.*)\\,.*", "\\1", w.ind)
-  K <- length(unique(k.vec))
-  S <- length(k.vec) / K
-  total.obs <- nrow(w.chain) * S
-  
-  #numFromNodes <- count.from.nodes(admat)
+    w.ind <- colnames(w.chain)
+    k.vec <- gsub("^w\\[(.*)\\,.*", "\\1", w.ind)
+    K <- length(unique(k.vec))
+    S <- length(k.vec) / K
+    total.obs <- nrow(w.chain) * S
 
-  w.chain.tb <- as_tibble(w.chain)
-  # root, MCF=1.0
-  children.w.sum <- get.children.w.sum.chain(admat, w.chain.tb, 1, S)
-  #parent.w <- subset.w.chain(w.chain.tb, 1, 1:S)
-  rule.freq <- rule.chain.freq(parent.chain=1, child.chain=children.w.sum)
-  
-  #score <- log(rule.freq)
-  score <- rule.freq
-  
-  for(i in 2:nrow(admat)) {
-    if(sum(admat[i,], na.rm=T) == 0) next #leaf
-    
-    curr.child.sum <- get.children.w.sum.chain(admat, w.chain.tb, i, S)
-    parent.w <- subset.w.chain(w.chain.tb, i-1, 1:S)
-    curr.freq <- rule.chain.freq(parent.chain=parent.w, child.chain=curr.child.sum)
-    #score <- score + log(curr.freq)
-    score <- score * curr.freq
-  }
-  score
+    #numFromNodes <- count.from.nodes(admat)
+    w.chain.tb <- as_tibble(w.chain)
+    # root, MCF=1.0
+    children.w.sum <- get.children.w.sum.chain(admat, w.chain.tb, 1, S)
+    #parent.w <- subset.w.chain(w.chain.tb, 1, 1:S)
+    rule.freq <- rule.chain.freq(parent.chain=1, child.chain=children.w.sum)
+
+    #score <- log(rule.freq)
+    score <- rule.freq
+
+    for(i in 2:nrow(admat)) {
+      if(sum(admat[i,], na.rm=T) == 0) next #leaf
+
+      curr.child.sum <- get.children.w.sum.chain(admat, w.chain.tb, i, S)
+      parent.w <- subset.w.chain(w.chain.tb, i-1, 1:S)
+      curr.freq <- rule.chain.freq(parent.chain=parent.w, child.chain=curr.child.sum)
+      #score <- score + log(curr.freq)
+      score <- score * curr.freq
+    }
+    score
 }
 
 #score.admat.chain(admat, w.chain)
