@@ -7,18 +7,12 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(rjags)
 library(coda)
-#library(MCMCpack)
-#library(bayesplot)
 library(ggmcmc)
 library(dplyr)
 library(gridExtra)
-
-working.dir <- ".."
-models.dir <- file.path(working.dir, "models")
-trace.dir <- file.path(working.dir, "trace")
-figs.dir <- file.path(working.dir, "figs")
-#dir.create(trace.dir, showWarnings = F)
-runName <- "v.6.0"
+library(fs)
+outdir <- file.path("..", "output", "dat_likelihood.Rmd")
+dir_create(outdir)
 ```
 
 ## Simulate data
@@ -119,12 +113,6 @@ w2 <- w %>%
     ##       variant_index=seq_len(nrow(.))) %>%
     gather("sample", "omega", -z) %>%
     mutate(sample=factor(sample, levels=slevels))
-##fig1 <- ggplot(w2, aes(z, omega)) +
-##    geom_jitter(width=0.1, size=1) +
-##    facet_wrap(~sample) +
-##    ylab(expression(omega)) +
-##    xlab("True cluster") +
-##    theme(panel.background=element_rect(fill="white", color="black"))
 fig2 <- ggplot(w2, aes(sample, omega, group=z)) +
     geom_point(size=1,  aes(color=z)) +
     geom_line(aes(color=z)) +
@@ -138,7 +126,7 @@ fig2
 ```
 
 ## functions
-```{r func}
+```{r func, eval=FALSE}
 runMCMC <- function(data, K, jags.file, inits, params, n.iter, thin) {
   data$K <- K
   jags.m <- jags.model(jags.file, data,
@@ -184,6 +172,7 @@ calcBIC <- function(n, k, ll) log(n)*k - 2*ll
 ## Cluster -- JAGS
 
 ```{r JAGS}
+stop()
 jags.file <- file.path(models.dir, "w.jags")
 inits <- list(".RNG.name" = "base::Wichmann-Hill", 
               ".RNG.seed" = 123)
