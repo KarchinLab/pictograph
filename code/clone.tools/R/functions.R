@@ -147,3 +147,46 @@ sample.w <- function(w.chain, K) {
   matrix(w.sample$value, nrow = K, byrow = T)
 }
 
+get.map.z <- function(z.chain) {
+  numIter <- max(z.chain$Iteration)
+  mcmc_z <- z.chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              numIter=numIter) %>%
+    mutate(probability=n/numIter) %>%
+    ungroup()
+  
+  map_z <- mcmc_z %>%
+    group_by(Parameter) %>%
+    select(Parameter, value, probability)
+  map_z <- filter(map_z, probability==max(probability)) %>%
+    ungroup()
+  map_z <- map_z %>%
+    mutate(variant_ind = as.numeric(
+      gsub("z\\[", "", gsub("\\]", "", as.character(map_z$Parameter)))))
+  
+  muts <- y$mut_id
+  muts.z <- map_z %>%
+    mutate(Mutation = muts[map_z$variant_ind]) %>%
+    arrange(value) %>%
+    rename(Cluster = value, Posterior_probability = probability)
+  muts.z <- muts.z %>%
+    select(Cluster, Posterior_probability, Mutation)
+  muts.z
+}
+
+# function to check if clustering respects sample presence 
+test.pres <- function(samps, pres.tb) {
+  # input: samps = one item in samps.list
+  #        pres.tb = tibble with columns mut_id and sample_presence (label of sample-presence set)
+  # output: TRUE or FALSE
+  chains <- ggs(samps)
+  z.chain <- get.parameter.chain("z", chains)
+  map.z <- get.map.z(z.chain)
+  
+  # check that clusters respect sample presence
+  pres.tb$cluster <- map.z$Cluster[match(pres.tb$mut_id, map.z$Mutation)]
+  clusts <- unique(pres.tb$cluster)
+  pres.equal <- all(sapply(clusts, function(x) 
+    length(unique(pres.tb$sample_presence[pres.tb$cluster == x])) == 1))
+}
