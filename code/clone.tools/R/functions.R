@@ -3,7 +3,7 @@ calcTheta <- function(m, tcn, w) {
 }
 
 runMCMC <- function(data, K, jags.file, inits, params,
-                    n.iter=20000, thin=100, n.chains=1,
+                    n.iter=20000, thin=10, n.chains=1,
                     n.adapt=1000, n.burn=10000) {
     data$K <- K
 
