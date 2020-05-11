@@ -3,8 +3,8 @@ calcTheta <- function(m, tcn, w) {
 }
 
 runMCMC <- function(data, K, jags.file, inits, params,
-                    n.iter, thin, n.chains=1,
-                    n.adapt=1000) {
+                    n.iter=20000, thin=100, n.chains=1,
+                    n.adapt=1000, n.burn=10000) {
     data$K <- K
 
     jags.m <- jags.model(jags.file,
@@ -12,6 +12,7 @@ runMCMC <- function(data, K, jags.file, inits, params,
                          n.chains = n.chains,
                          inits = inits,
                          n.adapt = n.adapt)
+    update(jags.m, n.burn)
     samps <- coda.samples(jags.m, params, n.iter=n.iter, thin=thin)
     samps
 }
