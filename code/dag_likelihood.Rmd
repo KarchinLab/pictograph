@@ -39,7 +39,8 @@ w <- matrix(c(0.98, 0.99, 0.97,
               0.30, 0.70, 0.00),
             byrow=T,
             nrow=K, ncol=S)
-colnames(w) <-  paste0("sample", 1:S)
+dimnames(w) <-  list(paste0("cluster", seq_len(K)),
+                     paste0("sample", 1:S))
 w
 
 tcn <- matrix(2, nrow=I, ncol=S)
@@ -213,7 +214,9 @@ w.map.tb <- w.map.tb %>%
   mutate(sample = as.integer(gsub(".*\\,(.*)\\]", "\\1", w.map.tb$ind))) %>%
   arrange(cluster)
 #w.map.tb
-w.map <- matrix(data=w.map.tb$mean_w, nrow=10, ncol=3, byrow=TRUE)
+w.map <- matrix(data=w.map.tb$mean_w, nrow=K, ncol=3, byrow=TRUE)
+dimnames(w.map) <- list(paste0("cluster", seq_len(K)),
+                        paste0("sample", seq_len(ncol(w.map))))
 w.map
 ```
 
@@ -224,13 +227,14 @@ source("cluster_first_k10_functions.R")
 ```
 
 ```{r admat_score} 
-true.admat <- base.admat(w, zero.thresh = 0.01)
-true.admat[1,1] <- true.admat[2,2] <- true.admat[3,3] <-  true.admat[3,6] <-
-  true.admat[4,4] <- true.admat[4,5] <- true.admat[5,8] <- true.admat[6,9] <-
-  true.admat[7,7] <- true.admat[8,10] <- 1
-true.admat
-
-score.admat(true.admat, w)
+A <- base.admat(w, zero.thresh = 0.01)
+rownames(A) <- c("root", rownames(w.map))
+colnames(A) <- rownames(w.map)
+## True adjacency matrix
+A[1, 1] <- A[2, 2] <- A[2, 3] <- 1
+A
+## TODO: unit test this
+score.admat(A, w)
 ```
 
 ```{r tree_mcmc}
@@ -240,45 +244,48 @@ mcmc_w <- mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "w", "Mean"]
 mcmc_w <- matrix(mcmc_w, nrow=K)
 colnames(mcmc_w) <- paste0("sample", 1:S)
 
-answer <- base.admat(mcmc_w)
-answer[1,1] <- answer[2,2] <- answer[3,7] <- answer[3,8] <- 
-  answer[5,3] <- answer[8,9] <- answer[9,4] <- answer[9,10] <- 
-  answer[10,5] <- answer[11,6] <- 1
+##
+## Let's switch back the labels so that it corresponds to the simulated MCFs 
+##'
+mcmc_w <- mcmc_w[c(1, 3, 2), ]
+dimnames(mcmc_w) <- dimnames(w)
+round(mcmc_w, 2)
 
-score.admat.chain(answer, w.chain)
+##A2 <- base.admat(mcmc_w)
+Ainit <- A ## start at truth
+score.admat.chain(Ainit, w.chain)
 
-admat.chain <- list(init.admat(mcmc_w, zero.thresh=0.01))
-score.chain <- c()
-
-numAccept = 0
-#2*2*6*5*8*4*5*4*5
 numIter <- 1000
-for (i in 1:numIter) {
-  P.prev <- score.admat.chain(admat.chain[[i]], w.chain)
-  score.chain[i] <- P.prev
-  #admat.star <- mutate.admat(admat.chain[[i]])
-  #P.star <- score.admat.chain(admat.star, w.chain)
-  
-  # if(P.prev == 0 & P.star == 0) {
-  #   admat.chain[[i+1]] <- admat.star
-  #   numAccept <- numAccept + 1
-  #   next
-  # }
-  P.star <- 0
-  while (P.star == 0) {
-      admat.star <- mutate.admat(admat.chain[[i]])
-      trace(score.admat.chain, browser)
-      P.star <- score.admat.chain(admat.star, w.chain)
-  }
-  
-  r <- P.star / P.prev
-  u <- runif(1,0,1)
-  if(u <= r) {
-    admat.chain[[i+1]] <- admat.star
-    numAccept <- numAccept + 1
-  } else {
-    admat.chain[[i+1]] <- admat.chain[[i]]
-  }
+nSamples <- ncol(w)
+A.chain <- matrix(NA, numIter, (K+1)*nSamples)
+A.chain[1, ] <- as.numeric(init.admat(mcmc_w, zero.thresh=0.01))
+numAccept  <-  0
+for (i in seq_len(numIter)) {
+    P.prev <- score.admat.chain(admat.chain[[i]], w.chain)
+    score.chain[i] <- P.prev
+    #admat.star <- mutate.admat(admat.chain[[i]])
+    #P.star <- score.admat.chain(admat.star, w.chain)
+
+    # if(P.prev == 0 & P.star == 0) {
+    #   admat.chain[[i+1]] <- admat.star
+    #   numAccept <- numAccept + 1
+    #   next
+    # }
+    P.star <- 0
+    while (P.star == 0) {
+        admat.star <- mutate.admat(admat.chain[[i]])
+        trace(score.admat.chain, browser)
+        P.star <- score.admat.chain(admat.star, w.chain)
+    }
+
+    r <- P.star / P.prev
+    u <- runif(1,0,1)
+    if(u <= r) {
+      admat.chain[[i+1]] <- admat.star
+      numAccept <- numAccept + 1
+    } else {
+      admat.chain[[i+1]] <- admat.chain[[i]]
+    }
 }
 score.chain[i+1] <- score.admat.chain(admat.chain[[i+1]], w.chain)
 acceptRate <- numAccept/(numIter)
