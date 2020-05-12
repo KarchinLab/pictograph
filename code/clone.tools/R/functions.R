@@ -190,3 +190,38 @@ test.pres <- function(samps, pres.tb) {
   pres.equal <- all(sapply(clusts, function(x) 
     length(unique(pres.tb$sample_presence[pres.tb$cluster == x])) == 1))
 }
+
+plot_ppd <- function(samps, test.data, K) {
+  ##
+  ## 50 mutations x 10 samples
+  chains <- do.call(rbind, samps)
+  ystar <- chains[, grep("ystar", colnames(chains))]
+  ## each row of MCMC is in column-major order
+  orig.order <- tibble(statistic=colnames(ystar))
+  ppd.summaries <- ystar %>%
+      as_tibble() %>%
+      gather("statistic", "value") %>%
+      group_by(statistic) %>%
+      summarize(mean=mean(value),
+                q1=quantile(value, 0.025),
+                q3=quantile(value, 0.975))
+  ppd.summaries2 <- left_join(orig.order,
+                              ppd.summaries, by="statistic") %>%
+      mutate(observed=as.numeric(test.data$y)) %>%
+      mutate(sample=paste0("sample", rep(1:test.data$S, each=test.data$I)),
+             variant=rep(1:test.data$I, test.data$S))
+  ggplot(ppd.summaries2, aes(x=statistic, y=mean,
+                             ymin=q1,
+                             ymax=q3)) +
+      geom_errorbar() +
+      geom_point(aes(x=statistic, y=observed),
+                 size=1, color="steelblue") +
+      theme(axis.text.x=element_blank(),
+            axis.ticks.x=element_blank(),
+            panel.background=element_rect(fill="white",
+                                          color="black")) +
+      ylab("Middle 95% of posterior\npredictive distribution") +
+      xlab("observation index (column-major order)") +
+      facet_wrap(~sample) +
+      ggtitle(paste0("K = ", K))
+}
