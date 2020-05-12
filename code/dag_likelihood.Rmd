@@ -30,6 +30,10 @@ set.seed(123)
 pi <- rep(0.1, 10)
 #z <- sample(1:K, size = I, replace = T, prob = pi)
 z <- rep(1:10, each=10)
+##
+## each row is a cluster of mutations
+##
+## columns are samples
 w <- matrix(c(0.98, 0.99, 0.97, 
               0.98, 0.90, 0.82,
               0.55, 0.00, 0.80, 
@@ -234,7 +238,7 @@ plot_ppd(samps, test.data, K)
 
 ## Z
 
-```{r zplot, echo=T, eval=T}
+```{r zplot, echo=TRUE, eval=TRUE}
 plot.z <- function(samps, z) {
   mcmc_vals <- summary(samps)$statistics
   mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
