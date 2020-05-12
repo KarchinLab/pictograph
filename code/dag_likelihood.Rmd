@@ -346,16 +346,13 @@ w.map <- matrix(data=w.map.tb$mean_w, nrow=10, ncol=3, byrow=TRUE)
 w.map
 ```
 
-## Admat
+## Adjacency matrix
 
 ```{r admat_functions}
 source("cluster_first_k10_functions.R")
 ```
 
-
-
 ```{r admat_score} 
-stop("here")
 true.admat <- base.admat(w, zero.thresh = 0.01)
 true.admat[1,1] <- true.admat[2,2] <- true.admat[3,3] <-  true.admat[3,6] <-
   true.admat[4,4] <- true.admat[4,5] <- true.admat[5,8] <- true.admat[6,9] <-
@@ -363,8 +360,6 @@ true.admat[1,1] <- true.admat[2,2] <- true.admat[3,3] <-  true.admat[3,6] <-
 true.admat
 
 score.admat(true.admat, w)
-
-
 ```
 
 ```{r tree_mcmc}
@@ -380,7 +375,6 @@ answer[1,1] <- answer[2,2] <- answer[3,7] <- answer[3,8] <-
   answer[10,5] <- answer[11,6] <- 1
 
 score.admat.chain(answer, w.chain)
-
 
 admat.chain <- list(init.admat(mcmc_w, zero.thresh=0.01))
 score.chain <- c()
@@ -401,8 +395,9 @@ for (i in 1:numIter) {
   # }
   P.star <- 0
   while (P.star == 0) {
-    admat.star <- mutate.admat(admat.chain[[i]])
-    P.star <- score.admat.chain(admat.star, w.chain)
+      admat.star <- mutate.admat(admat.chain[[i]])
+      trace(score.admat.chain, browser)
+      P.star <- score.admat.chain(admat.star, w.chain)
   }
   
   r <- P.star / P.prev
