@@ -189,3 +189,58 @@ score.admat.chain <- function(admat, w.chain) {
 check.base.admat <- function(admat, base) {
  all(which(is.na(admat)) == which(is.na(base)))
 }
+
+clusterIndex <- function(x){
+    as.character(x) %>%
+        strsplit("[", fixed=TRUE) %>%
+        sapply("[", 2) %>%
+        strsplit(",") %>%
+        sapply("[", 1) %>%
+        as.integer()
+}
+sampleIndex <- function(x){
+    as.character(x) %>%
+        strsplit(",", fixed=TRUE) %>%
+        sapply("[", 2) %>%
+        str_replace("]", "") %>%
+        as.integer()
+}
+
+mutationIndex <- function(x){
+    as.character(x) %>%
+        strsplit("[", fixed=TRUE) %>%
+        sapply("[", 2) %>%
+        str_replace("]", "") %>%
+        as.integer()
+}
+
+plot.z <- function(samps, z) {
+  mcmc_vals <- summary(samps)$statistics
+  mcmc_z <- as.vector(mcmc_vals[substr(rownames(mcmc_vals), 1, 1) == "z", "Mean"])
+  plot(z, mcmc_z, type = "p")
+  z_comp <- data.frame(z, mcmc_z)
+}
+
+z.chain.to.tb <- function(z.chain) {
+  z.chain.tb <- z.chain %>%
+    as_tibble() %>%
+    mutate(iter=1:nrow(z.chain)) %>%
+      gather(variant, mcmc_z, -c(iter))
+  L <- length(unique(z.chain.tb$variant))
+  variantIndex <- function(x){
+      xx <- strsplit(x, "[", fixed=TRUE)
+      x2 <- sapply(xx, "[", 2) %>%
+          gsub("]", "", .) %>%
+          as.integer()
+  }
+  K <- 3
+  z2 <- z.chain.tb %>%
+      mutate(variant_index = variantIndex(variant)) %>%
+      mutate(true_z = rep(1:10, each=nrow(z.chain)*K)) %>%
+      group_by(variant, mcmc_z) %>% 
+      mutate(count = n())
+  z.chain.tb_simp <- distinct(select(z2, -c(iter)))
+  z.chain.tb_simp %>% 
+    group_by(variant) %>%
+    mutate(prop = count/sum(count))
+}
