@@ -24,16 +24,10 @@ dir_create(outdir)
 I <- 30
 K <- 3
 S <- 3
-
 set.seed(123)
-
 pi <- rep(1/3, 3)
 ## 10 mutations for each of the 3 clusters
 z <- rep(1:3, each=10)
-##
-## each row is a cluster of mutations
-##
-## columns are samples
 w <- matrix(c(0.98, 0.99, 0.97, 
               0.55, 0.00, 0.80, 
               0.30, 0.70, 0.00),
@@ -260,8 +254,14 @@ nSamples <- ncol(w)
 A.chain <- matrix(NA, numIter, (K+1)*nSamples)
 A.chain[1, ] <- as.numeric(init.admat(mcmc_w, zero.thresh=0.01))
 numAccept  <-  0
+
+
 for (i in seq_len(numIter)) {
-    P.prev <- score.admat.chain(admat.chain[[i]], w.chain)
+    am <- matrix(A.chain[i, ], (K+1), nSamples)
+    ##P.prev <- score.admat.chain(am, w.chain)
+    source("cluster_first_k10_functions.R")
+    trace(scoreA, browser)
+    P.prev <- scoreA(am, w=w.chain[i, ])
     score.chain[i] <- P.prev
     #admat.star <- mutate.admat(admat.chain[[i]])
     #P.star <- score.admat.chain(admat.star, w.chain)
