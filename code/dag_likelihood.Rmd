@@ -156,7 +156,6 @@ plot_ppd(samps, test.data, K)
 ## Z
 
 ```{r zplot, echo=TRUE, eval=TRUE}
-source("cluster_first_k10_functions.R")
 ##trace(z.chain.to.tb, browser)
 z.chain.tb <- z.chain.to.tb(z.chain)
 z.chain.tb
@@ -216,10 +215,6 @@ w.map
 
 ## Adjacency matrix
 
-```{r admat_functions}
-source("cluster_first_k10_functions.R")
-```
-
 ```{r admat_score} 
 A <- base.admat(w, zero.thresh = 0.01)
 rownames(A) <- c("root", rownames(w.map))
@@ -251,51 +246,33 @@ score.admat.chain(Ainit, w.chain)
 
 numIter <- 1000
 nSamples <- ncol(w)
-A.chain <- matrix(NA, numIter, (K+1)*nSamples)
+A.chain <- matrix(NA, numIter+1, (K+1)*nSamples)
 A.chain[1, ] <- as.numeric(init.admat(mcmc_w, zero.thresh=0.01))
+score.chain <- rep(NA, numIter+1)
 numAccept  <-  0
-
-
 for (i in seq_len(numIter)) {
+    if(i %% 100 == 0) cat(".")
     am <- matrix(A.chain[i, ], (K+1), nSamples)
     ##P.prev <- score.admat.chain(am, w.chain)
-    source("cluster_first_k10_functions.R")
-    trace(scoreA, browser)
-    P.prev <- scoreA(am, w=w.chain[i, , drop=FALSE])
+    mcf <- w.chain[i, , drop=FALSE]
+    P.prev <- scoreA(am, w=mcf)
     score.chain[i] <- P.prev
-    #admat.star <- mutate.admat(admat.chain[[i]])
-    #P.star <- score.admat.chain(admat.star, w.chain)
-
-    # if(P.prev == 0 & P.star == 0) {
-    #   admat.chain[[i+1]] <- admat.star
-    #   numAccept <- numAccept + 1
-    #   next
-    # }
     P.star <- 0
     while (P.star == 0) {
-        admat.star <- mutate.admat(admat.chain[[i]])
-        trace(score.admat.chain, browser)
-        P.star <- score.admat.chain(admat.star, w.chain)
+        Astar <- mutateA(am)
+        P.star <- scoreA(Astar, mcf)
     }
-
     r <- P.star / P.prev
     u <- runif(1,0,1)
     if(u <= r) {
-      admat.chain[[i+1]] <- admat.star
-      numAccept <- numAccept + 1
+        A.chain[i+1, ] <- as.numeric(Astar)
+        numAccept <- numAccept + 1
     } else {
-      admat.chain[[i+1]] <- admat.chain[[i]]
+        A.chain[i+1, ] <- A.chain[i, ]
     }
 }
-score.chain[i+1] <- score.admat.chain(admat.chain[[i+1]], w.chain)
+score.chain[i+1] <- scoreA(matrix(A.chain[i+1, ], (K+1), nSamples), mcf)
 acceptRate <- numAccept/(numIter)
 acceptRate
-
-plot(score.chain)
-max(score.chain)
-max.score.ind <- which(score.chain == max(score.chain))
-if(length(max.score.ind) > 1) max.score.ind <- max.score.ind[1]
-max.admat <- admat.chain[[max.score.ind]]
-max.admat
 ```
 

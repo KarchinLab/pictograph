@@ -93,6 +93,34 @@ mutate.admat <- function(admat) {
   new.admat
 }
 
+mutateA <- function(A) {
+    ## choose a column to mutate
+    K <- ncol(A)
+    npossible <- colSums(!is.na(A))
+    columns <- which(npossible > 1)
+    rand.k <- sample(columns, size=1)
+    ## mutate
+    ## possible positions (0's)
+    ##possiblePos <- which(!is.na(A[, rand.k]) & A[, rand.k] != 1)
+    possiblePos <- which(!is.na(A[, rand.k]) & A[, rand.k] != 1)
+    ## current position with 1
+    ind.1 <- which(A[, rand.k] == 1)
+    ## select new position
+    if (length(possiblePos) == 1) {
+        new.1 <- possiblePos
+    } else {
+        new.1 <- sample(possiblePos, size=1)
+    }
+    new.admat <- A 
+    new.admat[ind.1, rand.k] <- 0
+    new.admat[new.1, rand.k] <- 1
+    while (sum(new.admat[1, ]) == 0) {
+      new.admat <- mutate.admat(admat)
+    }
+    new.admat
+}
+
+
 getChildrenWSum <- function(admat, w, row) {
   curr.row <- admat[row,]
   children <- which(curr.row == 1)
