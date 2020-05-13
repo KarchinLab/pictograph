@@ -50,9 +50,15 @@ test_that("jags_sampler", {
     extdir <- system.file("extdata", package="clone.tools")
     jags.file <- file.path(extdir, "mcf_model.jag")
     dat <- unit_test_data()
-    params <- c("z", "w", "ystar")
-    n.iter = 10000
-    thin = 2
+
+    jagsData <- function(dat){
+        w <- group_by(dat, cluster, sample) %>%
+            summarize(mcf=unique(mcf))
+
+    }
+    ##params <- c("z", "w", "ystar")
+    ##n.iter = 10000
+    ##thin = 2
     samps <- runMCMC(test.data, K, jags.file, inits, params, n.iter, thin)
 
 
