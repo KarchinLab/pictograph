@@ -224,3 +224,36 @@ plot_ppd <- function(samps, test.data, K) {
       facet_wrap(~sample) +
       ggtitle(paste0("K = ", K))
 }
+
+#' @export
+simulateVAF <- function(mcf, nvarClust, avg_depth=100, sd_depth=20){
+    nClust <- nrow(mcf)
+    nSamp <- ncol(mcf)
+    nVariants <- sum(nvarClust)
+    nObs <- nVariants * nSamp
+    stopifnot(length(nvarClust) == nClust)
+    ##pi <- rep(1/3, 3)
+    ## 10 mutations for each of the 3 clusters
+    z <- rep(1:nClust, nvarClust)
+
+    MCF <- mcf[z, ]
+    dimnames(MCF) <- list(paste0("variant", seq_len(nVariants)),
+                          paste0("sample", seq_len(nSamp)))
+    mult <- tcn <- MCF;
+    tcn[,] <- 2
+    mult[,] <- sample(1:2, nVariants*nSamp, replace=TRUE)
+    vaf <- (mult * MCF)/(tcn * MCF + 2*(1-MCF))
+    ## add more variation to sequencing depth
+    mus <- rnorm(nVariants, avg_depth, sd_depth)
+    mus <- ifelse(mus < 0, 0, mus)
+    depth <- matrix(rpois(nObs, mus), nVariants, nSamp)
+    y <- rbinom(nObs, as.numeric(depth), as.numeric(vaf))
+    y <- ifelse(y < 0, 0, y)
+    tibble(variant=rep(seq_len(nVariants), nSamp),
+           sample=rep(seq_len(nSamp), each=nVariants),
+           cluster=rep(z, nSamp),
+           y=y,
+           n=as.numeric(depth),
+           multiplicity=as.numeric(mult),
+           mcf=as.numeric(MCF))
+}
