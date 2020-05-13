@@ -40,26 +40,28 @@ test_that("simulateVAF", {
     dat <- simulateVAF(mcf, nvarClust)
     nobs <- sum(nvarClust) * ncol(mcf)
     expect_true(nobs==nrow(dat))
-)
+})
         
 test_that("jags_sampler", {
-    ##
-    ## Can we serve the model in clone.tools?
-    ##
-    ##modeldir <- file.path("..", "archive", "v6", "models")
+    library(rjags)
+    library(ggmcmc)
     extdir <- system.file("extdata", package="clone.tools")
     jags.file <- file.path(extdir, "mcf_model.jag")
     dat <- unit_test_data()
+    jags_inputs <- listJagInputs(dat)
+    model <- jags.model(jags.file,
+                        data=jags_inputs,
+                        n.chains=3,
+                        n.adapt=500)
+    samples <- coda.samples(model, n.iter=1000, thin=1,
+                            variable.names=c("w", "z", "ystar"))
+    tib <- ggs(samples)
 
-    jagsData <- function(dat){
-        w <- group_by(dat, cluster, sample) %>%
-            summarize(mcf=unique(mcf))
-
-    }
-    ##params <- c("z", "w", "ystar")
-    ##n.iter = 10000
-    ##thin = 2
-    samps <- runMCMC(test.data, K, jags.file, inits, params, n.iter, thin)
-
-
+    w.chain <- ggs(samples, family="w") %>%
+        mutate(cluster_index=clusterIndex(Parameter),
+               sample_index=sampleIndex(Parameter))
+    z.chain <- ggs(samples, family="z") %>%
+        mutate(variant_index=mutationIndex(Parameter))
+    expect_true(length(unique(z.chain$variant_index)) == jags_inputs$I)
 })
+

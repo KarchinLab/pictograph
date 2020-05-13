@@ -255,5 +255,43 @@ simulateVAF <- function(mcf, nvarClust, avg_depth=100, sd_depth=20){
            y=y,
            n=as.numeric(depth),
            multiplicity=as.numeric(mult),
+           copy_number=as.numeric(tcn),
            mcf=as.numeric(MCF))
+}
+
+
+#' @export
+listJagInputs <- function(dat){
+    w <- group_by(dat, cluster, sample) %>%
+        summarize(mcf=unique(mcf)) %>%
+        ungroup() %>%
+        spread(sample, mcf) %>%
+        select(-cluster) %>%
+        as.matrix()
+    K <- length(unique(dat$cluster))
+    tcn <- dat %>%
+        select(variant, sample, copy_number) %>%
+        spread(sample, copy_number) %>%
+        select(-variant) %>%
+        as.matrix()
+    S <- length(unique(dat$sample))
+    m <- dat %>%
+        select(variant, sample, multiplicity) %>%
+        spread(sample, multiplicity) %>%
+        select(-variant) %>%
+        as.matrix()
+    y <- dat %>%
+        select(variant, sample, y) %>%
+        spread(sample, y) %>%
+        select(-variant) %>%
+        as.matrix()
+    n <- dat %>%
+        select(variant, sample, n) %>%
+        spread(sample, n) %>%
+        select(-variant) %>%
+        as.matrix()                
+    I <- length(unique(dat$variant))
+
+    list(I=I, S=S, K=K,
+         y=y, n=n, m=m, tcn=tcn)
 }
