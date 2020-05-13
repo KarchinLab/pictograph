@@ -189,8 +189,6 @@ test.pres <- function(samps, pres.tb) {
   pres.equal <- all(sapply(clusts, function(x) 
     length(unique(pres.tb$sample_presence[pres.tb$cluster == x])) == 1))
 }
-<<<<<<< HEAD
-=======
 
 plot_ppd <- function(samps, test.data, K) {
   ##
@@ -226,4 +224,3 @@ plot_ppd <- function(samps, test.data, K) {
       facet_wrap(~sample) +
       ggtitle(paste0("K = ", K))
 }
->>>>>>> master
