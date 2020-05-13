@@ -1,5 +1,5 @@
 calcTheta <- function(m, tcn, w) {
-  (m * w) / (tcn * w + 2*(1-w))
+    (m * w) / (tcn * w + 2*(1-w))
 }
 
 runMCMC <- function(data, K, jags.file, inits, params,

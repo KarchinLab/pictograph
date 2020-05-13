@@ -11,6 +11,7 @@ rand.admat <- function(admat) {
   
   admat
 }
+
 base.admat <- function(w, zero.thresh=0.01) {
   cluster.sample.presence <- apply(w, 1, function(x) which(x>zero.thresh))
   K <- nrow(w)
@@ -145,9 +146,9 @@ get.children <- function(admat, parent.node) {
 
 get.children.w.sum.chain <- function(admat, w.chain.tb, parent.node, S) {
   # parent.node: root=1, clusters start at 2
-  children <- get.children(admat, parent.node)
-  children.w <- subset.w.chain(w.chain.tb, k=children, s=1:S)
-  get.w.chain.sum(children.w)
+    children <- get.children(admat, parent.node)
+    children.w <- subset.w.chain(w.chain.tb, k=children, s=1:S)
+    get.w.chain.sum(children.w)
 }
 
 rule.chain.freq <- function(parent.chain, child.chain) {
@@ -184,31 +185,26 @@ score.admat.chain <- function(admat, w.chain) {
     score
 }
 
+
+
 scoreA <- function(A, w){
-    w.ind <- colnames(w.chain)
+    w.ind <- colnames(w)
     k.vec <- gsub("^w\\[(.*)\\,.*", "\\1", w.ind)
     K <- length(unique(k.vec))
     S <- length(k.vec) / K
     total.obs <- nrow(w.chain) * S
-
-    #numFromNodes <- count.from.nodes(A)
-    w.chain.tb <- as_tibble(w.chain)
-    # root, MCF=1.0
-    children.w.sum <- get.children.w.sum.chain(A, w.chain.tb, 1, S)
-    #parent.w <- subset.w.chain(w.chain.tb, 1, 1:S)
+    w2 <- as_tibble(w)
+    ## root, MCF=1.0
+    children.w.sum <- get.children.w.sum.chain(A, w2, 1, S)
     rule.freq <- rule.chain.freq(parent.chain=1, child.chain=children.w.sum)
-
-    #score <- log(rule.freq)
     score <- rule.freq
-
     for(i in 2:nrow(A)) {
-      if(sum(A[i,], na.rm=T) == 0) next #leaf
-
-      curr.child.sum <- get.children.w.sum.chain(A, w.chain.tb, i, S)
-      parent.w <- subset.w.chain(w.chain.tb, i-1, 1:S)
-      curr.freq <- rule.chain.freq(parent.chain=parent.w, child.chain=curr.child.sum)
-      #score <- score + log(curr.freq)
-      score <- score * curr.freq
+        if(sum(A[i,], na.rm=T) == 0) next #leaf
+        curr.child.sum <- get.children.w.sum.chain(A, w2, i, S)
+        parent.w <- subset.w.chain(w2, i-1, 1:S)
+        curr.freq <- rule.chain.freq(parent.chain=parent.w,
+                                     child.chain=curr.child.sum)
+        score <- score * curr.freq
     }
     score
 }

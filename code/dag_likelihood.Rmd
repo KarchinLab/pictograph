@@ -261,7 +261,7 @@ for (i in seq_len(numIter)) {
     ##P.prev <- score.admat.chain(am, w.chain)
     source("cluster_first_k10_functions.R")
     trace(scoreA, browser)
-    P.prev <- scoreA(am, w=w.chain[i, ])
+    P.prev <- scoreA(am, w=w.chain[i, , drop=FALSE])
     score.chain[i] <- P.prev
     #admat.star <- mutate.admat(admat.chain[[i]])
     #P.star <- score.admat.chain(admat.star, w.chain)
