@@ -60,48 +60,48 @@ test_that("jags_sampler", {
     tib <- ggs(samples)
 
     mcf.chain <- ggs(samples, family="w") %>%
-        mutate(cluster_index=clusterIndex(Parameter),
-               sample_index=sampleIndex(Parameter))
+        mutate(cluster_id=clusterIndex(Parameter),
+               sample_id=sampleIndex(Parameter))
     z.chain <- ggs(samples, family="z") %>%
-        mutate(variant_index=mutationIndex(Parameter)) %>%
-        rename(cluster=value)
+        mutate(variant_id=mutationIndex(Parameter)) %>%
+        rename(cluster_id=value)
     ystar.chain <- ggs(samples, family="ystar") %>%
-        mutate(variant_index=clusterIndex(Parameter),
-               sample_index=sampleIndex(Parameter))
-    expect_true(length(unique(z.chain$variant_index)) == jags_inputs$I)
+        mutate(variant_id=clusterIndex(Parameter),
+               sample_id=sampleIndex(Parameter))
+    expect_true(length(unique(z.chain$variant_id)) == jags_inputs$I)
 
 
     ##
     ## plot cluster assignments
     ##
     z.chain %>%
-        group_by(variant_index, cluster) %>%
+        group_by(variant_id, cluster_id) %>%
         tally() %>%
         mutate(prob=n/1000) %>%
-        ggplot(aes(variant_index, cluster)) +
+        ggplot(aes(variant_id, cluster_id)) +
         geom_point(aes(size=prob)) +
         theme_bw()
     ##
     ## Summarize MCFs
     ##
     mcf.chain %>%
-        group_by(cluster_index, sample_index) %>%
+        group_by(cluster_id, sample_id) %>%
         summarize(mcf=mean(value)) %>%
-        ggplot(aes(cluster_index, mcf)) +
+        ggplot(aes(cluster_id, mcf)) +
         geom_point() +
         theme_bw(base_size=13)
 
     mcf <- mcf.chain %>%
-        group_by(cluster_index, sample_index) %>%
+        group_by(cluster_id, sample_id) %>%
         summarize(mean=mean(value))
     ##trace(constrainedEdges, browser)
     A <- constrainedEdges(mcf, zero.thresh=0.01)
-    wmat <- spread(mcf, sample_index, mean) %>%
+    wmat <- spread(mcf, sample_id, mean) %>%
         ungroup() %>%
-        select(-cluster_index) %>%
+        select(-cluster_id) %>%
         as.matrix()    
     A2 <- base.admat(wmat, zero.thresh = 0.01)
-    expect_equal(A, A2)    
+    expect_equal(A, A2)
 })
 
 
@@ -118,15 +118,101 @@ test_that("initializing dag", {
                     0.20, 0.22, 0.18),
                   byrow=TRUE,
                   nrow=4, ncol=3)
-    mcf.long <- tibble(cluster_index=rep(1:4, 3),
-                       sample_index=rep(1:3, each=4),
+    mcf.long <- tibble(cluster_id=as.character(rep(1:4, 3)),
+                       sample_id=as.character(rep(1:3, each=4)),
                        mean=as.numeric(mcf))
     am <- init.admat(mcf, zero.thresh=0.01)
 
     set.seed(123)
     am2 <- constrainedEdges(mcf.long)
+    dimnames(am2) <- list(c("root", 1:4), 1:4)
+    ##
+    ## long format might be easier to work with for vectorized operations
+    ##
+    am2.long <- as_tibble(am2) %>%
+        mutate(parent=rownames(am2)) %>%
+        pivot_longer(-parent,
+                     names_to="child",
+                     values_to="connected") %>%
+        filter(parent != child) %>%
+        unite("edge", c("parent", "child"), sep="->",
+              remove=FALSE) %>%
+        mutate(parent=factor(parent, levels=unique(parent)))
+    ## rand.admat calls mutate.admat
+    set.seed(2)
     am3 <- rand.admat(am2)
-    expect_identical(am3, am)
+
+    ##
+    ## this part of rand.admat randomly picks one of the zeros in each
+    ## column and changes the value to 1
+    ##
+    admat <- am2
+    for(col in 1:ncol(admat)) {
+        ind.0 <- which(admat[, col] == 0) # possible positions (0's)
+        rand.ind <- sample(ind.0, size=1)
+        admat[rand.ind,col] <- 1
+    }
+
+    ## children are the columns
+    ##
+    ## Below, we establish that the edges in am3.long are equivalent
+    ## to am3. This means we could replace the first part of
+    ## rand.admat function with the long formatted data
+    ##
+    set.seed(2)
+    randAdmat <- function(am.long){
+        new_edges <- am.long %>%
+            filter(connected==0) %>%
+            group_by(child) %>%
+            sample_n(1) %>%
+            mutate(connected=1) %>%
+            ungroup()
+        am3.long <- filter(am2.long, !edge %in% new_edges$edge) %>%
+            bind_rows(new_edges) %>%
+            arrange(parent, child)
+        am3.long
+    }
+    am3.long <- randAdmat(am2.long)
+    am3.wide <- am3.long %>%
+        select(-edge) %>%
+        spread(child, connected)
+    tmp <- am3.wide %>% select(-parent) %>%
+        as.matrix()
+    expect_equivalent(tmp, am3)
+    ##
+    ## Will NAs ever switch status?  If not, we should remove
+    ##
+    am3.long <- filter(am3.long, !is.na(connected))
+    ##
+    ## Note, only the root and parents 1 and 4 are allowed to have
+    ## children as clusters 2 and 3 have samples with undetectable
+    ## mutations
+    ##
+    ##
+    ## The next part of rand.admat requires that there is at
+    ## least one edge from the root.
+    ##
+
+    
+    expect_true(isRootConnected(am3.long))
+    ##
+    ## Disconnect root
+    ##
+    am3.long$connected[[1]] <- 0
+    expect_true(!isRootConnected(am3.long))
+    ##
+    ## connecting the root
+    ##
+    ##  1. randomly select child to connec to root
+    ##     
+    ##  2. For the child selected, disconnect any other edges to that child
+
+    edge <- am3.long %>%
+        filter(parent == "root") %>%
+        sample_n(1)
+    am3.long2 <- addEdge(am3.long, edge)
+    expect_true(isRootConnected(am3.long2))    
+    
 })
 
     
@@ -142,12 +228,13 @@ test_that("proposing a move", {
     mcf.long <- tibble(cluster_index=rep(1:4, 3),
                        sample_index=rep(1:3, each=4),
                        mean=as.numeric(mcf))
+    
     Astart <- mutateA(am)
 })
 
 
 test_that("skip", {
-    skip()
+    skip(" misc functions ")
     addRootEdge <- function(A){
         K <- ncol(A)
         j <- sample(seq_len(K), 1)
@@ -204,7 +291,7 @@ test_that("skip", {
     }
 
 
-    trace(sampleEdges, browser)
+##    trace(sampleEdges, browser)
     Anext <- sampleEdges(A)
 })
 
