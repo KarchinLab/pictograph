@@ -296,40 +296,5 @@ listJagInputs <- function(dat){
          y=y, n=n, m=m, tcn=tcn)
 }
 
-## refactored base.admat
-constrainedEdges <- function(w, zero.thresh=0.01) {
-    ##
-    ## Rules:
-    ##  - cluster (node) cannot connect to itself
-    ##  - a cluster with near-zero MCF cannot have children
-    ##  - a cluster present in X multiple samples cannot connect to a cluster present in Y samples
-    ##    if X < Y
-    ##         - X < Y implies ...
-    ##
-    ##cluster.sample.presence <- apply(w, 1, function(x) which( x> zero.thresh))
-    wmat <- spread(w, sample_index, mean) %>%
-        ungroup() %>%
-        select(-cluster_index) %>%
-        as.matrix()
-    cluster.sample.presence <- apply(wmat, 1, function(x) which(x>zero.thresh))
-    K <- length(unique(w$cluster_index))
-    S <- length(unique(w$sample_index))
-    admat <- matrix(0, K, K)
-    for(i in 1:K){
-        for(j in 1:K){
-            from.samples <- cluster.sample.presence[[i]]
-            to.samples <- cluster.sample.presence[[j]]
-            if (setequal(from.samples, to.samples)) next()
-            if(length(from.samples) < length(to.samples)) {
-                admat[i, j] <- NA
-                next()
-            }
-            if (all(to.samples %in% from.samples)) next()
-            admat[i, j] <- NA 
-      }            
-    }
-    diag(admat) <- NA
-    admat <- rbind(0, admat)
-    admat
-}
+
 
