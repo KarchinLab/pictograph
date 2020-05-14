@@ -147,3 +147,23 @@ toWide <- function(am.long){
         select(-parent) %>%
         as.matrix()
 }
+
+
+sampleNewEdge <- function(a){
+    condition1 <- a %>% group_by(child) %>%
+        summarize(n=sum(connected==0)) %>%
+        mutate(possible=which(n >= 1))
+    ## condition 2:
+    ##   for each child and for each zero of that child
+    ##     determine whether changing the 1 to a zero and the zero to a 1 would be valid
+    possible_moves <- filter(a, connected==0, child %in% condition1$child)
+    is_valid <- rep(NA, nrow(atmp))
+    for(i in seq_len(nrow(atmp))){
+        astar <- addEdge(a, atmp[i, ])
+        is_valid[i] <- validGraph(astar)
+    }
+    move_set <- possible_moves[is_valid, ]
+    ix <- sample(seq_len(nrow(move_set)), 1)
+    astar <- addEdge(a, move_set[ix, ])
+    astar
+}

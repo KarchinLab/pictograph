@@ -235,17 +235,37 @@ test_that("mutateA", {
     ## TODO: I think we should evaluate the possible valid move sets
     ## and never move to an invalid graph.
     expect_true(validGraph(a2))
-    skip("rest of mutateA")
-    set.seed(5)
-    new.admat <- astar
-    while (sum(new.admat[1, ]) == 0) {
-        new.admat <- mutate.admat(A)
+    ##
+    validGraph(a)
+    ## 
+    ## assumptions:
+    ##  The current graph is valid, which means the following
+    ##    - is directed
+    ##    - each child has a single 1
+    ##    - the root is connected to at least 1 child
+    ##
+    ## condition 1:
+    ##     child node must have 1 or more zeros
+    condition1 <- a %>% group_by(child) %>%
+        summarize(n=sum(connected==0)) %>%
+        mutate(possible=which(n >= 1))
+    ## condition 2:
+    ##   for each child and for each zero of that child
+    ##     determine whether changing the 1 to a zero and the zero to a 1 would be valid
+    possible_moves <- filter(a, connected==0, child %in% condition1$child)
+    is_valid <- rep(NA, nrow(atmp))
+    for(i in seq_len(nrow(atmp))){
+        astar <- addEdge(a, atmp[i, ])
+        is_valid[i] <- validGraph(astar)
     }
-    a2.wide <- select(a2, parent, child, connected) %>%
-        spread(child, connected) %>%
-        select(-parent) %>%
-        as.matrix()
-    expect_equivalent(a2.wide, astar)
+    move_set <- possible_moves[is_valid, ]
+    ix <- sample(seq_len(nrow(move_set)), 1)
+    astar <- addEdge(a, move_set[ix, ])
+    expect_true(validGraph(astar))
+
+    ## sampleNewEdge is wrapper for above
+    astar2 <- sampleNewEdge(a)
+    expect_true(validGraph(astar2))
 })
 
 
