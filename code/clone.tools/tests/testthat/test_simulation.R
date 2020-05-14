@@ -51,17 +51,160 @@ test_that("jags_sampler", {
     jags_inputs <- listJagInputs(dat)
     model <- jags.model(jags.file,
                         data=jags_inputs,
-                        n.chains=3,
+                        ## confusing to have more than 1 chain
+                        ## because of label-switching
+                        n.chains=1, 
                         n.adapt=500)
     samples <- coda.samples(model, n.iter=1000, thin=1,
                             variable.names=c("w", "z", "ystar"))
     tib <- ggs(samples)
 
-    w.chain <- ggs(samples, family="w") %>%
+    mcf.chain <- ggs(samples, family="w") %>%
         mutate(cluster_index=clusterIndex(Parameter),
                sample_index=sampleIndex(Parameter))
     z.chain <- ggs(samples, family="z") %>%
-        mutate(variant_index=mutationIndex(Parameter))
+        mutate(variant_index=mutationIndex(Parameter)) %>%
+        rename(cluster=value)
+    ystar.chain <- ggs(samples, family="ystar") %>%
+        mutate(variant_index=clusterIndex(Parameter),
+               sample_index=sampleIndex(Parameter))
     expect_true(length(unique(z.chain$variant_index)) == jags_inputs$I)
+
+
+    ##
+    ## plot cluster assignments
+    ##
+    z.chain %>%
+        group_by(variant_index, cluster) %>%
+        tally() %>%
+        mutate(prob=n/1000) %>%
+        ggplot(aes(variant_index, cluster)) +
+        geom_point(aes(size=prob)) +
+        theme_bw()
+    ##
+    ## Summarize MCFs
+    ##
+    mcf.chain %>%
+        group_by(cluster_index, sample_index) %>%
+        summarize(mcf=mean(value)) %>%
+        ggplot(aes(cluster_index, mcf)) +
+        geom_point() +
+        theme_bw(base_size=13)
+
+    mcf <- mcf.chain %>%
+        group_by(cluster_index, sample_index) %>%
+        summarize(mean=mean(value))
+    ##trace(constrainedEdges, browser)
+    A <- constrainedEdges(mcf, zero.thresh=0.01)
+    wmat <- spread(mcf, sample_index, mean) %>%
+        ungroup() %>%
+        select(-cluster_index) %>%
+        as.matrix()    
+    A2 <- base.admat(wmat, zero.thresh = 0.01)
+    expect_equal(A, A2)    
+})
+
+
+
+test_that("initializing dag", {
+    ##
+    ## For now, proceed with graph sampler
+    ## based on posterior means of the MCFs
+    ##
+    set.seed(123)
+    mcf <- matrix(c(0.98, 0.99, 0.97, 
+                    0.55, 0.00, 0.80, 
+                    0.30, 0.70, 0.00,
+                    0.20, 0.22, 0.18),
+                  byrow=TRUE,
+                  nrow=4, ncol=3)
+    mcf.long <- tibble(cluster_index=rep(1:4, 3),
+                       sample_index=rep(1:3, each=4),
+                       mean=as.numeric(mcf))
+    am <- init.admat(mcf, zero.thresh=0.01)
+
+    set.seed(123)
+    am2 <- constrainedEdges(mcf.long)
+    am3 <- rand.admat(am2)
+    expect_identical(am3, am)
+})
+
+    
+
+test_that("proposing a move", {    
+    set.seed(123)
+    mcf <- matrix(c(0.98, 0.99, 0.97, 
+                    0.55, 0.00, 0.80, 
+                    0.30, 0.70, 0.00,
+                    0.20, 0.22, 0.18),
+                  byrow=TRUE,
+                  nrow=4, ncol=3)
+    mcf.long <- tibble(cluster_index=rep(1:4, 3),
+                       sample_index=rep(1:3, each=4),
+                       mean=as.numeric(mcf))
+    Astart <- mutateA(am)
+})
+
+
+test_that("skip", {
+    skip()
+    addRootEdge <- function(A){
+        K <- ncol(A)
+        j <- sample(seq_len(K), 1)
+        ind.1 <- which(A[, j] == 1)
+        A[1, j] <- 1
+        A[ind.1, j] <- 0
+        A
+    }
+
+    isFullyConnected <- function(A){
+        numClusters <- nrow(A)
+        nodesInMainTree <- bfs(A)
+        numNodesInMainTree <- length(nodesInMainTree)
+        numClusters == numNodesInMainTree
+    }
+
+
+    ## refactored mutateA
+    edgeSampler <- function(A) {
+        ## choose a column to mutate
+        K <- ncol(A)
+        npossible <- colSums(!is.na(A))
+        columns <- which(npossible > 1)
+        rand.k <- sample(columns, size=1)
+        possible_edges <- which(!is.na(A[, rand.k]) & A[, rand.k] != 1)
+        ## current position with 1
+        ind.1 <- which(A[, rand.k] == 1)
+        ## select new position
+        if (length(possible_edges) == 1) {
+            new.1 <- possible_edges
+        } else {
+            new.1 <- sample(possible_edges, size=1)
+        }
+        A2 <- A
+        if(length(ind.1) > 0)
+            A2[ind.1, rand.k] <- 0
+        A2[new.1, rand.k] <- 1
+        if(sum(A2[1, ]) == 0) {
+            A2 <- addRootEdge(A2)
+        }
+        if(!isFullyConnected(A2)) return(A)
+        A2
+    }
+
+    sampleEdges <- function(A){
+        A2 <- edgeSampler(A)
+        while(!isFullyConnected(A2)){
+            j <- sample(seq_len(ncol(A)), 1)
+            A2 <- mutate.column(A2, j)
+        }
+        ## fix bi-directional
+        ##
+        A2
+    }
+
+
+    trace(sampleEdges, browser)
+    Anext <- sampleEdges(A)
 })
 
