@@ -234,6 +234,7 @@ test_that("mutateA", {
     ##
     ## TODO: I think we should evaluate the possible valid move sets
     ## and never move to an invalid graph.
+    expect_true(validGraph(a2))
     skip("rest of mutateA")
     set.seed(5)
     new.admat <- astar
