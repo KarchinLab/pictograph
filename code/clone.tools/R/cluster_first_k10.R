@@ -65,9 +65,7 @@ base.admat <- function(w, zero.thresh=0.01) {
 ##  rand.admat(base)
 ##}
 
-
-
-mutateA <- function(A) {
+.mutateA <- function(A){
     ## choose a column to mutate
     K <- ncol(A)
     npossible <- colSums(!is.na(A))
@@ -88,8 +86,16 @@ mutateA <- function(A) {
     new.admat <- A 
     new.admat[ind.1, rand.k] <- 0
     new.admat[new.1, rand.k] <- 1
+    new.admat
+}
+
+
+
+mutateA <- function(A) {
+    new.admat <- .mutateA(A)
+    ## if root not connected, call mutate.admat
     while (sum(new.admat[1, ]) == 0) {
-      new.admat <- mutate.admat(admat)
+        new.admat <- mutate.admat(A)
     }
     new.admat
 }
