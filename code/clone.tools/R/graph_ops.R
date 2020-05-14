@@ -139,3 +139,11 @@ initializeGraph <- function(mcf, zero.thresh=0.01){
     am.long2 <- randAdmat(am.long)
     am.long2
 }
+
+
+toWide <- function(am.long){
+    am.long %>% select(parent, child, connected) %>%
+        spread(child, connected) %>%
+        select(-parent) %>%
+        as.matrix()
+}
