@@ -176,6 +176,13 @@ test_that("initializing a graph", {
     isDirected <- function(am) !any(am$bi_directional)
     expect_true(isDirected(am3.long2))
     ##
+    ## 
+    ##
+    random_edge <- am3.long %>%
+        sample_n(1)
+    am <- addEdge(am3.long, random_edge)
+
+    ##
     ## Proposing a new edge
     ##
     ## - connecting the root as we did above is a specific example

@@ -45,21 +45,31 @@ constrainedEdges <- function(w, zero.thresh=0.01) {
     am2.long
 }
 
-reversedEdges <- function(am){
-    tmp <- am %>%
-        filter(!is.na(connected)) %>%
-        unite("reverse_edge", c("child", "parent"), sep="->",
-              remove=FALSE)
-    connections <- setNames(tmp$connected, tmp$edge)
-    reversed_connections <- connections[tmp$reverse_edge] %>%
+reversedConnection <- function(am){
+    connections <- setNames(am$connected, am$edge)
+    reversed_connections <- connections[am$reverse_edge] %>%
         "["(!is.na(.))
-    reversed <- setNames(rep(0, nrow(tmp)), tmp$reverse_edge)
+    reversed <- setNames(rep(0, nrow(am)), am$reverse_edge)
     reversed[names(reversed_connections)] <- reversed_connections
-    tmp$reversed_connected <- reversed
-    tmp %>%
+    reversed
+}
+
+isBidirectional <- function(am){
+    am %>%
         mutate(bi_directional=(reverse_edge %in% edge) &
                    connected==1 &
-                   reversed_connected == 1)
+                   reversed_connected == 1) %>%
+        pull(bi_directional)
+}
+
+reversedEdges <- function(am){
+    am2 <- am %>%
+        filter(!is.na(connected)) %>%
+        unite("reverse_edge", c("child", "parent"), sep="->",
+              remove=FALSE) %>%
+        mutate(reversed_connected=reversedConnection(.))
+    am2 %>%
+        mutate(bi_directional=isBidirectional(.))
 }
 
 randAdmat <- function(am.long){
@@ -87,6 +97,7 @@ isParentConnected <- function(am){
 }
 
 isRootConnected <- function(am) isParentConnected(am)[1]
+
 
 addEdge <- function(am, new_edge){
     ## Add the edge
