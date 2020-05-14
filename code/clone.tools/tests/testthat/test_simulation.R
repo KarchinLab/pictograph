@@ -70,7 +70,6 @@ test_that("jags_sampler", {
                sample_id=sampleIndex(Parameter))
     expect_true(length(unique(z.chain$variant_id)) == jags_inputs$I)
 
-
     ##
     ## plot cluster assignments
     ##
@@ -101,7 +100,13 @@ test_that("jags_sampler", {
         select(-cluster_id) %>%
         as.matrix()    
     A2 <- base.admat(wmat, zero.thresh = 0.01)
-    expect_equal(A, A2)
+
+    tmp <- A %>%
+        select(parent, child, connected) %>%
+        spread(child, connected) %>%
+        select(-parent) %>%
+        as.matrix()
+    expect_equivalent(tmp, A2)
 })
 
 
@@ -191,9 +196,9 @@ test_that("initializing a graph", {
     }
 })
 
-test_that("graph validity", {
-    
-})
+##test_that("graph validity", {
+##    
+##})
 
     
 
