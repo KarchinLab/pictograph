@@ -45,6 +45,7 @@ test_that("simulateVAF", {
 test_that("jags_sampler", {
     library(rjags)
     library(ggmcmc)
+    library(stringr)
     extdir <- system.file("extdata", package="clone.tools")
     jags.file <- file.path(extdir, "mcf_model.jag")
     dat <- unit_test_data()
@@ -151,7 +152,6 @@ test_that("initializing a graph", {
     set.seed(2)
     am2 <- initializeGraph(mcf)
     expect_equivalent(am2, am3.long)
-    
     ##
     ## Note, only the root and parents 1 and 4 are allowed to have
     ## children as clusters 2 and 3 have samples with undetectable
@@ -184,22 +184,6 @@ test_that("initializing a graph", {
     expect_true(validGraph(am3.long2))
     expect_true(isRootConnected(am3.long2))
     expect_true(isDirected(am3.long2))
-    ##
-    ## 
-    ##
-    valid <- FALSE
-    ##    while(!valid){
-    for(i in 1:10){
-        random_edge <- am3.long %>%
-            sample_n(1)
-        am <- addEdge(am3.long, random_edge)
-        if(!any(isBidirectional(am))) valid <- TRUE
-        print(valid)
-        if(valid) {
-            am2 <- am
-            break()
-        }
-    }
 })
 
 test_that("mutateA", {
