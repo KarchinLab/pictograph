@@ -146,6 +146,12 @@ test_that("initializing a graph", {
     am <- am[rowSums(is.na(am)) < 4, ]
     expect_equivalent(tmp, am)
     expect_true(validGraph(am3.long))
+
+    ## constrainedEdges and randAdmat are combined in the function initializeGraph
+    set.seed(2)
+    am2 <- initializeGraph(mcf)
+    expect_equivalent(am2, am3.long)
+    
     ##
     ## Note, only the root and parents 1 and 4 are allowed to have
     ## children as clusters 2 and 3 have samples with undetectable
@@ -194,6 +200,50 @@ test_that("initializing a graph", {
             break()
         }
     }
+})
+
+test_that("mutateA", {
+    set.seed(123)
+    mcf <- matrix(c(0.98, 0.99, 0.97, 
+                    0.55, 0.00, 0.80, 
+                    0.30, 0.70, 0.00,
+                    0.20, 0.22, 0.18),
+                  byrow=TRUE,
+                  nrow=4, ncol=3)
+    mcf.long <- tibble(cluster_id=as.character(rep(1:4, 3)),
+                       sample_id=as.character(rep(1:3, each=4)),
+                       mean=as.numeric(mcf))
+    set.seed(2)
+    A <- init.admat(mcf, zero.thresh=0.01)
+    astar <- mutateA(A)
+
+    a <- randAdmat(mcf)
+
+    
+
+    K <- ncol(A)
+    npossible <- colSums(!is.na(A))
+    columns <- which(npossible > 1)
+    rand.k <- sample(columns, size=1)
+    ## mutate
+    ## possible positions (0's)
+    ##possiblePos <- which(!is.na(A[, rand.k]) & A[, rand.k] != 1)
+    possiblePos <- which(!is.na(A[, rand.k]) & A[, rand.k] != 1)
+    ## current position with 1
+    ind.1 <- which(A[, rand.k] == 1)
+    ## select new position
+    if (length(possiblePos) == 1) {
+        new.1 <- possiblePos
+    } else {
+        new.1 <- sample(possiblePos, size=1)
+    }
+    new.admat <- A 
+    new.admat[ind.1, rand.k] <- 0
+    new.admat[new.1, rand.k] <- 1
+    while (sum(new.admat[1, ]) == 0) {
+      new.admat <- mutate.admat(admat)
+    }    
+
 })
 
 ##test_that("graph validity", {

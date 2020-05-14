@@ -126,3 +126,16 @@ addEdge <- function(am, new_edge){
         updateGraphElements()
     am2
 }
+
+initializeGraph <- function(mcf, zero.thresh=0.01){
+    clusters <- seq_len(nrow(mcf))
+    nsamp <- ncol(mcf)
+    samples <- seq_len(nsamp)
+    nclust <- length(clusters)
+    mcf.long <- tibble(cluster_id=as.character(rep(clusters, nsamp)),
+                       sample_id=as.character(rep(samples, each=nclust)),
+                       mean=as.numeric(mcf))    
+    am.long <- constrainedEdges(mcf.long, zero.thresh=zero.thresh)
+    am.long2 <- randAdmat(am.long)
+    am.long2
+}
