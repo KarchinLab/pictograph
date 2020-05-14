@@ -106,7 +106,7 @@ test_that("jags_sampler", {
 
 
 
-test_that("initializing dag", {
+test_that("initializing a graph", {
     ##
     ## For now, proceed with graph sampler
     ## based on posterior means of the MCFs
@@ -121,52 +121,25 @@ test_that("initializing dag", {
     mcf.long <- tibble(cluster_id=as.character(rep(1:4, 3)),
                        sample_id=as.character(rep(1:3, each=4)),
                        mean=as.numeric(mcf))
-    am <- init.admat(mcf, zero.thresh=0.01)
-
-    set.seed(123)
-    am2 <- constrainedEdges(mcf.long)
-    dimnames(am2) <- list(c("root", 1:4), 1:4)
-    ##
-    ## long format might be easier to work with for vectorized operations
-    ##
-    am2.long <- as_tibble(am2) %>%
-        mutate(parent=rownames(am2)) %>%
-        pivot_longer(-parent,
-                     names_to="child",
-                     values_to="connected") %>%
-        filter(parent != child) %>%
-        unite("edge", c("parent", "child"), sep="->",
-              remove=FALSE) %>%
-        mutate(parent=factor(parent, levels=unique(parent)))
-    ## rand.admat calls mutate.admat
     set.seed(2)
-    am3 <- rand.admat(am2)
-
-    ##
-    ## this part of rand.admat randomly picks one of the zeros in each
-    ## column and changes the value to 1
-    ##
-    admat <- am2
-    for(col in 1:ncol(admat)) {
-        ind.0 <- which(admat[, col] == 0) # possible positions (0's)
-        rand.ind <- sample(ind.0, size=1)
-        admat[rand.ind,col] <- 1
-    }
-
-    ## children are the columns
+    am <- init.admat(mcf, zero.thresh=0.01)
+    am2.long <- constrainedEdges(mcf.long)
     ##
     ## Below, we establish that the edges in am3.long are equivalent
     ## to am3. This means we could replace the first part of
     ## rand.admat function with the long formatted data
     ##
     set.seed(2)
+    ##trace(randAdmat, browser)
     am3.long <- randAdmat(am2.long)
     am3.wide <- am3.long %>%
-        select(-edge) %>%
+        select(-c(edge, reverse_edge, bi_directional, reversed_connected)) %>%
         spread(child, connected)
     tmp <- am3.wide %>% select(-parent) %>%
         as.matrix()
-    expect_equivalent(tmp, am3)
+    ## remove row with all NAs in am
+    am <- am[rowSums(is.na(am)) < 4, ]
+    expect_equivalent(tmp, am)
     ##
     ## Will NAs ever switch status?  If not, we should remove
     ##
@@ -193,17 +166,32 @@ test_that("initializing dag", {
     ##     
     ##  2. For the child selected, disconnect any other edges to that child
     ##
+    ##  3. Check that we have a valid directed acyclic graph (DAG)
+    ##   
     edge <- am3.long %>%
         filter(parent == "root") %>%
         sample_n(1)
     am3.long2 <- addEdge(am3.long, edge)
-    expect_true(isRootConnected(am3.long2))    
+    expect_true(isRootConnected(am3.long2))
+    isDirected <- function(am) !any(am$bi_directional)
+    expect_true(isDirected(am3.long2))
+    ##
+    ## Proposing a new edge
+    ##
+    ## - connecting the root as we did above is a specific example
+    ##   of a more general class of problems to propose a new graph
+    ##
+    
+})
+
+test_that("graph validity", {
     
 })
 
     
 
-test_that("proposing a move", {    
+test_that("proposing a move", {
+    skip("proposing a move")
     set.seed(123)
     mcf <- matrix(c(0.98, 0.99, 0.97, 
                     0.55, 0.00, 0.80, 

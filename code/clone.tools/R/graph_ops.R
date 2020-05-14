@@ -31,8 +31,35 @@ constrainedEdges <- function(w, zero.thresh=0.01) {
       }            
     }
     diag(admat) <- NA
-    admat <- rbind(0, admat)
-    admat
+    am2 <- rbind(0, admat)
+    dimnames(am2) <- list(c("root", 1:4), 1:4)
+    am2.long <- as_tibble(am2) %>%
+        mutate(parent=rownames(am2)) %>%
+        pivot_longer(-parent,
+                     names_to="child",
+                     values_to="connected") %>%
+        filter(parent != child) %>%
+        unite("edge", c("parent", "child"), sep="->",
+              remove=FALSE) %>%
+        mutate(parent=factor(parent, levels=unique(parent)))    
+    am2.long
+}
+
+reversedEdges <- function(am){
+    tmp <- am %>%
+        filter(!is.na(connected)) %>%
+        unite("reverse_edge", c("child", "parent"), sep="->",
+              remove=FALSE)
+    connections <- setNames(tmp$connected, tmp$edge)
+    reversed_connections <- connections[tmp$reverse_edge] %>%
+        "["(!is.na(.))
+    reversed <- setNames(rep(0, nrow(tmp)), tmp$reverse_edge)
+    reversed[names(reversed_connections)] <- reversed_connections
+    tmp$reversed_connected <- reversed
+    tmp %>%
+        mutate(bi_directional=(reverse_edge %in% edge) &
+                   connected==1 &
+                   reversed_connected == 1)
 }
 
 randAdmat <- function(am.long){
@@ -42,10 +69,14 @@ randAdmat <- function(am.long){
         sample_n(1) %>%
         mutate(connected=1) %>%
         ungroup()
-    am3.long <- filter(am2.long, !edge %in% new_edges$edge) %>%
+    am3.long <- filter(am.long, !edge %in% new_edges$edge) %>%
         bind_rows(new_edges) %>%
         arrange(parent, child)
-    am3.long
+    ##
+    ## Keep reverse edge
+    ##
+    am <- reversedEdges(am3.long)
+    am
 }
 
 isParentConnected <- function(am){
