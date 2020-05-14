@@ -133,17 +133,14 @@ test_that("initializing a graph", {
     ##trace(randAdmat, browser)
     am3.long <- randAdmat(am2.long)
     am3.wide <- am3.long %>%
-        select(-c(edge, reverse_edge, bi_directional, reversed_connected)) %>%
+        select(parent, child, connected) %>%
         spread(child, connected)
     tmp <- am3.wide %>% select(-parent) %>%
         as.matrix()
     ## remove row with all NAs in am
     am <- am[rowSums(is.na(am)) < 4, ]
     expect_equivalent(tmp, am)
-    ##
-    ## Will NAs ever switch status?  If not, we should remove
-    ##
-    am3.long <- filter(am3.long, !is.na(connected))
+    expect_true(validGraph(am3.long))
     ##
     ## Note, only the root and parents 1 and 4 are allowed to have
     ## children as clusters 2 and 3 have samples with undetectable
@@ -159,6 +156,7 @@ test_that("initializing a graph", {
     ##
     am3.long$connected[[1]] <- 0
     expect_true(!isRootConnected(am3.long))
+    expect_true(!validGraph(am3.long))
     ##
     ## connecting the root
     ##
@@ -172,23 +170,25 @@ test_that("initializing a graph", {
         filter(parent == "root") %>%
         sample_n(1)
     am3.long2 <- addEdge(am3.long, edge)
+    expect_true(validGraph(am3.long2))
     expect_true(isRootConnected(am3.long2))
-    isDirected <- function(am) !any(am$bi_directional)
     expect_true(isDirected(am3.long2))
     ##
     ## 
     ##
-    random_edge <- am3.long %>%
-        sample_n(1)
-    am <- addEdge(am3.long, random_edge)
-
-    ##
-    ## Proposing a new edge
-    ##
-    ## - connecting the root as we did above is a specific example
-    ##   of a more general class of problems to propose a new graph
-    ##
-    
+    valid <- FALSE
+    ##    while(!valid){
+    for(i in 1:10){
+        random_edge <- am3.long %>%
+            sample_n(1)
+        am <- addEdge(am3.long, random_edge)
+        if(!any(isBidirectional(am))) valid <- TRUE
+        print(valid)
+        if(valid) {
+            am2 <- am
+            break()
+        }
+    }
 })
 
 test_that("graph validity", {

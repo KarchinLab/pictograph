@@ -62,14 +62,20 @@ isBidirectional <- function(am){
         pull(bi_directional)
 }
 
+updateGraphElements <- function(am){
+    am %>%
+        mutate(reversed_connected=reversedConnection(.)) %>%
+        mutate(bi_directional=isBidirectional(.)) %>%
+        mutate(root_connected=isRootConnected(.))
+}
+
+
 reversedEdges <- function(am){
     am2 <- am %>%
         filter(!is.na(connected)) %>%
         unite("reverse_edge", c("child", "parent"), sep="->",
-              remove=FALSE) %>%
-        mutate(reversed_connected=reversedConnection(.))
-    am2 %>%
-        mutate(bi_directional=isBidirectional(.))
+              remove=FALSE)
+    am2
 }
 
 randAdmat <- function(am.long){
@@ -81,11 +87,12 @@ randAdmat <- function(am.long){
         ungroup()
     am3.long <- filter(am.long, !edge %in% new_edges$edge) %>%
         bind_rows(new_edges) %>%
-        arrange(parent, child)
-    ##
-    ## Keep reverse edge
-    ##
-    am <- reversedEdges(am3.long)
+        arrange(parent, child) 
+    am <- reversedEdges(am3.long) %>%
+        mutate(reversed_connection=reversedConnection(.),
+               bi_directional=NA,
+               root_connected=NA)    
+    am  <- updateGraphElements(am)
     am
 }
 
@@ -98,6 +105,13 @@ isParentConnected <- function(am){
 
 isRootConnected <- function(am) isParentConnected(am)[1]
 
+isDirected <- function(am) !any(am$bi_directional)
+
+validGraph <- function(am){
+    isDirected(am) &&
+        isRootConnected(am)
+}
+
 
 addEdge <- function(am, new_edge){
     ## Add the edge
@@ -108,6 +122,7 @@ addEdge <- function(am, new_edge){
     updated_edges <- bind_rows(new_edge, disconnect_edge)
     am2 <- filter(am, ! edge %in% updated_edges$edge ) %>%
         bind_rows(updated_edges) %>%
-        arrange(parent)
+        arrange(parent) %>%
+        updateGraphElements()
     am2
 }
