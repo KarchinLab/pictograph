@@ -1,16 +1,16 @@
-rand.admat <- function(admat) {
-  for(col in 1:ncol(admat)) {
-    ind.0 <- which(admat[,col] == 0) # possible positions (0's)
-    rand.ind <- sample(ind.0, size=1)
-    admat[rand.ind,col] <- 1
-  }
-  
-  while (sum(admat[1, ]) == 0) {
-    admat <- mutate.admat(admat)
-  }
-  
-  admat
-}
+##rand.admat <- function(admat) {
+##  for(col in 1:ncol(admat)) {
+##    ind.0 <- which(admat[,col] == 0) # possible positions (0's)
+##    rand.ind <- sample(ind.0, size=1)
+##    admat[rand.ind,col] <- 1
+##  }
+##  
+##  while (sum(admat[1, ]) == 0) {
+##    admat <- mutate.admat(admat)
+##  }
+##  
+##  admat
+##}
 
 base.admat <- function(w, zero.thresh=0.01) {
   cluster.sample.presence <- apply(w, 1, function(x) which(x>zero.thresh))
@@ -60,38 +60,12 @@ base.admat <- function(w, zero.thresh=0.01) {
   admat
 }
 
-init.admat <- function(w, zero.thresh) {
-  base <- base.admat(w, zero.thresh)
-  rand.admat(base)
-}
+##init.admat <- function(w, zero.thresh) {
+##  base <- base.admat(w, zero.thresh)
+##  rand.admat(base)
+##}
 
 
-mutate.admat <- function(admat) {
-  # choose a column to mutate
-  K <- ncol(admat)
-  rand.k <- sample(1:K, size=1)
-  
-  # mutate
-  ## possible positions (0's)
-  possiblePos <- which(!is.na(admat[, rand.k]) & admat[, rand.k] != 1)
-  ## current position with 1
-  ind.1 <- which(admat[, rand.k] == 1)
-  ## select new position
-  if (length(possiblePos) == 1) {
-    new.1 <- possiblePos
-  } else {
-    new.1 <- sample(possiblePos, size=1)
-  }
-  
-  new.admat <- admat 
-  new.admat[ind.1, rand.k] <- 0
-  new.admat[new.1, rand.k] <- 1
-  
-  while (sum(new.admat[1, ]) == 0) {
-    new.admat <- mutate.admat(admat)
-  }
-  new.admat
-}
 
 mutateA <- function(A) {
     ## choose a column to mutate
