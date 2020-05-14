@@ -160,18 +160,6 @@ test_that("initializing dag", {
     ## rand.admat function with the long formatted data
     ##
     set.seed(2)
-    randAdmat <- function(am.long){
-        new_edges <- am.long %>%
-            filter(connected==0) %>%
-            group_by(child) %>%
-            sample_n(1) %>%
-            mutate(connected=1) %>%
-            ungroup()
-        am3.long <- filter(am2.long, !edge %in% new_edges$edge) %>%
-            bind_rows(new_edges) %>%
-            arrange(parent, child)
-        am3.long
-    }
     am3.long <- randAdmat(am2.long)
     am3.wide <- am3.long %>%
         select(-edge) %>%
@@ -192,8 +180,6 @@ test_that("initializing dag", {
     ## The next part of rand.admat requires that there is at
     ## least one edge from the root.
     ##
-
-    
     expect_true(isRootConnected(am3.long))
     ##
     ## Disconnect root
@@ -206,7 +192,7 @@ test_that("initializing dag", {
     ##  1. randomly select child to connec to root
     ##     
     ##  2. For the child selected, disconnect any other edges to that child
-
+    ##
     edge <- am3.long %>%
         filter(parent == "root") %>%
         sample_n(1)

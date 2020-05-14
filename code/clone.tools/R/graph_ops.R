@@ -35,6 +35,19 @@ constrainedEdges <- function(w, zero.thresh=0.01) {
     admat
 }
 
+randAdmat <- function(am.long){
+    new_edges <- am.long %>%
+        filter(connected==0) %>%
+        group_by(child) %>%
+        sample_n(1) %>%
+        mutate(connected=1) %>%
+        ungroup()
+    am3.long <- filter(am2.long, !edge %in% new_edges$edge) %>%
+        bind_rows(new_edges) %>%
+        arrange(parent, child)
+    am3.long
+}
+
 isParentConnected <- function(am){
     am %>%
         group_by(parent) %>%
