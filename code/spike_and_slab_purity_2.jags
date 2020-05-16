@@ -13,13 +13,6 @@ model {
 	alpha <- rep(1, K)
 	pi[1:K] ~ ddirch(alpha[1:K])
 
-	# uniform beta parameters
-	a[1] <- 1
-	b[1] <- 1
-	# beta parameters, mass close to 0
-	a[2] <- 1
-	b[2] <- 1000
-
 	for (k in 1:K) {
 		for (s in 1:S) {
 			p[k,s] ~ dbeta(5,2)
