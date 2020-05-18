@@ -190,8 +190,8 @@ simulateDataPurity <- function(I=120, K=10, S=3, avg.cov=100,
     }
   }
   
-  colnames(w) <- colnames(p) <- paste0("sample", 1:S)
-  colnames(m) <- colnames(p)
+  colnames(m)  <- colnames(w) <- colnames(P) <- paste0("sample", 1:S)
+  
   test.data <- list("I" = I, "S" = S, "K" = K, 
                     "y" = y, "n" = n,
                     "m" = m, "tcn" = tcn,
