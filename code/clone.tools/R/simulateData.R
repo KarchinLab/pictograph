@@ -201,3 +201,58 @@ simulateDataPurity <- function(I=120, K=10, S=3, avg.cov=100,
                     purity=purity)
   test.data
 }
+
+simTestCase1 <- function(){
+  # single sample clusters with few variants
+  set.seed(1234)
+  I=100; K=9; S=3;
+  purity=c(0.80, 0.85, 0.90)
+  avg.cov=100
+  
+  z <- c(rep(1:6, each=15), 
+         7, 8, 8, 8, 9, 9, 9, 9, 9, 9)
+  ## True cancer cell fraction
+  w <- matrix(c(1, 1, 1, 
+                0.98, 0.90, 0.82,
+                0.55, 0.00, 0.80, 
+                0.30, 0.00, 0.30, 
+                0.43, 0.90, 0.00,
+                0.30, 0.70, 0.00,
+                0.20, 0.00, 0.00,
+                0.00, 0.00, 0.16,
+                0.00, 0.14, 0.00),
+              byrow=T,
+              nrow=K, ncol=S)
+  
+  colnames(w) <-  paste0("sample", 1:S)
+  
+  tcn <- matrix(2, nrow=I, ncol=S)
+  m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
+              nrow=I, ncol=S)
+  
+  # variant x sample matrix
+  W <- w[z, ]
+  P <- matrix(rep(purity, each = I), nrow = I, ncol = S)
+  
+  theta <- calcTheta2(m, tcn, W, P)
+  ##
+  ## Simulate altered reads
+  ##
+  n <- replicate(S, rpois(I, avg.cov))
+  y <- matrix(NA, nrow=I, ncol=S)
+  for (i in 1:I) {
+    for (s in 1:S) {
+      y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+    }
+  }
+  
+  colnames(w) <- colnames(m) <- paste0("sample", 1:S)
+  test.data <- list("I" = I, "S" = S, "K" = K, 
+                    "y" = y, "n" = n,
+                    "m" = m, "tcn" = tcn,
+                    z=z,
+                    w=w,
+                    theta=theta,
+                    purity=purity)
+  test.data
+}
