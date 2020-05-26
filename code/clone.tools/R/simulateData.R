@@ -263,7 +263,7 @@ simTestCaseIP30 <- function(){
   # single sample clusters with few variants
   set.seed(1234)
   K=19; S=5;
-  purity=c(0.80, 0.85, 0.90, 0.80. 0.85)
+  purity=c(0.80, 0.85, 0.90, 0.80, 0.85)
   avg.cov=100
   
   z <- rep(1:19, each=5)
