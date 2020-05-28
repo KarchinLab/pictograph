@@ -1,13 +1,16 @@
 Package: clone.tools
-Title: What the Package Does (One Line, Title Case)
-Version: 0.0.0.9000
+Title: Tools for modeling clonal evolution of a cancer
+Version: 0.0.1
 Authors@R: 
-    person(given = "First",
-           family = "Last",
+    person(given = "Lily",
+           family = "Zhang",
            role = c("aut", "cre"),
            email = "first.last@example.com",
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: What license it uses
+Description: Implements a Bayesian models to sample evolutionary clone trees
+License: Artistic-2.0
 Encoding: UTF-8
 LazyData: true
+Suggests: 
+    testthat
+RoxygenNote: 7.1.0

@@ -1,5 +1,5 @@
 calcTheta <- function(m, tcn, w) {
-  (m * w) / (tcn * w + 2*(1-w))
+    (m * w) / (tcn * w + 2*(1-w))
 }
 
 calcTheta2 <- function(m, tcn, w, p) {
@@ -10,7 +10,6 @@ runMCMC <- function(data, K, jags.file, inits, params,
                     n.iter=20000, thin=10, n.chains=1,
                     n.adapt=1000, n.burn=10000) {
     data$K <- K
-
     jags.m <- jags.model(jags.file,
                          data,
                          n.chains = n.chains,
@@ -236,3 +235,77 @@ plot_ppd <- function(samps, test.data, K) {
       facet_wrap(~sample) +
       ggtitle(paste0("K = ", K))
 }
+
+#' @export
+simulateVAF <- function(mcf, nvarClust, avg_depth=100, sd_depth=20){
+    nClust <- nrow(mcf)
+    nSamp <- ncol(mcf)
+    nVariants <- sum(nvarClust)
+    nObs <- nVariants * nSamp
+    stopifnot(length(nvarClust) == nClust)
+    ##pi <- rep(1/3, 3)
+    ## 10 mutations for each of the 3 clusters
+    z <- rep(1:nClust, nvarClust)
+
+    MCF <- mcf[z, ]
+    dimnames(MCF) <- list(paste0("variant", seq_len(nVariants)),
+                          paste0("sample", seq_len(nSamp)))
+    mult <- tcn <- MCF;
+    tcn[,] <- 2
+    mult[,] <- sample(1:2, nVariants*nSamp, replace=TRUE)
+    vaf <- (mult * MCF)/(tcn * MCF + 2*(1-MCF))
+    ## add more variation to sequencing depth
+    mus <- rnorm(nVariants, avg_depth, sd_depth)
+    mus <- ifelse(mus < 0, 0, mus)
+    depth <- matrix(rpois(nObs, mus), nVariants, nSamp)
+    y <- rbinom(nObs, as.numeric(depth), as.numeric(vaf))
+    y <- ifelse(y < 0, 0, y)
+    tibble(variant=rep(seq_len(nVariants), nSamp),
+           sample=rep(seq_len(nSamp), each=nVariants),
+           cluster=rep(z, nSamp),
+           y=y,
+           n=as.numeric(depth),
+           multiplicity=as.numeric(mult),
+           copy_number=as.numeric(tcn),
+           mcf=as.numeric(MCF))
+}
+
+
+#' @export
+listJagInputs <- function(dat){
+    w <- group_by(dat, cluster, sample) %>%
+        summarize(mcf=unique(mcf)) %>%
+        ungroup() %>%
+        spread(sample, mcf) %>%
+        select(-cluster) %>%
+        as.matrix()
+    K <- length(unique(dat$cluster))
+    tcn <- dat %>%
+        select(variant, sample, copy_number) %>%
+        spread(sample, copy_number) %>%
+        select(-variant) %>%
+        as.matrix()
+    S <- length(unique(dat$sample))
+    m <- dat %>%
+        select(variant, sample, multiplicity) %>%
+        spread(sample, multiplicity) %>%
+        select(-variant) %>%
+        as.matrix()
+    y <- dat %>%
+        select(variant, sample, y) %>%
+        spread(sample, y) %>%
+        select(-variant) %>%
+        as.matrix()
+    n <- dat %>%
+        select(variant, sample, n) %>%
+        spread(sample, n) %>%
+        select(-variant) %>%
+        as.matrix()                
+    I <- length(unique(dat$variant))
+
+    list(I=I, S=S, K=K,
+         y=y, n=n, m=m, tcn=tcn)
+}
+
+
+
