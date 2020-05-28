@@ -2,6 +2,10 @@ calcTheta <- function(m, tcn, w) {
   (m * w) / (tcn * w + 2*(1-w))
 }
 
+calcTheta2 <- function(m, tcn, w, p) {
+  (m * w * p) / (tcn * p + 2*(1-p))
+}
+
 runMCMC <- function(data, K, jags.file, inits, params,
                     n.iter=20000, thin=10, n.chains=1,
                     n.adapt=1000, n.burn=10000) {
@@ -30,7 +34,15 @@ reshapeW <- function(w, S, K) {
 
 calcLogLik <- function(z.iter, w.iter, input.data) {
   W <- w.iter[z.iter, ]
-  theta <- calcTheta(input.data$m, input.data$tcn, W)
+  
+  if (is.null(input.data$purity)) {
+    theta <- calcTheta(input.data$m, input.data$tcn, W)
+  } else {
+    purity <- input.data$purity
+    P <- matrix(rep(purity, each = I), nrow = nrow(W), ncol = ncol(W))
+    theta <- calcTheta2(input.data$m, input.data$tcn, W, P)
+  }
+  
   sum(dbinom(as.matrix(input.data$y), as.matrix(input.data$n), as.matrix(theta), log=T))
 }
 
@@ -47,7 +59,6 @@ calcChainLogLik <- function(samps, input.data, K) {
 }
 
 calcBIC <- function(n, k, ll) log(n)*k - 2*ll
-
 
 relabelZ <- function(z.chain, I, K){
   mcmc_z <- z.chain %>%
