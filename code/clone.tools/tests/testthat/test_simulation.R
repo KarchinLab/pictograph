@@ -136,7 +136,6 @@ test_that("initializing a graph", {
     ## rand.admat function with the long formatted data
     ##
     set.seed(2)
-    ##trace(randAdmat, browser)
     am3.long <- randAdmat(am2.long)
     am3.wide <- am3.long %>%
         select(parent, child, connected) %>%
@@ -171,7 +170,7 @@ test_that("initializing a graph", {
     ##
     ## connecting the root
     ##
-    ##  1. randomly select child to connec to root
+    ##  1. randomly select child to connect to root
     ##     
     ##  2. For the child selected, disconnect any other edges to that child
     ##
@@ -200,11 +199,11 @@ test_that("mutateA", {
     set.seed(2)
     A <- init.admat(mcf, zero.thresh=0.01)
 
-
     set.seed(2)
     a <- initializeGraph(mcf)
     expect_equivalent(toWide(a), A[rowSums(is.na(A)) < 4, ])
-
+    expect_true(validGraph(a))
+    
     set.seed(3)
     astar <- .mutateA(A)
     K <- ncol(A)
@@ -235,8 +234,6 @@ test_that("mutateA", {
     ## TODO: I think we should evaluate the possible valid move sets
     ## and never move to an invalid graph.
     expect_true(validGraph(a2))
-    ##
-    validGraph(a)
     ## 
     ## assumptions:
     ##  The current graph is valid, which means the following
@@ -253,9 +250,9 @@ test_that("mutateA", {
     ##   for each child and for each zero of that child
     ##     determine whether changing the 1 to a zero and the zero to a 1 would be valid
     possible_moves <- filter(a, connected==0, child %in% condition1$child)
-    is_valid <- rep(NA, nrow(atmp))
-    for(i in seq_len(nrow(atmp))){
-        astar <- addEdge(a, atmp[i, ])
+    is_valid <- rep(NA, nrow(possible_moves))
+    for(i in seq_len(nrow(possible_moves))){
+        astar <- addEdge(a, possible_moves[i, ])
         is_valid[i] <- validGraph(astar)
     }
     move_set <- possible_moves[is_valid, ]
@@ -267,6 +264,7 @@ test_that("mutateA", {
     astar2 <- sampleNewEdge(a)
     expect_true(validGraph(astar2))
 })
+
 
 
 test_that("skip", {

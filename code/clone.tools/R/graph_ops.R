@@ -157,9 +157,9 @@ sampleNewEdge <- function(a){
     ##   for each child and for each zero of that child
     ##     determine whether changing the 1 to a zero and the zero to a 1 would be valid
     possible_moves <- filter(a, connected==0, child %in% condition1$child)
-    is_valid <- rep(NA, nrow(atmp))
-    for(i in seq_len(nrow(atmp))){
-        astar <- addEdge(a, atmp[i, ])
+    is_valid <- rep(NA, nrow(possible_moves))
+    for(i in seq_len(nrow(possible_moves))){
+        astar <- addEdge(a, possible_moves[i, ])
         is_valid[i] <- validGraph(astar)
     }
     move_set <- possible_moves[is_valid, ]
