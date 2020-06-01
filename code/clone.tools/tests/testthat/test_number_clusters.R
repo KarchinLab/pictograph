@@ -9,9 +9,9 @@ test_that("Best K as min BIC", {
   set.seed(123)
   extdir <- system.file("extdata", package="clone.tools")
   jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
-  #sim.data <- simTestCase2(15)
-  sim.data <- simulateDataPurity() # this sim should pass all tests
-  #sim.data <- simTestCase1(10)
+  sim.data <- simTestCase2(5)
+  #sim.data <- simulateDataPurity() # this sim should pass all tests
+  #sim.data <- simTestCase1(3) # 10 passes all tests, 3 fails
   input.data <- sim.data[c("y", "n", "purity", "tcn", "m", "I", "S")]
   
   inits <- list(".RNG.name" = "base::Wichmann-Hill",
