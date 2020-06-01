@@ -307,5 +307,60 @@ listJagInputs <- function(dat){
          y=y, n=n, m=m, tcn=tcn)
 }
 
+getmode <- function(v) {
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
 
+get.z.mapping <- function(true.z, z.chain) {
+  mcmc_z <- z.chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              maxiter=max(Iteration)) %>%
+    mutate(probability=n/maxiter) %>%
+    ungroup()
+  map_z <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(value=value[probability==max(probability)]) %>%
+    mutate(Variant = 1:length(true.z), true_z = true.z)
+  z_mappings <- map_z %>%
+    select(Variant, true_z, value) %>%
+    rename("mcmc_z" = "value")
+  z_mappings <- z_mappings %>%
+    group_by(true_z) %>%
+    summarize(mcmc_z = getmode(mcmc_z))
+  z_mappings
+}
+
+relabel.w.z.chains <- function(true.z, chains) {
+  w.chain <- get.parameter.chain("w", chains)
+  z.chain <- get.parameter.chain("z", chains)
+  
+  z_mappings <- get.z.mapping(true.z, z.chain)
+  
+  # relabel w.chain
+  w.chain.relabeled <- w.chain %>%
+    mutate(k = as.numeric(gsub("w\\[", "", sapply(w.chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
+    mutate(s = gsub("\\]", "", sapply(w.chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][2])))
+  w.chain.relabeled <- w.chain.relabeled %>%
+    mutate(new_k = match(w.chain.relabeled$k, z_mappings$mcmc_z))
+  w.chain.relabeled <- w.chain.relabeled %>%
+    mutate(new_Parameter = paste0("w[", new_k, ",", s, "]")) %>%
+    arrange(new_k, s)
+  w.chain.relabeled <- w.chain.relabeled %>%
+    select(Iteration, Chain, new_Parameter, value) %>%
+    rename("Parameter" = "new_Parameter")
+  w.chain.relabeled <- w.chain.relabeled %>%
+    mutate(Parameter = factor(w.chain.relabeled$Parameter, levels = unique(w.chain.relabeled$Parameter)))
+  
+  # relabel z.chain
+  z.chain.relabeled <- z.chain %>%
+    mutate(new_value = match(value, z_mappings$mcmc_z))
+  z.chain.relabeled <- z.chain.relabeled %>%
+    select(Iteration, Chain, Parameter, new_value) %>%
+    rename("value" = "new_value")
+  
+  list(w.chain=w.chain.relabeled,
+       z.chain=z.chain.relabeled)
+}
 
