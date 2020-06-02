@@ -9,8 +9,8 @@ test_that("Best K as min BIC", {
   set.seed(123)
   extdir <- system.file("extdata", package="clone.tools")
   jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
-  sim.data <- simTestCase2(5)
-  #sim.data <- simulateDataPurity() # this sim should pass all tests
+  #sim.data <- simTestCase2(5)
+  sim.data <- simulateDataPurity() # this sim should pass all tests
   #sim.data <- simTestCase1(3) # 10 passes all tests, 3 fails
   input.data <- sim.data[c("y", "n", "purity", "tcn", "m", "I", "S")]
   
@@ -56,7 +56,7 @@ test_that("Best K as min BIC", {
     summarize(value=value[probability==max(probability)])
   expect_equivalent(length(unique(map_z$value)), 10)
   
-  # compare cluster assignment to truth
+  # compare cluster assignment (z) to truth
   w.z.relabeled.chains <- relabel.w.z.chains(sim.data$z, chains)
   w.chain <- w.z.relabeled.chains[["w.chain"]]
   
@@ -69,7 +69,31 @@ test_that("Best K as min BIC", {
   map_z_remapped <- mcmc_z_remapped %>%
     group_by(Parameter) %>%
     summarize(value=value[probability==max(probability)])
-  expect_equivalent(length(unique(map_z_remapped$value)), 10)
+  expect_equivalent(map_z_remapped$value, sim.data$z)
   
-  
+  # compare cancer cell fraction (w) values to truth
+  # MAP w -------------------
+  # density plot 
+  w.dens <- ggplot(w.chain, aes(x = value)) +
+    geom_density() +
+    facet_wrap(~Parameter, ncol = sim.data$S, scales = "free_y") +
+    theme_light()
+  # find peak for MAP w
+  w.dens.p <- ggplot_build(w.dens)$data[[1]]
+  w.map <- w.dens.p %>%
+    as_tibble() %>%
+    group_by(PANEL) %>%
+    summarize(value = x[max(y) == y])
+  w.map <- w.map %>%
+    mutate(Parameter = unique(w.chain$Parameter),
+           value_rounded = round(value, 2))
+  # is MAP w within 0.04 of truth?
+  w.map.matrix <- matrix(w.map$value_rounded, sim.data$K, sim.data$S, byrow=TRUE)
+  thresh <- 0.04
+  w.diff <- abs(sim.data$w - w.map.matrix)
+  for (k in 1:sim.data$K) {
+    for (s in 1:sim.data$S) {
+      expect_lte(w.diff[k,s], thresh)
+    }
+  }
 })
