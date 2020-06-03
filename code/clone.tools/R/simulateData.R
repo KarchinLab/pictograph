@@ -202,12 +202,11 @@ simulateDataPurity <- function(I=120, K=10, S=3, avg.cov=100,
   test.data
 }
 
-simTestCase1 <- function(numVarPerClust){
+simTestCase1 <- function(numVarPerClust, avg.cov=100){
   # single sample clusters with few variants
   set.seed(1234)
   K=10; S=3;
   purity=c(0.80, 0.85, 0.90)
-  avg.cov=100
   
   z <- c(rep(1:7, each=numVarPerClust), 
          8, 9, 9, 10, 10, 10)
@@ -259,12 +258,11 @@ simTestCase1 <- function(numVarPerClust){
   test.data
 }
 
-simTestCase2 <- function(varPerClust){
+simTestCase2 <- function(varPerClust, avg.cov=100){
   # single sample clusters with few variants
   set.seed(1234)
   K=10; S=3;
   purity=c(0.80, 0.85, 0.90)
-  avg.cov=100
   
   z <- rep(1:K, each=varPerClust)
   I <- length(z)
@@ -315,12 +313,11 @@ simTestCase2 <- function(varPerClust){
   test.data
 }
 
-simTestCase3 <- function(minVar, maxVar){
+simTestCase3 <- function(minVar, maxVar, avg.cov=100){
   # single sample clusters with few variants
   set.seed(1234)
   K=10; S=3;
   purity=c(0.80, 0.85, 0.90)
-  avg.cov=100
   
   z <- unlist(sapply(seq_len(K), function(x) rep(x, sample(minVar:maxVar, 1))))
   #z <- rep(1:K, each=varPerClust)
@@ -372,12 +369,11 @@ simTestCase3 <- function(minVar, maxVar){
   test.data
 }
 
-simTestCaseIP30 <- function(){
+simTestCaseIP30 <- function(avg.cov=100){
   # single sample clusters with few variants
   set.seed(1234)
   K=19; S=5;
   purity=c(0.80, 0.85, 0.90, 0.80, 0.85)
-  avg.cov=100
   
   z <- rep(1:19, each=5)
   I <- length(z)
