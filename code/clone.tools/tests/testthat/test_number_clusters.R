@@ -11,13 +11,14 @@ test_that("Best K as min BIC", {
   jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
   #sim.data <- simTestCase2(5)
   #sim.data <- simulateDataPurity() # this sim should pass all tests
-  sim.data <- simTestCase1(10, avg.cov=100) # 10 (avg.cov=100) fails, avg.cov=200 passes all
+  sim.data <- simTestCase1(50, avg.cov=100) # 10 (avg.cov=100) fails, avg.cov=200 passes all
   input.data <- sim.data[c("y", "n", "purity", "tcn", "m", "I", "S")]
   
   inits <- list(".RNG.name" = "base::Wichmann-Hill",
                 ".RNG.seed" = 123)
   params <- c("z", "w")
   kToTest <- 5:15
+  kToTest <- 10
   samps.list <- mclapply(kToTest,
                          function(k) runMCMC(input.data, k, jags.file, inits, params,
                                            n.iter=1000, thin=1,
@@ -30,6 +31,21 @@ test_that("Best K as min BIC", {
     samps = samps.list, k = kToTest)
   min.BIC.k <- kToTest[which(BIC == min(BIC))]
   expect_equivalent(10, min.BIC.k)
+
+
+  ## try fitting mixture to pattern where columns 2 and 3 zero
+  devtools::load_all()
+  sim.data2 <- simTestCaseZeros(20, avg.cov=100)
+  input.data2 <- sim.data[c("y", "n", "purity", "tcn", "m", "I", "S")]
+  kToTest <- 10
+  samps.list <- mclapply(kToTest,
+                         function(k) runMCMC(input.data2, k, jags.file, inits, params,
+                                             n.iter=1000, thin=1,
+                                             n.burn=100),
+                         mc.cores=8)
+  ## this fails
+  ## try K 1 - smallnumber (4)  on just the mutations with 2 columns of zeros
+  
   
   # BIC_tb <- tibble(k = kToTest,
   #                  BIC = BIC)
@@ -55,7 +71,7 @@ test_that("Best K as min BIC", {
     group_by(Parameter) %>%
     summarize(value=value[probability==max(probability)])
   expect_equivalent(length(unique(map_z$value)), 10)
-  
+
   # compare cluster assignment (z) to truth
   w.z.relabeled.chains <- relabel.w.z.chains(sim.data$z, chains)
   w.chain <- w.z.relabeled.chains[["w.chain"]]
@@ -70,6 +86,12 @@ test_that("Best K as min BIC", {
     group_by(Parameter) %>%
     summarize(value=value[probability==max(probability)])
   expect_equivalent(map_z_remapped$value, sim.data$z)
+
+  zs <- map_z_remapped %>%
+      mutate(truez=sim.data$z)
+  table(zs$value, zs$truez)
+
+  
   
   # compare cancer cell fraction (w) values to truth
   # MAP w -------------------
