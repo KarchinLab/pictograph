@@ -171,6 +171,28 @@ get.map.z <- function(z.chain) {
   map_z
 }
 
+get.map.w <- function(w.chain) {
+  S <- numberSamples(w.chain)
+  K <- numberClusters(w.chain)
+  # density plot 
+  w.dens <- ggplot(w.chain, aes(x = value)) +
+    geom_density() +
+    facet_wrap(~Parameter, ncol = S, scales = "free_y") +
+    theme_light()
+  # find peak for MAP w
+  w.dens.p <- ggplot_build(w.dens)$data[[1]]
+  w.map <- w.dens.p %>%
+    as_tibble() %>%
+    group_by(PANEL) %>%
+    summarize(value = x[max(y) == y])
+  w.map <- w.map %>%
+    mutate(Parameter = unique(w.chain$Parameter),
+           value_rounded = round(value, 2))
+  # return w matrix
+  w.map.matrix <- matrix(w.map$value_rounded, K, S, byrow=TRUE)
+  w.map.matrix
+}
+
 # function to check if clustering respects sample presence 
 test.pres <- function(samps, pres.tb) {
   # input: samps = one item in samps.list
