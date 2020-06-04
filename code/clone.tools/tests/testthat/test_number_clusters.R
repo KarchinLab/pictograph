@@ -10,8 +10,8 @@ test_that("Best K as min BIC", {
   extdir <- system.file("extdata", package="clone.tools")
   jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
   #sim.data <- simTestCase2(5)
-  sim.data <- simulateDataPurity() # this sim should pass all tests
-  #sim.data <- simTestCase1(3) # 10 passes all tests, 3 fails
+  #sim.data <- simulateDataPurity() # this sim should pass all tests
+  sim.data <- simTestCase1(10, avg.cov=100) # 10 (avg.cov=100) fails, avg.cov=200 passes all
   input.data <- sim.data[c("y", "n", "purity", "tcn", "m", "I", "S")]
   
   inits <- list(".RNG.name" = "base::Wichmann-Hill",
@@ -87,9 +87,9 @@ test_that("Best K as min BIC", {
   w.map <- w.map %>%
     mutate(Parameter = unique(w.chain$Parameter),
            value_rounded = round(value, 2))
-  # is MAP w within 0.04 of truth?
+  # is MAP w within certain range of truth?
   w.map.matrix <- matrix(w.map$value_rounded, sim.data$K, sim.data$S, byrow=TRUE)
-  thresh <- 0.04
+  thresh <- 0.025
   w.diff <- abs(sim.data$w - w.map.matrix)
   for (k in 1:sim.data$K) {
     for (s in 1:sim.data$S) {
