@@ -369,13 +369,17 @@ simTestCase3 <- function(minVar, maxVar, avg.cov=100){
   test.data
 }
 
-simTestCaseIP30 <- function(avg.cov=100){
+simTestCaseIP30 <- function(numVarPerClust, avg.cov=100){
   # single sample clusters with few variants
   set.seed(1234)
   K=19; S=5;
   purity=c(0.80, 0.85, 0.90, 0.80, 0.85)
   
-  z <- rep(1:19, each=5)
+  #z <- rep(1:19, each=5)
+  singles <- c(2, 6, 16, 17 ,18)
+  z <- sort(c(rep((1:19)[-singles], each=numVarPerClust),
+         rep(singles, sample(1:2, length(singles), replace = T))))
+  
   I <- length(z)
   ## True cancer cell fraction
   w <- matrix(c(0.53, 0.61, 0.00, 0.00, 0.00,
