@@ -32,7 +32,7 @@ constrainedEdges <- function(w, zero.thresh=0.01) {
     }
     diag(admat) <- NA
     am2 <- rbind(0, admat)
-    dimnames(am2) <- list(c("root", 1:4), 1:4)
+    dimnames(am2) <- list(c("root", 1:K), 1:K)
     am2.long <- as_tibble(am2) %>%
         mutate(parent=rownames(am2)) %>%
         pivot_longer(-parent,
