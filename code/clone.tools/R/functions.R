@@ -158,31 +158,17 @@ sample.w <- function(w.chain, K) {
 }
 
 get.map.z <- function(z.chain) {
-  numIter <- max(z.chain$Iteration)
+  it <- max(z.chain$Iteration)
   mcmc_z <- z.chain %>%
     group_by(Parameter, value) %>%
     summarize(n=n(),
-              numIter=numIter) %>%
-    mutate(probability=n/numIter) %>%
+              maxiter=it) %>%
+    mutate(probability=n/maxiter) %>%
     ungroup()
-  
   map_z <- mcmc_z %>%
     group_by(Parameter) %>%
-    select(Parameter, value, probability)
-  map_z <- filter(map_z, probability==max(probability)) %>%
-    ungroup()
-  map_z <- map_z %>%
-    mutate(variant_ind = as.numeric(
-      gsub("z\\[", "", gsub("\\]", "", as.character(map_z$Parameter)))))
-  
-  muts <- y$mut_id
-  muts.z <- map_z %>%
-    mutate(Mutation = muts[map_z$variant_ind]) %>%
-    arrange(value) %>%
-    rename(Cluster = value, Posterior_probability = probability)
-  muts.z <- muts.z %>%
-    select(Cluster, Posterior_probability, Mutation)
-  muts.z
+    summarize(value=value[probability==max(probability)])
+  map_z
 }
 
 # function to check if clustering respects sample presence 

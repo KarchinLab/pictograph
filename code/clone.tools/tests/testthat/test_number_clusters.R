@@ -33,10 +33,10 @@ test_that("Best K as min BIC", {
   expect_equivalent(10, min.BIC.k)
 
 
-  ## try fitting mixture to pattern where columns 2 and 3 zero
+  ## try fitting mixture to pattern where columns 2 and 3 zero 
   devtools::load_all()
   sim.data2 <- simTestCaseZeros(20, avg.cov=100)
-  input.data2 <- sim.data[c("y", "n", "purity", "tcn", "m", "I", "S")]
+  input.data2 <- sim.data2[c("y", "n", "purity", "tcn", "m", "I", "S")]
   kToTest <- 10
   samps.list <- mclapply(kToTest,
                          function(k) runMCMC(input.data2, k, jags.file, inits, params,
@@ -44,7 +44,32 @@ test_that("Best K as min BIC", {
                                              n.burn=100),
                          mc.cores=8)
   ## this fails
-  ## try K 1 - smallnumber (4)  on just the mutations with 2 columns of zeros
+  ## try K 1 - smallnumber (4)  on just the mutations with 2 columns (S1, S2) of zeros (clusters 4 and 9)
+  input.data2.clust49 <- input.data2
+  select.muts <- rowSums(input.data2.clust49$y[,1:2]) == 0
+  input.data2.clust49$I <- sum(select.muts)
+  input.data2.clust49$y <- input.data2.clust49$y[select.muts, ]
+  input.data2.clust49$n <- input.data2.clust49$n[select.muts, ]
+  input.data2.clust49$tcn <- input.data2.clust49$tcn[select.muts, ]
+  input.data2.clust49$m <- input.data2.clust49$m[select.muts, ]
+  maxK <- 4
+  kToTest <- 2:maxK
+  samps.list <- mclapply(kToTest,
+                         function(k) runMCMC(input.data2.clust49, k, jags.file, inits, params,
+                                             n.iter=1000, thin=1,
+                                             n.burn=100),
+                         mc.cores=8)
+  # need different jags model for K=1
+  jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
+  samps.K1 <- runMCMC(input.data2.clust49, 1, jags.file.K1, inits, params, n.iter=1000, thin=1, n.burn=100)
+  samps.list <- c(list(samps.K1), samps.list)
+  # check BIC
+  BIC <- mapply(function(samps, k)
+    calcBIC(input.data2.clust49$I*input.data2.clust49$S, k, calcChainLogLik(samps, input.data2.clust49, k)),
+    samps = samps.list, k = 1:maxK)
+  min.BIC.k <- which(BIC == min(BIC))
+  min.BIC.k
+  expect_equivalent(2, min.BIC.k)
   
   
   # BIC_tb <- tibble(k = kToTest,
@@ -55,36 +80,21 @@ test_that("Best K as min BIC", {
   #   theme_light() +
   #   scale_x_continuous(breaks = kToTest)
   
-  # map cluster numbers back to truth (for K=10)
+  # ---------------------------------------------------------------------------
+  # chains for K=10
   chains <- ggs(samps.list[[which(kToTest == 10)]])
   
   # are there really 10 MAP clusters?
-  z.chain <- get.parameter.chain("z", chains)
-  it <- max(z.chain$Iteration)
-  mcmc_z <- z.chain %>%
-    group_by(Parameter, value) %>%
-    summarize(n=n(),
-              maxiter=it) %>%
-    mutate(probability=n/maxiter) %>%
-    ungroup()
-  map_z <- mcmc_z %>%
-    group_by(Parameter) %>%
-    summarize(value=value[probability==max(probability)])
+  map_z <- get.map.z(get.parameter.chain("z", chains))
   expect_equivalent(length(unique(map_z$value)), 10)
 
   # compare cluster assignment (z) to truth
-  w.z.relabeled.chains <- relabel.w.z.chains(sim.data$z, chains)
+  # map cluster numbers back to truth (for K=10)
+  w.z.relabeled.chains <- relabel.w.z.chains(sim.data2$z[select.muts], chains)
   w.chain <- w.z.relabeled.chains[["w.chain"]]
+  z.chain <- w.z.relabeled.chains[["z.chain"]]
+  map_z_remapped <- get.map.z(z.chain)
   
-  mcmc_z_remapped <- w.z.relabeled.chains[["z.chain"]] %>%
-    group_by(Parameter, value) %>%
-    summarize(n=n(),
-              maxiter=max(Iteration)) %>%
-    mutate(probability=n/maxiter) %>%
-    ungroup()
-  map_z_remapped <- mcmc_z_remapped %>%
-    group_by(Parameter) %>%
-    summarize(value=value[probability==max(probability)])
   expect_equivalent(map_z_remapped$value, sim.data$z)
 
   zs <- map_z_remapped %>%
