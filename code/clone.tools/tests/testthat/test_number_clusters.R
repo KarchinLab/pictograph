@@ -128,4 +128,28 @@ test_that("Best K as min BIC", {
       expect_lte(w.diff[k,s], thresh)
     }
   }
+  
+  # ---------------------------------------------------------------------------
+  # Test case using IP30 CCFs for K=19
+  sim.data3 <- simTestCaseIP30(30, avg.cov=100) 
+  input.data3 <- sim.data3[c("y", "n", "purity", "tcn", "m", "I", "S")]
+  
+  inits <- list(".RNG.name" = "base::Wichmann-Hill",
+                ".RNG.seed" = 123)
+  params <- c("z", "w")
+  kToTest <- 10:22
+  #kToTest <- 19
+  samps.list3 <- mclapply(kToTest,
+                          function(k) runMCMC(input.data3, k, jags.file, inits, params,
+                                              n.iter=1000, thin=1,
+                                              n.burn=100),
+                          mc.cores=8)
+  # check if best K (min BIC) is same as truth (K=10)
+  BIC3 <- mapply(function(samps, k)
+    calcBIC(input.data3$I*input.data3$S, k, calcChainLogLik(samps, input.data3, k)),
+    samps = samps.list3, k = kToTest)
+  min.BIC.k <- kToTest[which(BIC3 == min(BIC3))]
+  min.BIC.k
+  
+  
 })
