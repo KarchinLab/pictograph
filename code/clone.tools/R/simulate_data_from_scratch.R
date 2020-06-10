@@ -35,14 +35,21 @@ sampleCCF <- function(numClusters, numSamples, parentCCF) {
   x * parentCCF
 }
 
-simDataFromScratch <- function(S, K, minVarPerClust, maxVarPerClust, avg.cov=100) {
+simDataFromScratch <- function(S, K, varPerClustMode, 
+                               minVarPerClust, maxVarPerClust, 
+                               varPerClust, avg.cov=100) {
   purity <- samplePurityFromUnif(min.purity = 0.5, max.purity = 0.9, S)
   rand.am <- generateRandomGraphFromK(K)
   w <- round(generateRandomCCFsFromGraph(rand.am, S, K), 2)
   
-  z <- unlist(mapply(function(clust, numVar) rep(clust, numVar), 
-                     1:K, 
-                     sample(minVarPerClust:maxVarPerClust, K)))
+  if (varPerClustMode == "variable") {
+    z <- unlist(mapply(function(clust, numVar) rep(clust, numVar), 
+                       1:K, 
+                       sample(minVarPerClust:maxVarPerClust, K)))
+  } else if (varPerClustMode == "constant") {
+    z <- rep(1:K, each = varPerClust)
+  } else stop("mutPerClust must be either variable or constant")
+  
   I <- length(z)
   
   tcn <- matrix(2, nrow=I, ncol=S)
