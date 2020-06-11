@@ -79,6 +79,7 @@ simDataFromScratch <- function(S, K, varPerClustMode,
                     z=z,
                     w=w,
                     theta=theta,
-                    purity=purity)
+                    purity=purity,
+                    am.long=rand.am)
   test.data
 }
