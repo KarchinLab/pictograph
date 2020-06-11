@@ -42,9 +42,10 @@ sampleCCF <- function(numClusters, numSamples, parentCCF) {
 
 simDataFromScratch <- function(S, K, varPerClustMode, 
                                minVarPerClust, maxVarPerClust, 
-                               varPerClust, avg.cov=100) {
+                               varPerClust, avg.cov=100,
+                               max.num.root.children) {
   purity <- samplePurityFromUnif(min.purity = 0.5, max.purity = 0.9, S)
-  rand.am <- generateRandomGraphFromK(K)
+  rand.am <- generateRandomGraphFromK(K, max.num.root.children)
   w.not.rounded <- generateRandomCCFsFromGraph(rand.am, S, K, purity)
   w <- round(w.not.rounded, 2)
   

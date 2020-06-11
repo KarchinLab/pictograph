@@ -107,7 +107,11 @@ getEdgeName <- function(from, to) {
   paste0(from, "->", to)
 }
 
-randAdmat2 <- function(am.long) {
+numNodesConnectedToRoot <- function(am.long) {
+  sum(am.long[am.long$parent == "root", ]$connected)
+}
+
+randAdmat2 <- function(am.long, max.num.root.children) {
   # input: blank am.long
   # output: random graph
   
@@ -123,8 +127,16 @@ randAdmat2 <- function(am.long) {
   from.nodes <- c("root", temp.node)
   
   while(length(not.root.nodes) > 0) {
+    
+    # remove "root" from possible parents if max.num.root.children quota satisfied
+    if(numNodesConnectedToRoot(am.long) > max.num.root.children) {
+      from.nodes.pool <- from.nodes
+    } else {
+      from.nodes.pool <- from.nodes[-1]
+    }
+      
     temp.to <- sample(not.root.nodes, 1)
-    temp.from <- sample(from.nodes, 1)
+    temp.from <- sample(from.nodes.pool, 1)
     am.long[am.long$edge == getEdgeName(temp.from, temp.to), ]$connected <- 1
     from.nodes <- c(from.nodes, temp.to)
     not.root.nodes <- not.root.nodes[not.root.nodes != temp.to]
@@ -337,11 +349,11 @@ initEmptyAdmatFromK <- function(K) {
   am2
 }
 
-generateRandomGraphFromK <- function(K) {
+generateRandomGraphFromK <- function(K, max.num.root.children) {
   # input: number of mutation clusters, K
   # output: mutation tree; adjacency matrix
   am.long <- toLong(initEmptyAdmatFromK(K))
-  rand.am.long <- randAdmat2(am.long)
+  rand.am.long <- randAdmat2(am.long, max.num.root.children)
   if (!validGraph(rand.am.long)) warning("graph is not valid")
   rand.am.long
 }
