@@ -290,6 +290,7 @@ initializeGraph <- function(mcf, zero.thresh=0.01){
 
 
 toWide <- function(am.long){
+    am.long$child <- as.numeric(am.long$child)
     am.long %>% select(parent, child, connected) %>%
         spread(child, connected) %>%
         select(-parent) %>%
