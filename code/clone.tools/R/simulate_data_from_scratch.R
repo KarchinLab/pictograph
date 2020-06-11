@@ -40,12 +40,13 @@ simDataFromScratch <- function(S, K, varPerClustMode,
                                varPerClust, avg.cov=100) {
   purity <- samplePurityFromUnif(min.purity = 0.5, max.purity = 0.9, S)
   rand.am <- generateRandomGraphFromK(K)
-  w <- round(generateRandomCCFsFromGraph(rand.am, S, K), 2)
+  w.not.rounded <- generateRandomCCFsFromGraph(rand.am, S, K)
+  w <- round(w.not.rounded, 2)
   
   if (varPerClustMode == "variable") {
     z <- unlist(mapply(function(clust, numVar) rep(clust, numVar), 
                        1:K, 
-                       sample(minVarPerClust:maxVarPerClust, K)))
+                       sample(minVarPerClust:maxVarPerClust, K, replace = T)))
   } else if (varPerClustMode == "constant") {
     z <- rep(1:K, each = varPerClust)
   } else stop("mutPerClust must be either variable or constant")
