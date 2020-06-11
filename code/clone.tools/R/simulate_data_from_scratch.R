@@ -2,13 +2,18 @@ samplePurityFromUnif <- function(min.purity, max.purity, S) {
   round(runif(S, min=min.purity, max=max.purity), 2)
 }
 
-generateRandomCCFsFromGraph <- function(rand.am, S, K) {
+generateRandomCCFsFromGraph <- function(rand.am, S, K, purity) {
   edges <- rand.am[rand.am$connected == 1, ]
   w <- matrix(NA, nrow=K, ncol=S)
   
   # Assign CCFs for root children
   root_children <- edges$child[edges$parent == "root"]
-  w[as.numeric(root_children), ] <- sampleCCF(length(root_children), S, rep(1, S))
+  # if root has only one child, child CCFs should be equal to 1
+  if (length(root_children) == 1) {
+    w[as.numeric(root_children), ] <- rep(1, S)
+  } else {
+    w[as.numeric(root_children), ] <- sampleCCF(length(root_children), S, rep(1, S))
+  }
   
   # move down tree
   all_parents <- as.character(edges$parent[which(edges$parent != "root")])
@@ -40,7 +45,7 @@ simDataFromScratch <- function(S, K, varPerClustMode,
                                varPerClust, avg.cov=100) {
   purity <- samplePurityFromUnif(min.purity = 0.5, max.purity = 0.9, S)
   rand.am <- generateRandomGraphFromK(K)
-  w.not.rounded <- generateRandomCCFsFromGraph(rand.am, S, K)
+  w.not.rounded <- generateRandomCCFsFromGraph(rand.am, S, K, purity)
   w <- round(w.not.rounded, 2)
   
   if (varPerClustMode == "variable") {
