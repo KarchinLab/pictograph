@@ -1,11 +1,11 @@
 Package: clone.tools
 Title: Tools for modeling clonal evolution of a cancer
-Version: 0.0.1
+Version: 0.0.2
 Authors@R: 
     person(given = "Lily",
-           family = "Zhang",
+           family = "Zheng",
            role = c("aut", "cre"),
-           email = "first.last@example.com",
+           email = "lily@jhu.edu",
            comment = c(ORCID = "YOUR-ORCID-ID"))
 Description: Implements a Bayesian models to sample evolutionary clone trees
 License: Artistic-2.0
