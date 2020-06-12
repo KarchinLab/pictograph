@@ -30,9 +30,6 @@ generateRandomCCFsFromGraph <- function(rand.am, S, K, purity) {
   
   w
 }
-
-.allOnes <- function(x) all(x == 1)
-.allZeroes <- function(x) all(x == 0)
   
 sampleCCF <- function(numClusters, numSamples, parentCCF) {
   if (numClusters == 1) {
