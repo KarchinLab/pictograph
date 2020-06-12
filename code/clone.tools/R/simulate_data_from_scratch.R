@@ -16,7 +16,7 @@ generateRandomCCFsFromGraph <- function(rand.am, S, K, purity) {
   }
   
   # move down tree
-  all_parents <- as.character(edges$parent[which(edges$parent != "root")])
+  all_parents <- unique(as.character(edges$parent[which(edges$parent != "root")]))
   next_parents <- all_parents[all_parents %in% root_children]
   
   # assign rest of CCFs
@@ -34,10 +34,13 @@ generateRandomCCFsFromGraph <- function(rand.am, S, K, purity) {
 sampleCCF <- function(numClusters, numSamples, parentCCF) {
   if (numClusters == 1) {
     x <- runif(numSamples, 0, 1)
+    children.CCF <- round(x * parentCCF, 2)
   } else {
     x <- t(MCMCpack::rdirichlet(numSamples, rep(1, numClusters)))
+    y <- matrix(rep(parentCCF, numClusters), nrow=numClusters, byrow = T)
+    children.CCF <- round(x * y, 2)
   }
-  children.CCF <- round(x * parentCCF, 2)
+  
   children.CCF
 }
 
