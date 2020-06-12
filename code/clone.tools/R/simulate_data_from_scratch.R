@@ -31,13 +31,31 @@ generateRandomCCFsFromGraph <- function(rand.am, S, K, purity) {
   w
 }
 
+.allOnes <- function(x) all(x == 1)
+.allZeroes <- function(x) all(x == 0)
+  
 sampleCCF <- function(numClusters, numSamples, parentCCF) {
   if (numClusters == 1) {
     x <- runif(numSamples, 0, 1)
   } else {
     x <- t(MCMCpack::rdirichlet(numSamples, rep(1, numClusters)))
   }
-  x * parentCCF
+  children.CCF <- round(x * parentCCF, 2)
+  children.CCF
+}
+
+.noAllZeroes <- function(w) {
+  !any(rowSums(w) == 0)
+}
+.allDistinct <- function(w) {
+  w.distinct <- w %>% 
+    as_tibble() %>% 
+    distinct()
+  nrow(w) == nrow(w.distinct)
+}
+
+.isValidW <- function(w) {
+  .noAllZeroes(w) & .allDistinct(w)
 }
 
 simDataFromScratch <- function(S, K, varPerClustMode, 
@@ -46,8 +64,10 @@ simDataFromScratch <- function(S, K, varPerClustMode,
                                max.num.root.children) {
   purity <- samplePurityFromUnif(min.purity = 0.5, max.purity = 0.9, S)
   rand.am <- generateRandomGraphFromK(K, max.num.root.children)
-  w.not.rounded <- generateRandomCCFsFromGraph(rand.am, S, K, purity)
-  w <- round(w.not.rounded, 2)
+  w <- generateRandomCCFsFromGraph(rand.am, S, K, purity)
+  
+  # make sure w is valid (all clusters have distinct CCFs and no all 0's)
+  while(!.isValidW(w)) w <- generateRandomCCFsFromGraph(rand.am, S, K, purity)
   
   if (varPerClustMode == "variable") {
     z <- unlist(mapply(function(clust, numVar) rep(clust, numVar), 
