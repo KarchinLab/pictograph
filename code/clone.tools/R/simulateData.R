@@ -369,13 +369,17 @@ simTestCase3 <- function(minVar, maxVar, avg.cov=100){
   test.data
 }
 
-simTestCaseIP30 <- function(avg.cov=100){
+simTestCaseIP30 <- function(numVarPerClust, avg.cov=100){
   # single sample clusters with few variants
   set.seed(1234)
   K=19; S=5;
   purity=c(0.80, 0.85, 0.90, 0.80, 0.85)
   
-  z <- rep(1:19, each=5)
+  #z <- rep(1:19, each=5)
+  singles <- c(2, 6, 16, 17 ,18)
+  z <- sort(c(rep((1:19)[-singles], each=numVarPerClust),
+         rep(singles, sample(1:2, length(singles), replace = T))))
+  
   I <- length(z)
   ## True cancer cell fraction
   w <- matrix(c(0.53, 0.61, 0.00, 0.00, 0.00,
@@ -397,6 +401,62 @@ simTestCaseIP30 <- function(avg.cov=100){
                 0.00, 0.00, 0.18, 0.00, 0.00,
                 0.00, 0.00, 0.00, 0.00, 0.40,
                 0.00, 0.00, 0.33, 0.43, 0.00),
+              byrow=T,
+              nrow=K, ncol=S)
+  
+  colnames(w) <-  paste0("sample", 1:S)
+  
+  tcn <- matrix(2, nrow=I, ncol=S)
+  m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
+              nrow=I, ncol=S)
+  
+  # variant x sample matrix
+  W <- w[z, ]
+  P <- matrix(rep(purity, each = I), nrow = I, ncol = S)
+  
+  theta <- calcTheta2(m, tcn, W, P)
+  ##
+  ## Simulate altered reads
+  ##
+  n <- replicate(S, rpois(I, avg.cov))
+  y <- matrix(NA, nrow=I, ncol=S)
+  for (i in 1:I) {
+    for (s in 1:S) {
+      y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+    }
+  }
+  
+  colnames(w) <- colnames(m) <- paste0("sample", 1:S)
+  test.data <- list("I" = I, "S" = S, "K" = K, 
+                    "y" = y, "n" = n,
+                    "m" = m, "tcn" = tcn,
+                    z=z,
+                    w=w,
+                    theta=theta,
+                    purity=purity)
+  test.data
+}
+
+simTestCaseZeros <- function(numVarPerClust, avg.cov=100){
+  # single sample clusters with few variants
+  set.seed(1234)
+  K=10; S=3;
+  purity=c(0.80, 0.85, 0.90)
+  
+  z <- c(rep(1:7, each=numVarPerClust), 
+         8, 9, 9, 10, 10, 10)
+  I <- length(z)
+  ## True cancer cell fraction
+  w <- matrix(c(1.00, 1.00, 1.00,
+                0.98, 0.90, 0.82, 
+                0.55, 0.00, 0.80, 
+                0.00, 0.00, 0.20, 
+                0.43, 0.90, 0.00,
+                0.30, 0.70, 0.00,
+                0.30, 0.10, 0.00,
+                0.10, 0.00, 0.00,
+                0.00, 0.00, 0.10,
+                0.00, 0.07, 0.00),
               byrow=T,
               nrow=K, ncol=S)
   

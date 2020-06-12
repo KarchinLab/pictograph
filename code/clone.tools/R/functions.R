@@ -158,31 +158,39 @@ sample.w <- function(w.chain, K) {
 }
 
 get.map.z <- function(z.chain) {
-  numIter <- max(z.chain$Iteration)
+  it <- max(z.chain$Iteration)
   mcmc_z <- z.chain %>%
     group_by(Parameter, value) %>%
     summarize(n=n(),
-              numIter=numIter) %>%
-    mutate(probability=n/numIter) %>%
+              maxiter=it) %>%
+    mutate(probability=n/maxiter) %>%
     ungroup()
-  
   map_z <- mcmc_z %>%
     group_by(Parameter) %>%
-    select(Parameter, value, probability)
-  map_z <- filter(map_z, probability==max(probability)) %>%
-    ungroup()
-  map_z <- map_z %>%
-    mutate(variant_ind = as.numeric(
-      gsub("z\\[", "", gsub("\\]", "", as.character(map_z$Parameter)))))
-  
-  muts <- y$mut_id
-  muts.z <- map_z %>%
-    mutate(Mutation = muts[map_z$variant_ind]) %>%
-    arrange(value) %>%
-    rename(Cluster = value, Posterior_probability = probability)
-  muts.z <- muts.z %>%
-    select(Cluster, Posterior_probability, Mutation)
-  muts.z
+    summarize(value=value[probability==max(probability)])
+  map_z
+}
+
+get.map.w <- function(w.chain) {
+  S <- numberSamples(w.chain)
+  K <- numberClusters(w.chain)
+  # density plot 
+  w.dens <- ggplot(w.chain, aes(x = value)) +
+    geom_density() +
+    facet_wrap(~Parameter, ncol = S, scales = "free_y") +
+    theme_light()
+  # find peak for MAP w
+  w.dens.p <- ggplot_build(w.dens)$data[[1]]
+  w.map <- w.dens.p %>%
+    as_tibble() %>%
+    group_by(PANEL) %>%
+    summarize(value = x[max(y) == y])
+  w.map <- w.map %>%
+    mutate(Parameter = unique(w.chain$Parameter),
+           value_rounded = round(value, 2))
+  # return w matrix
+  w.map.matrix <- matrix(w.map$value_rounded, K, S, byrow=TRUE)
+  w.map.matrix
 }
 
 # function to check if clustering respects sample presence 

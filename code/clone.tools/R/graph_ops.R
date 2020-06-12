@@ -45,7 +45,13 @@ constrainedEdges <- function(w, zero.thresh=0.01) {
     am2.long
 }
 
-reversedConnection <- function(am){
+getAllNodes <- function(am.long) {
+  # returns vector of all nodes in graph
+  am.long$parent <- as.character(am.long$parent)
+  unique(c(am.long$parent, am.long$child))
+}
+
+reversedConnection <- function(am) {
     connections <- setNames(am$connected, am$edge)
     reversed_connections <- connections[am$reverse_edge] %>%
         "["(!is.na(.))
@@ -54,7 +60,7 @@ reversedConnection <- function(am){
     reversed
 }
 
-isBidirectional <- function(am){
+isBidirectional <- function(am) {
     am %>%
         mutate(bi_directional=(reverse_edge %in% edge) &
                    connected==1 &
@@ -62,15 +68,16 @@ isBidirectional <- function(am){
         pull(bi_directional)
 }
 
-updateGraphElements <- function(am){
+updateGraphElements <- function(am) {
     am %>%
+        mutate(parent=factor(parent, levels=unique(parent))) %>%
         mutate(reversed_connected=reversedConnection(.)) %>%
         mutate(bi_directional=isBidirectional(.)) %>%
         mutate(root_connected=isRootConnected(.))
 }
 
 
-reversedEdges <- function(am){
+reversedEdges <- function(am) {
     am2 <- am %>%
         filter(!is.na(connected)) %>%
         unite("reverse_edge", c("child", "parent"), sep="->",
@@ -78,26 +85,55 @@ reversedEdges <- function(am){
     am2
 }
 
-randAdmat <- function(am.long){
-    new_edges <- am.long %>%
-        filter(connected==0) %>%
-        group_by(child) %>%
-        sample_n(1) %>%
-        mutate(connected=1) %>%
-        ungroup()
-    am3.long <- filter(am.long, !edge %in% new_edges$edge) %>%
-        bind_rows(new_edges) %>%
-        arrange(parent, child) 
-    am <- reversedEdges(am3.long) %>%
-        mutate(reversed_connection=reversedConnection(.),
-               bi_directional=NA,
-               root_connected=NA)    
-    am  <- updateGraphElements(am)
-    am
+getEdgeName <- function(from, to) {
+  paste0(from, "->", to)
 }
 
-isParentConnected <- function(am){
+numNodesConnectedToRoot <- function(am.long) {
+  sum(am.long[am.long$parent == "root", ]$connected)
+}
+
+randAdmat <- function(am.long, max.num.root.children) {
+  # input: blank am.long
+  # output: random graph
+  
+  am.long$parent <- as.character(am.long$parent)
+  
+  all.nodes <- getAllNodes(am.long)
+  not.root.nodes <- all.nodes[all.nodes != "root"]
+  
+  # choose node to connect to root
+  temp.node <- sample(not.root.nodes, 1)
+  am.long[am.long$edge == getEdgeName("root", temp.node), ]$connected <- 1
+  not.root.nodes <- not.root.nodes[not.root.nodes != temp.node]
+  from.nodes <- c("root", temp.node)
+  
+  while(length(not.root.nodes) > 0) {
+    
+    # remove "root" from possible parents if max.num.root.children quota satisfied
+    if(numNodesConnectedToRoot(am.long) > max.num.root.children) {
+      from.nodes.pool <- from.nodes
+    } else {
+      from.nodes.pool <- from.nodes[-1]
+    }
+      
+    temp.to <- sample(not.root.nodes, 1)
+    temp.from <- sample(from.nodes.pool, 1)
+    am.long[am.long$edge == getEdgeName(temp.from, temp.to), ]$connected <- 1
+    from.nodes <- c(from.nodes, temp.to)
+    not.root.nodes <- not.root.nodes[not.root.nodes != temp.to]
+  }
+  am.long <- reversedEdges(am.long) %>%
+    mutate(reversed_connected=reversedConnection(.),
+           bi_directional=NA,
+           root_connected=NA)    
+  am.long <- updateGraphElements(am.long)
+  am.long
+}
+
+isParentConnected <- function(am) {
     am %>%
+        mutate(parent=factor(parent, levels=unique(parent))) %>%
         group_by(parent) %>%
         summarize(n=sum(connected)) %>%
         pull(n) > 0
@@ -107,9 +143,55 @@ isRootConnected <- function(am) isParentConnected(am)[1]
 
 isDirected <- function(am) !any(am$bi_directional)
 
-validGraph <- function(am){
+isFullyConnected <- function(am.long) {
+    # checks if graph (am.long format) is fully connected
+    all_nodes <- getAllNodes(am.long)
+    nodes_in_main_tree <- bfsLong(am.long)
+    length(all_nodes) == length(nodes_in_main_tree)
+}
+
+containsCycle <- function(am.long) {
+    # returns nodes in main tree (connected to root) including "root" 
+    # starting at root
+    am.long$parent <- as.character(am.long$parent)
+    children <- am.long[(am.long$parent == "root" & am.long$connected == 1), ]$child
+    nodes <- c("root", children)
+    
+    while(length(children) > 0) {
+        c <- children[1]
+        temp.children <- am.long[(am.long$parent == c & am.long$connected == 1), ]$child
+        children <- c(children, temp.children)
+        if (any(temp.children %in% nodes)) return(TRUE)
+        nodes <- c(nodes, temp.children)
+        
+        children <- children[-1]
+    }
+    FALSE
+}
+
+validGraph <- function(am) {
     isDirected(am) &&
-        isRootConnected(am)
+        isRootConnected(am) &&
+            !containsCycle(am) &&
+                isFullyConnected(am)
+}
+
+bfsLong <- function(am.long) {
+  # returns vector of nodes in main tree (connected to root) including "root" 
+  # starting at root
+  am.long$parent <- as.character(am.long$parent)
+  children <- am.long[(am.long$parent == "root" & am.long$connected == 1), ]$child
+  nodes <- c("root", children)
+  
+  while(length(children) > 0) {
+    c <- children[1]
+    temp.children <- am.long[(am.long$parent == c & am.long$connected == 1), ]$child
+    children <- c(children, temp.children)
+    if (any(temp.children %in% nodes)) stop("graph has cycle")
+    nodes <- c(nodes, temp.children)
+    children <- children[-1]
+  }
+  nodes
 }
 
 
@@ -142,12 +224,25 @@ initializeGraph <- function(mcf, zero.thresh=0.01){
 
 
 toWide <- function(am.long){
+    am.long$child <- as.numeric(am.long$child)
     am.long %>% select(parent, child, connected) %>%
         spread(child, connected) %>%
         select(-parent) %>%
         as.matrix()
 }
 
+toLong <- function(am) {
+  am.long <- as_tibble(am) %>%
+    mutate(parent=rownames(am)) %>%
+    pivot_longer(-parent,
+                 names_to="child",
+                 values_to="connected") %>%
+    filter(parent != child) %>%
+    unite("edge", c("parent", "child"), sep="->",
+          remove=FALSE) %>%
+    mutate(parent=factor(parent, levels=unique(parent)))   
+  am.long
+}
 
 sampleNewEdge <- function(a){
     condition1 <- a %>% group_by(child) %>%
@@ -166,4 +261,37 @@ sampleNewEdge <- function(a){
     ix <- sample(seq_len(nrow(move_set)), 1)
     astar <- addEdge(a, move_set[ix, ])
     astar
+}
+
+initEmptyAdmatFromK <- function(K) {
+  admat <- matrix(0, K, K)
+  diag(admat) <- NA
+  am2 <- rbind(0, admat)
+  dimnames(am2) <- list(c("root", 1:K), 1:K)
+  am2
+}
+
+generateRandomGraphFromK <- function(K, max.num.root.children) {
+  # input: number of mutation clusters, K
+  # output: mutation tree; adjacency matrix
+  am.long <- toLong(initEmptyAdmatFromK(K))
+  rand.am.long <- randAdmat(am.long, max.num.root.children)
+  if (!validGraph(rand.am.long)) warning("graph is not valid")
+  rand.am.long
+}
+
+plotGraph <- function(am.long){
+  am <- toWide(am.long)
+  rownames(am) <- c("root", colnames(am))
+  am <- cbind(root=0, am) ## add column for root
+  colnames(am) <- rownames(am)
+
+  am[is.na(am)] <- 0
+  
+  ig <- igraph::graph_from_adjacency_matrix(am, mode = "directed", weighted = TRUE,
+                                    diag = FALSE, add.row = TRUE) 
+  
+  igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
+              vertex.color = "white", vertex.label.family = "Helvetica",
+              edge.arrow.size = 0.2, edge.arrow.width = 2)
 }
