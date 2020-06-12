@@ -174,7 +174,6 @@ validGraph <- function(am) {
         isRootConnected(am) &&
             !containsCycle(am) &&
                 isFullyConnected(am)
-                
 }
 
 bfsLong <- function(am.long) {
@@ -279,4 +278,20 @@ generateRandomGraphFromK <- function(K, max.num.root.children) {
   rand.am.long <- randAdmat(am.long, max.num.root.children)
   if (!validGraph(rand.am.long)) warning("graph is not valid")
   rand.am.long
+}
+
+plotGraph <- function(am.long){
+  am <- toWide(am.long)
+  rownames(am) <- c("root", colnames(am))
+  am <- cbind(root=0, am) ## add column for root
+  colnames(am) <- rownames(am)
+
+  am[is.na(am)] <- 0
+  
+  ig <- igraph::graph_from_adjacency_matrix(am, mode = "directed", weighted = TRUE,
+                                    diag = FALSE, add.row = TRUE) 
+  
+  igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
+              vertex.color = "white", vertex.label.family = "Helvetica",
+              edge.arrow.size = 0.2, edge.arrow.width = 2)
 }
