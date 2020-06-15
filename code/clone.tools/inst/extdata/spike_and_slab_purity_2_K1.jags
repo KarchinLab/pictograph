@@ -22,8 +22,7 @@ model {
 			# w[k,s] ~ dbeta(a[z.p[k,s]], b[z.p[k,s]])
 
 			w1[k,s] ~ dbeta(1,1)T(0.005, )
-			w2[k,s] <- 0
-			w[k,s] <- ifelse(z.p[k,s] == 1, w1[k,s], w2[k,s])
+			w[k,s] <- ifelse(z.p[k,s] == 1, w1[k,s], 0)
 
 		}
 	}
