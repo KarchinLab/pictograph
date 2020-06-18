@@ -65,48 +65,101 @@ decide.ht <- function(pval, alpha=0.05) {
   else return(0)
 }
 
-calc.topology.cost <- function(admat, cpov) {
+calcTopologyCost <- function(am, cpov, am_format = "long") {
   TC <- 0
-  edges <- which(admat == 1, arr.ind=TRUE)
+  
+  if (am_format == "long") {
+    am <- toWide(am)
+  } 
+  
+  edges <- which(am == 1, arr.ind=TRUE)
   N <- nrow(edges)
   for (i in seq_len(N)) {
     TC <- TC + cpov[edges[i,1], edges[i,2]]
   }
+  
   TC
 }
 
-calc.mass.cost <- function(admat, mcf_matrix) {
-  numChildren <- rowSums(admat, na.rm = T)
-  nodes <- which(numChildren > 0, arr.ind = T) # not leaves
-  mc.node <- rep(0, length(nodes))
-  
-  for (i in 1:length(nodes)) {
-    node <- nodes[i]
-    
-    # root node: MCF = 1
-    parent.w <- rep(1, ncol(mcf_matrix))
-    # not root node: look up MCF in mcf_matrix
-    if (node != 1) { 
-      parent.w <- mcf_matrix[node-1,]
-    }
-    
-    kids <- which(admat[node,] == 1, arr.ind = T)
-    if (numChildren[node] > 1) {
-      children.w <- colSums(mcf_matrix[kids,])
-    } else {
-      children.w <- mcf_matrix[kids,]
-    }
-    
-    mc.s <- ifelse(parent.w >= children.w, 0, children.w - parent.w)
-    mc.node[i] <- sqrt(sum(mc.s^2))
-  }
-  sum(mc.node)
+getEdges <- function(am.long) {
+  am.long %>%
+    filter(connected == 1) %>%
+    mutate(parent = as.character(parent))
 }
 
-calc.tree.fitness <- function(admat, cpov, mcf_matrix, weight.mass = 1, weight.topology = 1, scaling.coeff=5) {
-  TC <- calc.topology.cost(admat, cpov)
-  MC <- calc.mass.cost(admat, mcf_matrix)
-  Z <- weight.topology * TC + weight.mass * MC
-  fitness <- exp(-scaling.coeff * Z)
+getChildren <- function(am.long, node) {
+  # returns vector of children nodes
+  edges <- am.long %>%
+    mutate(parent = as.character(parent)) %>%
+    filter(connected == 1) %>%
+    filter(parent == node)
+  return(edges$child)
+}
+
+calcMassCost <- function(am, mcf_matrix, am_format="long") {
+  num_samples <- ncol(mcf_matrix)
+  
+  if (am_format == "long") {
+    edges <- getEdges(am)
+    
+    parent_nodes <- unique(edges$parent)
+    mass_cost <- rep(0, length(parent_nodes)) # mass cost of each parent node
+    
+    for (i in seq_len(length(parent_nodes))) {
+      parent_node <- parent_nodes[i]
+      
+      # root CCF is 1
+      if (parent_node == "root") {
+        parent_w <- rep(1, num_samples)
+      } else {
+        parent_w <- mcf_matrix[as.numeric(parent_node), ]
+      }
+      
+      kids <- getChildren(am, parent_node)
+      if (length(kids) > 1) {
+        children_w <- colSums(mcf_matrix[as.numeric(kids), ])
+      } else {
+        children_w <- mcf_matrix[as.numeric(kids), ]
+      }
+      
+      mc_s <- ifelse(parent_w >= children_w, 0, children_w - parent_w)
+      mass_cost[i] <- sqrt(sum(mc_s^2))
+    }
+    return(sum(mass_cost))
+    
+  } else if (am_format == "wide") {
+    num_children <- rowSums(am, na.rm = T)
+    nodes <- which(num_children > 0, arr.ind = T) # not leaves
+    mc_node <- rep(0, length(nodes))
+    
+    for (i in 1:length(nodes)) {
+      node <- nodes[i]
+      
+      # root node: MCF = 1
+      parent_w <- rep(1, ncol(mcf_matrix))
+      # not root node: look up MCF in mcf_matrix
+      if (node != 1) { 
+        parent_w <- mcf_matrix[node-1,]
+      }
+      
+      kids <- which(am[node,] == 1, arr.ind = T)
+      if (num_children[node] > 1) {
+        children_w <- colSums(mcf_matrix[kids, ])
+      } else {
+        children_w <- mcf_matrix[kids, ]
+      }
+      
+      mc_s <- ifelse(parent_w >= children_w, 0, children_w - parent_w)
+      mc_node[i] <- sqrt(sum(mc_s^2))
+    }
+    return(sum(mc_node))
+  }
+}
+
+calcTreeFitness <- function(admat, cpov, mcf_matrix, am_format = "long", weight_mass = 1, weight_topology = 1, scaling_coeff=5) {
+  TC <- calcTopologyCost(admat, cpov, am_format)
+  MC <- calcMassCost(admat, mcf_matrix, am_format)
+  Z <- weight_topology * TC + weight_mass * MC
+  fitness <- exp(-scaling_coeff * Z)
   fitness
 }

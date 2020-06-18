@@ -7,8 +7,8 @@ calcTheta2 <- function(m, tcn, w, p) {
 }
 
 runMCMC <- function(data, K, jags.file, inits, params,
-                    n.iter=20000, thin=10, n.chains=1,
-                    n.adapt=1000, n.burn=10000) {
+                    n.iter=10000, thin=10, n.chains=1,
+                    n.adapt=1000, n.burn=1000) {
     data$K <- K
     jags.m <- jags.model(jags.file,
                          data,
@@ -18,6 +18,33 @@ runMCMC <- function(data, K, jags.file, inits, params,
     update(jags.m, n.burn)
     samps <- coda.samples(jags.m, params, n.iter=n.iter, thin=thin)
     samps
+}
+
+runClusteringForRangeK <- function(data, kToTest, 
+                                   inits = list(".RNG.name" = "base::Wichmann-Hill", ".RNG.seed" = 123), 
+                                   params = c("z", "w"), n.iter=10000, thin=10, n.chains=1,
+                                   n.adapt=1000, n.burn=1000,
+                                   mc.cores=8) {
+  # jags files stored in clone.tools
+  extdir <- system.file("extdata", package="clone.tools")
+  jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
+  jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
+  
+  # use proper jags model for K=1
+  if (kToTest[1] == 1) {
+    samps.K1 <- runMCMC(data, 1, jags.file.K1, inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
+    samps.list <- parallel::mclapply(kToTest[-1],
+                           function(k) runMCMC(data, k, jags.file, inits, params,
+                                               n.iter=n.iter, thin=thin, n.burn=n.burn),
+                           mc.cores=mc.cores)
+    samps.list <- c(list(samps.K1), samps.list)
+  } else {
+    samps.list <- parallel::mclapply(kToTest,
+                           function(k) runMCMC(data, k, jags.file, inits, params,
+                                               n.iter=n.iter, thin=thin, n.burn=n.burn),
+                           mc.cores=mc.cores)
+  }
+  return(samps.list)
 }
 
 getParamChain <- function(samps, param) {
@@ -58,6 +85,12 @@ calcChainLogLik <- function(samps, input.data, K) {
 }
 
 calcBIC <- function(n, k, ll) log(n)*k - 2*ll
+
+calcBICForRangeK <- function(samps.list, kToTest, input.data) {
+  mapply(function(samps, k)
+    calcBIC(input.data$I*input.data$S, k, calcChainLogLik(samps, input.data, k)),
+    samps = samps.list, k = kToTest)
+}
 
 relabelZ <- function(z.chain, I, K){
   mcmc_z <- z.chain %>%
