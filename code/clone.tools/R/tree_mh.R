@@ -1,16 +1,22 @@
-runTreeMH <- function(w.chain, 
+runTreeMH <- function(w_chain, 
                       num_iter=10000, thin=10, burn=1000,
-                      first_am=NULL, seed=123) {
+                      first_am=NULL, seed=123,
+                      post=NULL) {
   
-  mcf_stats <- summarizeWChain(w.chain)
-  mcf_matrix <- get.map.w(w.chain)
+  mcf_stats <- summarizeWChain(w_chain)
+  mcf_matrix <- get.map.w(w_chain)
   
   # initialize chains ---------------------------------------------------------
-  if (is.null(first_am)) {
-    am_chain <- list(initializeGraph(mcf_matrix, max.num.root.children=1))
-  } else {
-    am_chain <- list(first_am)
-  }
+  #if (is.null(post)) {
+    if (is.null(first_am)) {
+      am_chain <- list(initializeGraph(mcf_matrix, max.num.root.children=1))
+    } else {
+      am_chain <- list(first_am)
+    }
+  #} else {
+    # update restrictions using posterior admat
+  #}
+  
   
   cpov <- create.cpov(mcf_stats)
   am_prev <- am_chain[[1]]
@@ -45,3 +51,4 @@ runTreeMH <- function(w.chain,
                   accept_rate=num_accept/num_iter)
   return(results)
 }
+
