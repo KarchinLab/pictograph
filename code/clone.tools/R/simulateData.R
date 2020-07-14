@@ -244,6 +244,10 @@ simTestCase1 <- function(numVarPerClust, avg.cov=100){
   for (i in 1:I) {
     for (s in 1:S) {
       y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+      # make sure real mutation has variant read
+      if (theta[i,s] > 0 & y[i, s] == 0) {
+        y[i, s] <- 1
+      }
     }
   }
   
@@ -299,6 +303,10 @@ simTestCase2 <- function(varPerClust, avg.cov=100){
   for (i in 1:I) {
     for (s in 1:S) {
       y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+      # make sure real mutation has variant read
+      if (theta[i,s] > 0 & y[i, s] == 0) {
+        y[i, s] <- 1
+      }
     }
   }
   
@@ -355,6 +363,10 @@ simTestCase3 <- function(minVar, maxVar, avg.cov=100){
   for (i in 1:I) {
     for (s in 1:S) {
       y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+      # make sure real mutation has variant read
+      if (theta[i,s] > 0 & y[i, s] == 0) {
+        y[i, s] <- 1
+      }
     }
   }
   
@@ -423,6 +435,10 @@ simTestCaseIP30 <- function(numVarPerClust, avg.cov=100){
   for (i in 1:I) {
     for (s in 1:S) {
       y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+      # make sure real mutation has variant read
+      if (theta[i,s] > 0 & y[i, s] == 0) {
+        y[i, s] <- 1
+      }
     }
   }
   
@@ -479,6 +495,10 @@ simTestCaseZeros <- function(numVarPerClust, avg.cov=100){
   for (i in 1:I) {
     for (s in 1:S) {
       y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+      # make sure real mutation has variant read
+      if (theta[i,s] > 0 & y[i, s] == 0) {
+        y[i, s] <- 1
+      }
     }
   }
   

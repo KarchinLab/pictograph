@@ -8,22 +8,18 @@ model {
 			## posterior predictive distribution
 			ystar[i, s] ~ dbin(theta[i, s], n[i, s])
 		}
-		#z[i] ~ dcat(pi[1:K])
+
 		z[i] <- 1
 	}
-	#alpha <- rep(1, K)
-	#pi[1:K] ~ ddirch(alpha[1:K])
 
-	for (k in 1:K) {
-		for (s in 1:S) {
-			p[k,s] ~ dbeta(5,2)
-			z.p[k,s] ~ dcat(c(p[k,s], 1-p[k,s]))
+	for (s in 1:S) {
+		p[1,s] ~ dbeta(5,2)
+		z.p[1,s] ~ dcat(c(p[1,s], 1-p[1,s]))
 
-			# w[k,s] ~ dbeta(a[z.p[k,s]], b[z.p[k,s]])
+		# w[1,s] ~ dbeta(a[z.p[1,s]], b[z.p[1,s]])
 
-			w1[k,s] ~ dbeta(1,1)T(0.005, )
-			w[k,s] <- ifelse(z.p[k,s] == 1, w1[k,s], 0)
+		w1[1,s] ~ dbeta(1,1)T(0.005, )
+		w[1,s] <- ifelse(z.p[1,s] == 1, w1[1,s], 0)
 
-		}
 	}
 }

@@ -9,7 +9,7 @@ calcTheta2 <- function(m, tcn, w, p) {
 runMCMC <- function(data, K, jags.file, inits, params,
                     n.iter=10000, thin=10, n.chains=1,
                     n.adapt=1000, n.burn=1000) {
-    data$K <- K
+    if (K > 1) data$K <- K
     jags.m <- jags.model(jags.file,
                          data,
                          n.chains = n.chains,
