@@ -14,7 +14,7 @@ runTreeMH <- function(w_chain,
       am_chain <- list(first_am)
     }
   #} else {
-    # update restrictions using posterior admat
+    # @TODO update restrictions using posterior admat
   #}
   
   
@@ -46,9 +46,9 @@ runTreeMH <- function(w_chain,
       score_chain <- c(score_chain, fit_prev)
     }
   }
-  results <- list(am_chain=am_chain,
-                  score_chain=score_chain,
-                  accept_rate=num_accept/num_iter)
+  results <- list(am_chain = am_chain,
+                  score_chain = score_chain,
+                  accept_rate = num_accept/num_iter)
   return(results)
 }
 

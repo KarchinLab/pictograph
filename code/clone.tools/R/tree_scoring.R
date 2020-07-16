@@ -43,7 +43,12 @@ create.cpov <- function(mcf_stats, alpha=0.05, zero.thresh=0.01, mcf_matrix = NU
         ## cumulative sum of the
         ## number of standard deviations for the difference in
         ## MCFs between 2 samples
-        statistic <- statistic + (d / d_sd)^2 * I
+        if (d == 0 || is.nan(d / d_sd)) {
+          next
+        } else {
+          statistic <- statistic + (d / d_sd)^2 * I
+        }
+        
         for (k in 0:S) {
           pval <- pval + ((1 - pchisq(statistic, k)) *
                             choose(S, k) / (2^S))
