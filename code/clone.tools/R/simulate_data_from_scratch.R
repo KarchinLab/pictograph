@@ -3,7 +3,8 @@ samplePurityFromUnif <- function(min.purity, max.purity, S) {
 }
 
 generateRandomCCFsFromGraph <- function(rand.am, S, K, purity) {
-  edges <- rand.am[rand.am$connected == 1, ]
+  edges <- rand.am %>%
+    filter(connected == 1)
   w <- matrix(NA, nrow=K, ncol=S)
   
   # Assign CCFs for root children
@@ -109,4 +110,8 @@ simDataFromScratch <- function(S, K, varPerClustMode,
                     purity=purity,
                     am.long=rand.am)
   test.data
+}
+
+inputDataFromSim <- function(sim.data) {
+  sim.data[c("y", "n", "purity", "tcn", "m", "I", "S")]
 }

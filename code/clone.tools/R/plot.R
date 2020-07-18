@@ -9,7 +9,18 @@ get.parameter.chain <- function(param, chains) {
   chains[grep(paste0(param, "\\["), chains$Parameter), ]
 }
 
-plot.variant.z <- function(mcmc_z, I, K) {
+plot.variant.z <- function(z_chain) {
+  I <- length(unique(z_chain$Parameter))
+  K <- max(unique(z_chain$value))
+  num_iter <- max(z_chain$Iteration)
+  
+  mcmc_z <- z_chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              num_iter=num_iter) %>%
+    mutate(probability=n/num_iter) %>%
+    ungroup()
+  
   z.seg.tb <- mcmc_z %>%
     group_by(Parameter) %>%
     summarize(z1 = min(value), z2 = max(value))
