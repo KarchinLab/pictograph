@@ -307,6 +307,7 @@ bfsLong <- function(am.long) {
 
 addEdge <- function(am, new_edge){
     ## Add the edge
+    child_levels <- levels(am$parent) # save levels to reorder later
     new_edge$connected <- 1
     disconnect_edge <- filter(am, child == new_edge$child)  %>%
         filter(connected==1) %>%
@@ -316,6 +317,10 @@ addEdge <- function(am, new_edge){
         bind_rows(updated_edges) %>%
         arrange(parent) %>%
         updateGraphElements()
+    am2 <- am2 %>%
+      mutate(child = as.numeric(am2$child)) %>%
+      arrange(parent, child)
+    am2 <- mutate(am2, child = as.character(am2$child))
     am2
 }
 
@@ -357,7 +362,7 @@ toLong <- function(am) {
   am.long
 }
 
-sampleNewEdge <- function(a){
+sampleNewEdge <- function(a, max.num.root.children){
     condition1 <- a %>% group_by(child) %>%
         summarize(n=sum(connected==0)) %>%
         mutate(possible=which(n >= 1))
@@ -368,7 +373,7 @@ sampleNewEdge <- function(a){
     is_valid <- rep(NA, nrow(possible_moves))
     for(i in seq_len(nrow(possible_moves))){
         astar <- addEdge(a, possible_moves[i, ])
-        is_valid[i] <- validGraph(astar)
+        is_valid[i] <- validGraph(astar) & (numNodesConnectedToRoot(astar) <= max.num.root.children)
     }
     move_set <- possible_moves[is_valid, ]
     ix <- sample(seq_len(nrow(move_set)), 1)
@@ -394,6 +399,12 @@ generateRandomGraphFromK <- function(K, max.num.root.children) {
 }
 
 plotGraph <- function(am.long){
+  # make sure am.long is sorted by parent and child
+  am.long <- mutate(am.long, child = as.numeric(am.long$child)) %>%
+    arrange(parent, child)
+  am.long <- mutate(am.long, child = as.character(am.long$child))
+  
+  # change to wide format and plot
   am <- toWide(am.long)
   rownames(am) <- c("root", colnames(am))
   am <- cbind(root=0, am) ## add column for root
@@ -412,6 +423,60 @@ plotGraph <- function(am.long){
 getPosteriorAmLong <- function(am_chain) {
   # input: chain from tree MCMC of trees in am.long format
   # output: posterior am.long 
+  num_trees <- length(am_chain)
   
+  combined_am_chain <- am_chain %>%
+    bind_rows
+  post_am <- combined_am_chain %>%
+    group_by(edge) %>%
+    mutate(posterior_prob = sum(connected) / num_trees) %>%
+    ungroup() %>%
+    select(edge, parent, child, possible_edge, posterior_prob) %>%
+    distinct()
+  post_am
+}
+
+toWidePostAm <- function(post_am) {
+  post_am %>% 
+    mutate(child = as.numeric(post_am$child)) %>%
+    select(parent, child, posterior_prob) %>%
+    spread(child, posterior_prob) %>%
+    select(-parent) %>%
+    as.matrix()
+}
+
+plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1) {
+  # filter1 filters columns (am wide format) for edges with posterior prob > (max(column) - filter1.threshold)
+  post_am_mat <- toWidePostAm(post_am)
   
+  # add column for root
+  post_am_mat <- cbind(0, post_am_mat) 
+  colnames(post_am_mat)[1] <- "root"
+  rownames(post_am_mat) <- colnames(post_am_mat)
+  admat <- as.matrix(post_am_mat)
+  admat[is.na(admat)] <- 0 
+
+  # filter edges
+  if (filter1) {
+    #thresh <- apply(admat, 2, max) - filter1.threshold
+    admat <- apply(admat, 2, function(x) ifelse(x > (max(x)-filter1.threshold), x, 0))
+  } 
+  
+  ig <- igraph::graph_from_adjacency_matrix(admat, mode = "directed", weighted = TRUE,
+                                    diag = FALSE, add.row = TRUE) 
+  
+  E(ig)$lty <- ifelse(E(ig)$weight < 0.25, 2, 1)
+  
+  # make edge black if only 1 edge to vertex
+  e <- ends(ig, E(ig))
+  numTo <- table(e[,2])
+  edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
+  E(ig)$color <- edgeColors
+  
+  V(ig)$label.cex <- 0.5
+  
+  igraph::plot.igraph(ig, layout = layout_as_tree(ig),
+              vertex.color = "white", vertex.label.family = "Helvetica",
+              edge.arrow.size = 0.2, edge.arrow.width = 2,
+              edge.width = E(ig)$weight*3)
 }
