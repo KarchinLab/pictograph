@@ -362,7 +362,7 @@ toLong <- function(am) {
   am.long
 }
 
-sampleNewEdge <- function(a){
+sampleNewEdge <- function(a, max.num.root.children){
     condition1 <- a %>% group_by(child) %>%
         summarize(n=sum(connected==0)) %>%
         mutate(possible=which(n >= 1))
@@ -373,7 +373,7 @@ sampleNewEdge <- function(a){
     is_valid <- rep(NA, nrow(possible_moves))
     for(i in seq_len(nrow(possible_moves))){
         astar <- addEdge(a, possible_moves[i, ])
-        is_valid[i] <- validGraph(astar)
+        is_valid[i] <- validGraph(astar) & (numNodesConnectedToRoot(astar) <= max.num.root.children)
     }
     move_set <- possible_moves[is_valid, ]
     ix <- sample(seq_len(nrow(move_set)), 1)
@@ -399,6 +399,12 @@ generateRandomGraphFromK <- function(K, max.num.root.children) {
 }
 
 plotGraph <- function(am.long){
+  # make sure am.long is sorted by parent and child
+  am.long <- mutate(am.long, child = as.numeric(am.long$child)) %>%
+    arrange(parent, child)
+  am.long <- mutate(am.long, child = as.character(am.long$child))
+  
+  # change to wide format and plot
   am <- toWide(am.long)
   rownames(am) <- c("root", colnames(am))
   am <- cbind(root=0, am) ## add column for root
