@@ -459,10 +459,10 @@ plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1
   # filter edges
   if (filter1) {
     #thresh <- apply(admat, 2, max) - filter1.threshold
-    ad <- apply(admat, 2, function(x) ifelse(x > (max(x)-filter1.threshold), x, 0))
-  }
+    admat <- apply(admat, 2, function(x) ifelse(x > (max(x)-filter1.threshold), x, 0))
+  } 
   
-  ig <- igraph::graph_from_adjacency_matrix(ad, mode = "directed", weighted = TRUE,
+  ig <- igraph::graph_from_adjacency_matrix(admat, mode = "directed", weighted = TRUE,
                                     diag = FALSE, add.row = TRUE) 
   
   E(ig)$lty <- ifelse(E(ig)$weight < 0.25, 2, 1)
