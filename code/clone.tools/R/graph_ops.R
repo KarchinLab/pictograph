@@ -423,6 +423,60 @@ plotGraph <- function(am.long){
 getPosteriorAmLong <- function(am_chain) {
   # input: chain from tree MCMC of trees in am.long format
   # output: posterior am.long 
+  num_trees <- length(am_chain)
   
+  combined_am_chain <- am_chain %>%
+    bind_rows
+  post_am <- combined_am_chain %>%
+    group_by(edge) %>%
+    mutate(posterior_prob = sum(connected) / num_trees) %>%
+    ungroup() %>%
+    select(edge, parent, child, possible_edge, posterior_prob) %>%
+    distinct()
+  post_am
+}
+
+toWidePostAm <- function(post_am) {
+  post_am %>% 
+    mutate(child = as.numeric(post_am$child)) %>%
+    select(parent, child, posterior_prob) %>%
+    spread(child, posterior_prob) %>%
+    select(-parent) %>%
+    as.matrix()
+}
+
+plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1) {
+  # filter1 filters columns (am wide format) for edges with posterior prob > (max(column) - filter1.threshold)
+  post_am_mat <- toWidePostAm(post_am)
   
+  # add column for root
+  post_am_mat <- cbind(0, post_am_mat) 
+  colnames(post_am_mat)[1] <- "root"
+  rownames(post_am_mat) <- colnames(post_am_mat)
+  admat <- as.matrix(post_am_mat)
+  admat[is.na(admat)] <- 0 
+
+  # filter edges
+  if (filter1) {
+    #thresh <- apply(admat, 2, max) - filter1.threshold
+    ad <- apply(admat, 2, function(x) ifelse(x > (max(x)-filter1.threshold), x, 0))
+  }
+  
+  ig <- igraph::graph_from_adjacency_matrix(ad, mode = "directed", weighted = TRUE,
+                                    diag = FALSE, add.row = TRUE) 
+  
+  E(ig)$lty <- ifelse(E(ig)$weight < 0.25, 2, 1)
+  
+  # make edge black if only 1 edge to vertex
+  e <- ends(ig, E(ig))
+  numTo <- table(e[,2])
+  edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
+  E(ig)$color <- edgeColors
+  
+  V(ig)$label.cex <- 0.5
+  
+  igraph::plot.igraph(ig, layout = layout_as_tree(ig),
+              vertex.color = "white", vertex.label.family = "Helvetica",
+              edge.arrow.size = 0.2, edge.arrow.width = 2,
+              edge.width = E(ig)$weight*3)
 }
