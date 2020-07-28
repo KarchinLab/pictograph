@@ -307,6 +307,7 @@ bfsLong <- function(am.long) {
 
 addEdge <- function(am, new_edge){
     ## Add the edge
+    child_levels <- levels(am$parent) # save levels to reorder later
     new_edge$connected <- 1
     disconnect_edge <- filter(am, child == new_edge$child)  %>%
         filter(connected==1) %>%
@@ -316,6 +317,10 @@ addEdge <- function(am, new_edge){
         bind_rows(updated_edges) %>%
         arrange(parent) %>%
         updateGraphElements()
+    am2 <- am2 %>%
+      mutate(child = as.numeric(am2$child)) %>%
+      arrange(parent, child)
+    am2 <- mutate(am2, child = as.character(am2$child))
     am2
 }
 
