@@ -1,5 +1,5 @@
 ## refactored base.admat
-constrainedEdges <- function(w, zero.thresh=0.01) {
+constrainedEdges <- function(wmat, zero.thresh=0.01) {
     ##
     ## Rules:
     ##  - cluster (node) cannot connect to itself
@@ -9,39 +9,37 @@ constrainedEdges <- function(w, zero.thresh=0.01) {
     ##         - X < Y implies ...
     ##
     ##cluster.sample.presence <- apply(w, 1, function(x) which( x> zero.thresh))
-    wmat <- spread(w, sample_id, mean) %>%
-        ungroup() %>%
-        select(-cluster_id) %>%
-        as.matrix()
+
     cluster.sample.presence <- apply(wmat, 1, function(x) which(x>zero.thresh))
-    K <- length(unique(w$cluster_id))
-    S <- length(unique(w$sample_id))
-    admat <- matrix(0, K, K)
+    K <- nrow(wmat)
+    S <- ncol(wmat)
+    admat <- matrix(T, K, K)
     for(i in 1:K){
         for(j in 1:K){
             from.samples <- cluster.sample.presence[[i]]
             to.samples <- cluster.sample.presence[[j]]
             if (setequal(from.samples, to.samples)) next()
             if(length(from.samples) < length(to.samples)) {
-                admat[i, j] <- NA
+                admat[i, j] <- F
                 next()
             }
             if (all(to.samples %in% from.samples)) next()
-            admat[i, j] <- NA 
+            admat[i, j] <- F 
       }            
     }
-    diag(admat) <- NA
-    am2 <- rbind(0, admat)
+    diag(admat) <- F
+    am2 <- rbind(T, admat)
     dimnames(am2) <- list(c("root", 1:K), 1:K)
     am2.long <- as_tibble(am2) %>%
         mutate(parent=rownames(am2)) %>%
         pivot_longer(-parent,
                      names_to="child",
-                     values_to="connected") %>%
+                     values_to="possible_edge") %>%
         filter(parent != child) %>%
         unite("edge", c("parent", "child"), sep="->",
               remove=FALSE) %>%
-        mutate(parent=factor(parent, levels=unique(parent)))    
+        mutate(parent=factor(parent, levels=unique(parent))) %>%
+        mutate(connected=0)
     am2.long
 }
 
@@ -93,36 +91,148 @@ numNodesConnectedToRoot <- function(am.long) {
   sum(am.long[am.long$parent == "root", ]$connected)
 }
 
-randAdmat <- function(am.long, max.num.root.children) {
-  # input: blank am.long
-  # output: random graph
+randAdmatUnchecked <- function(am.long, max.num.root.children) {
+  # input: blank am.long (from either constrainedEdges or toLong(initEmptyAdmatFromK(K))
+  #     - $connected = 0 
+  #     - $possible_edge = T/F if from constrainedEdges
+  # output: random graph (not necessarily valid)
+  blank <- am.long # save copy of original am.long
+  parent_levels <- levels(blank$parent)
   
   am.long$parent <- as.character(am.long$parent)
   
   all.nodes <- getAllNodes(am.long)
-  not.root.nodes <- all.nodes[all.nodes != "root"]
+  node.pool <- all.nodes[all.nodes != "root"] # nodes left to connect in graph
+  # possible edges may be limited by constraints
+  if ("possible_edge" %in% colnames(am.long)) {
+    possible.edges <- am.long %>%
+      filter(possible_edge == TRUE)
+    has_constraints <- TRUE
+  } else {
+    possible.edges <- am.long
+    has_constraints <- FALSE
+  }
+  parent.pool <- unique(possible.edges$parent) # possible parent nodes 
   
   # choose node to connect to root
-  temp.node <- sample(not.root.nodes, 1)
+  # select "to" node from parent.pool to prevent getting stuck if max.num.root.children == 1
+  temp.node <- sample(parent.pool[parent.pool != "root"], 1)
   am.long[am.long$edge == getEdgeName("root", temp.node), ]$connected <- 1
-  not.root.nodes <- not.root.nodes[not.root.nodes != temp.node]
+  node.pool <- node.pool[node.pool != temp.node]
+  
+  # connect nodes that are left 
+  for (n in node.pool) {
+    # all possible edges to node n
+    # check if there are constraints present 
+    if (has_constraints) {
+      temp.possible.edges <- am.long %>%
+        filter(possible_edge == T)
+    } else {
+      temp.possible.edges <- am.long
+    }
+    # can't connect to root if max.num.root.children quota is satisfied
+    if (numNodesConnectedToRoot(am.long) >= max.num.root.children) {
+      temp.possible.edges <- temp.possible.edges %>%
+        filter(child == n, parent != "root")
+    } else {
+      temp.possible.edges <- temp.possible.edges %>%
+        filter(child == n)
+    }
+    
+    # choose edge to connect -- randomly sample if more than 1 possible edge
+    if(nrow(temp.possible.edges) > 1) {
+      temp.edge <- temp.possible.edges[sample(nrow(temp.possible.edges), 1), ]$edge
+    } else if (nrow(temp.possible.edges) == 1) {
+      temp.edge <- temp.possible.edges$edge
+    } else {
+      # if no possible edges, start over
+      randAdmatUnchecked(blank, max.num.root.children)
+    }
+    
+    # connect edge 
+    am.long[am.long$edge == temp.edge, ]$connected <- 1
+  }
+  
+  am.long <- am.long %>%
+    mutate(parent = factor(am.long$parent, levels = parent_levels))
+  
+  am.long <- reversedEdges(am.long) %>%
+    mutate(reversed_connected=reversedConnection(.),
+           bi_directional=NA,
+           root_connected=NA)    
+  am.long <- updateGraphElements(am.long)
+  
+  return(am.long)
+}
+
+randAdmat <- function(am.long, max.num.root.children) {
+  # input: blank am.long (from either constrainedEdges or toLong(initEmptyAdmatFromK(K))
+  #     - $connected = 0 
+  #     - $possible_edge = T/F if from constrainedEdges
+  # output: random graph
+  blank <- am.long
+  has_constraints <- ifelse("possible_edge" %in% colnames(am.long), 
+                            ifelse(any(!am.long$possible_edge), T, F),
+                            F)
+  
+  am.long$parent <- as.character(am.long$parent)
+  
+  all.nodes <- getAllNodes(am.long)
+  node.pool <- all.nodes[all.nodes != "root"] # nodes left to connect in graph
+  possible.edges <- am.long %>% 
+    filter(!is.na(connected))
+  parent.pool <- unique(possible.edges$parent) # possible parent nodes 
+  
+  # choose node to connect to root
+  # select "to" node from parent.pool to prevent getting stuck if max.num.root.children == 1
+  temp.node <- sample(parent.pool[parent.pool != "root"], 1)
+  am.long[am.long$edge == getEdgeName("root", temp.node), ]$connected <- 1
+  node.pool <- node.pool[node.pool != temp.node]
   from.nodes <- c("root", temp.node)
   
-  while(length(not.root.nodes) > 0) {
+  while(length(node.pool) > 0) {
     
     # remove "root" from possible parents if max.num.root.children quota satisfied
-    if(numNodesConnectedToRoot(am.long) > max.num.root.children) {
+    if(numNodesConnectedToRoot(am.long) < max.num.root.children) {
       from.nodes.pool <- from.nodes
     } else {
       from.nodes.pool <- from.nodes[-1]
     }
-      
-    temp.to <- sample(not.root.nodes, 1)
-    temp.from <- sample(from.nodes.pool, 1)
+    
+    if (length(from.nodes.pool) == 1) {
+      temp.from <- from.nodes.pool
+    } else {
+      temp.from <- sample(from.nodes.pool, 1)
+    } 
+    
+    # remove possible "to" nodes based on NA constraints 
+    temp.to.pool <- am.long %>% 
+      filter(parent==temp.from) %>% 
+      filter(!is.na(connected))
+    # remove "to" nodes if not in node.pool
+    temp.to.pool <- temp.to.pool$child
+    temp.to.pool <- temp.to.pool[temp.to.pool %in% node.pool]
+    # sample possible children nodes to be "to" node and connect edge 
+    if (length(temp.to.pool) > 1) {
+      temp.to <- sample(temp.to.pool, 1)
+    } else if (length(temp.to.pool) == 1) {
+      temp.to <- temp.to.pool
+    } else {
+      # remove temp.from from from.nodes
+    }
+    
     am.long[am.long$edge == getEdgeName(temp.from, temp.to), ]$connected <- 1
-    from.nodes <- c(from.nodes, temp.to)
-    not.root.nodes <- not.root.nodes[not.root.nodes != temp.to]
+    
+    # add temp.to to possible from.nodes if it is a possible parent
+    if (temp.to %in% parent.pool) {
+      from.nodes <- c(from.nodes, temp.to)
+    }
+    
+    node.pool <- node.pool[node.pool != temp.to]
   }
+  
+  
+  
   am.long <- reversedEdges(am.long) %>%
     mutate(reversed_connected=reversedConnection(.),
            bi_directional=NA,
@@ -210,15 +320,18 @@ addEdge <- function(am, new_edge){
 }
 
 initializeGraph <- function(mcf, max.num.root.children=1, zero.thresh=0.01){
-    clusters <- seq_len(nrow(mcf))
-    nsamp <- ncol(mcf)
-    samples <- seq_len(nsamp)
-    nclust <- length(clusters)
-    mcf.long <- tibble(cluster_id=as.character(rep(clusters, nsamp)),
-                       sample_id=as.character(rep(samples, each=nclust)),
-                       mean=as.numeric(mcf))    
-    am.long <- constrainedEdges(mcf.long, zero.thresh=zero.thresh)
-    am.long2 <- randAdmat(am.long, max.num.root.children)
+    # clusters <- seq_len(nrow(mcf))
+    # nsamp <- ncol(mcf)
+    # samples <- seq_len(nsamp)
+    # nclust <- length(clusters)
+    # mcf.long <- tibble(cluster_id=as.character(rep(clusters, nsamp)),
+    #                    sample_id=as.character(rep(samples, each=nclust)),
+    #                    mean=as.numeric(mcf))    
+    am.long <- constrainedEdges(mcf, zero.thresh=zero.thresh)
+    am.long2 <- randAdmatUnchecked(am.long, max.num.root.children)
+    while (!validGraph(am.long2)) {
+      am.long2 <- randAdmatUnchecked(am.long, max.num.root.children)
+    }
     am.long2
 }
 
@@ -251,7 +364,7 @@ sampleNewEdge <- function(a){
     ## condition 2:
     ##   for each child and for each zero of that child
     ##     determine whether changing the 1 to a zero and the zero to a 1 would be valid
-    possible_moves <- filter(a, connected==0, child %in% condition1$child)
+    possible_moves <- filter(a, connected==0, possible_edge==T, child %in% condition1$child)
     is_valid <- rep(NA, nrow(possible_moves))
     for(i in seq_len(nrow(possible_moves))){
         astar <- addEdge(a, possible_moves[i, ])
@@ -294,4 +407,11 @@ plotGraph <- function(am.long){
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
               vertex.color = "white", vertex.label.family = "Helvetica",
               edge.arrow.size = 0.2, edge.arrow.width = 2)
+}
+
+getPosteriorAmLong <- function(am_chain) {
+  # input: chain from tree MCMC of trees in am.long format
+  # output: posterior am.long 
+  
+  
 }
