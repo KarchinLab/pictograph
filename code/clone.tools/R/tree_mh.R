@@ -41,8 +41,8 @@ runTreeMH <- function(w_chain,
       fit_prev <- fit_star
     }
     
-    # keep thinned obs
-    if (i%%thin == 0) {
+    # keep thinned obs (and don't keep burn-in)
+    if (i%%thin == 0 & i > burn) {
       am_chain <- append(am_chain, list(am_prev))
       score_chain <- c(score_chain, fit_prev)
     }
