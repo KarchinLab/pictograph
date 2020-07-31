@@ -15,7 +15,7 @@ runMCMC <- function(data, K, jags.file, inits, params,
                          n.chains = n.chains,
                          inits = inits,
                          n.adapt = n.adapt)
-    update(jags.m, n.burn)
+    if (n.burn > 0) update(jags.m, n.burn)
     samps <- coda.samples(jags.m, params, n.iter=n.iter, thin=thin)
     samps
 }

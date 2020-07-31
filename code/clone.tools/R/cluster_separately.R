@@ -130,10 +130,15 @@ clusterSep <- function(input_data,
     w_chain <- rbind(w_chain, temp_relabeled_w_chain)
     z_chain <- rbind(z_chain, temp_relabeled_z_chain)
   }
+  
+  # set levels for Parameter
   w_chain <- w_chain %>%
     mutate(Parameter = factor(Parameter, levels = unique(w_chain$Parameter)))
+  z_chain_param_order <- tibble(Parameter = unique(z_chain$Parameter)) %>%
+    mutate(Variant = as.numeric(gsub("z\\[", "", gsub("\\]", "", unique(z_chain$Parameter))))) %>%
+    arrange(Variant)
   z_chain <- z_chain %>%
-    mutate(Parameter = factor(Parameter, levels = unique(z_chain$Parameter)))
+    mutate(Parameter = factor(Parameter, levels = z_chain_param_order$Parameter))
   
   return(list(w_chain, z_chain))
 }
@@ -167,7 +172,8 @@ relabel_z_chain <- function(z_chain, new_cluster_labels, mutation_indices) {
   new_z <- new_z %>%
     mutate(new_i = mutation_indices[i],
            value = new_cluster_labels[new_z$value]) %>%
-    mutate(Parameter = paste0("z[", new_i, "]")) %>%
+    mutate(Parameter = paste0("z[", new_i, "]")) %>% 
+    arrange(new_i) %>%
     select(Iteration, Chain, Parameter, value)
   return(new_z)
 }
