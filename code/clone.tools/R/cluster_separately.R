@@ -113,11 +113,13 @@ clusterSep <- function(input_data,
   }
   
   # 3. Relabel z_chain and w_chain for alls and merge 
-  # first set doens't need to change labels 
+  # first set doens't need to change cluster labels
   w_chain <- get.parameter.chain("w", ggs(sep_samps_list[[1]])) %>%
     mutate(Parameter = as.character(Parameter))
-  z_chain <- get.parameter.chain("z", ggs(sep_samps_list[[1]])) %>%
+  temp_z_chain <- get.parameter.chain("z", ggs(sep_samps_list[[1]])) %>%
     mutate(Parameter = as.character(Parameter))
+  # still need to change mutation indices
+  z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[i]]$mutation_indices)
   
   for (i in 2:length(sep_samps_list)) {
     temp_w_chain <- get.parameter.chain("w", ggs(sep_samps_list[[i]]))
@@ -177,3 +179,18 @@ relabel_z_chain <- function(z_chain, new_cluster_labels, mutation_indices) {
     select(Iteration, Chain, Parameter, value)
   return(new_z)
 }
+
+relabel_z_chain_mut_only <- function(z_chain, mutation_indices) {
+  # mutation_indices = numeric vector of original mutation indices prior to separating by sample presence
+  # cluster labels are left unchanged 
+  if (length(mutation_indices) != length(unique(z_chain$Parameter))) {
+    stop("number of supplied mutation indices does not match the number of mutations in z_chain")
+  }
+  new_z <- z_chain %>%
+    mutate(i = as.numeric(gsub("\\]", "", gsub("z\\[", "", sapply(z_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))))
+  new_z <- new_z %>%
+    mutate(new_i = mutation_indices[i]) %>%
+    mutate(Parameter = paste0("z[", new_i, "]")) %>% 
+    arrange(new_i) %>%
+    select(Iteration, Chain, Parameter, value)
+  return(new_z)}
