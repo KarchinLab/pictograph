@@ -119,7 +119,7 @@ clusterSep <- function(input_data,
   temp_z_chain <- get.parameter.chain("z", ggs(sep_samps_list[[1]])) %>%
     mutate(Parameter = as.character(Parameter))
   # still need to change mutation indices
-  z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[i]]$mutation_indices)
+  z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[1]]$mutation_indices)
   
   for (i in 2:length(sep_samps_list)) {
     temp_w_chain <- get.parameter.chain("w", ggs(sep_samps_list[[i]]))
