@@ -480,3 +480,16 @@ plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1
               edge.arrow.size = 0.2, edge.arrow.width = 2,
               edge.width = E(ig)$weight*3)
 }
+
+labelMAPEdgesFromPostAM <- function(post_am) {
+  post_am %>%
+    group_by(child) %>%
+    mutate(map_edge = posterior_prob == max(posterior_prob)) %>%
+    ungroup()
+}
+
+getMAPGraphFromPostAM <- function(post_am) {
+  map_am <- labelMAPEdgesFromPostAM(post_am) %>%
+    mutate(connected = ifelse(map_edge, 1, 0))
+  return(map_am)
+}
