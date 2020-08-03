@@ -192,13 +192,29 @@ simulateDataPurity <- function(I=120, K=10, S=3, avg.cov=100,
   
   colnames(m)  <- colnames(w) <- colnames(P) <- paste0("sample", 1:S)
   
+  # true tree
+  true_am <- toLong(initEmptyAdmatFromK(10))
+  true_edges <- c(getEdgeName("root", "1"),
+                  getEdgeName("1", "2"),
+                  getEdgeName("2", "3"),
+                  getEdgeName("2", "6"),
+                  getEdgeName("3", "4"),
+                  getEdgeName("3", "5"),
+                  getEdgeName("4", "8"),
+                  getEdgeName("5", "9"),
+                  getEdgeName("6", "7"),
+                  getEdgeName("7", "10"))
+  true_am <- true_am %>%
+    mutate(connected = ifelse(edge %in% true_edges, 1, 0))
+  
   test.data <- list("I" = I, "S" = S, "K" = K, 
                     "y" = y, "n" = n,
                     "m" = m, "tcn" = tcn,
                     z=z,
                     w=w,
                     theta=theta,
-                    purity=purity)
+                    purity=purity,
+                    am.long=true_am)
   test.data
 }
 
