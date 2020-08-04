@@ -87,14 +87,50 @@ calcPropRelationshipsCorrect <- function(test_mut_rel, true_mut_rel) {
 # -----------------------------------------------------------------------------
 # CCF metrics (as described in PASTRI paper)
 
-# Metric 1 -- A measure of sensitivity, matches the true clones to the nearest 
-#   reported clusters
-calcMetric1 <- function() {
+
+calcMetric1 <- function(true_w, w_star) {
+  # Metric 1 -- A measure of sensitivity, matches the true clones to the 
+  #   nearest reported clusters
+  # input: matrices with ncol = number of samples, nrow = number of clusters
+  # returns: numeric value 
   
+  # number of clusters can be different, but number of samples must be equal
+  if (ncol(true_w) != ncol(w_star)) {
+    stop("true_w and w_star have different number of samples")
+  }
+  
+  min_diff <- rep(Inf, nrow(true_w))
+  
+  for (i in 1:nrow(true_w)) {
+    for (j in 1:nrow(w_star)) {
+      temp_diff <- mean(abs(true_w[i, ] - w_star[j, ]))
+      if (temp_diff < min_diff[i]) min_diff[i] <- temp_diff
+    }
+  }
+  
+  return(sum(min_diff))
 }
 
-# Metric 2 -- A measure of specificity, matches the reported clusters to the 
-#   nearest true clones 
-calcMetric2 <- function() {
+
+calcMetric2 <- function(true_w, w_star) {
+  # Metric 2 -- A measure of specificity, matches the reported clusters to
+  #   the nearest true clones 
+  # input: matrices with ncol = number of samples, nrow = number of clusters
+  # returns: numeric value 
   
+  # number of clusters can be different, but number of samples must be equal
+  if (ncol(true_w) != ncol(w_star)) {
+    stop("true_w and w_star have different number of samples")
+  }
+  
+  min_diff <- rep(Inf, nrow(w_star))
+  
+  for (i in 1:nrow(w_star)) {
+    for (j in 1:nrow(true_w)) {
+      temp_diff <- mean(abs(true_w[i, ] - w_star[j, ]))
+      if (temp_diff < min_diff[i]) min_diff[i] <- temp_diff
+    }
+  }
+  
+  return(sum(min_diff))
 }
