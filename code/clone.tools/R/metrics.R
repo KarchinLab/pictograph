@@ -127,7 +127,7 @@ calcMetric2 <- function(true_w, w_star) {
   
   for (i in 1:nrow(w_star)) {
     for (j in 1:nrow(true_w)) {
-      temp_diff <- mean(abs(true_w[i, ] - w_star[j, ]))
+      temp_diff <- mean(abs(true_w[j, ] - w_star[i, ]))
       if (temp_diff < min_diff[i]) min_diff[i] <- temp_diff
     }
   }
