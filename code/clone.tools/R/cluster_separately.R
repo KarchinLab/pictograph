@@ -127,16 +127,18 @@ clusterSep <- function(input_data,
   # still need to change mutation indices
   z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[1]]$mutation_indices)
   
-  for (i in 2:length(sep_samps_list)) {
-    temp_w_chain <- get.parameter.chain("w", ggs(sep_samps_list[[i]]))
-    temp_z_chain <- get.parameter.chain("z", ggs(sep_samps_list[[i]]))
-    new_cluster_labels <- seq_len(best_K_vals[i]) + sum(best_K_vals[1:(i-1)])
-    
-    temp_relabeled_w_chain <- relabel_w_chain(temp_w_chain, new_cluster_labels)
-    temp_relabeled_z_chain <- relabel_z_chain(temp_z_chain, new_cluster_labels, sep_list[[i]]$mutation_indices)
-    
-    w_chain <- rbind(w_chain, temp_relabeled_w_chain)
-    z_chain <- rbind(z_chain, temp_relabeled_z_chain)
+  if (length(sep_list) > 1) {
+    for (i in 2:length(sep_samps_list)) {
+      temp_w_chain <- get.parameter.chain("w", ggs(sep_samps_list[[i]]))
+      temp_z_chain <- get.parameter.chain("z", ggs(sep_samps_list[[i]]))
+      new_cluster_labels <- seq_len(best_K_vals[i]) + sum(best_K_vals[1:(i-1)])
+      
+      temp_relabeled_w_chain <- relabel_w_chain(temp_w_chain, new_cluster_labels)
+      temp_relabeled_z_chain <- relabel_z_chain(temp_z_chain, new_cluster_labels, sep_list[[i]]$mutation_indices)
+      
+      w_chain <- rbind(w_chain, temp_relabeled_w_chain)
+      z_chain <- rbind(z_chain, temp_relabeled_z_chain)
+    }
   }
   
   # set levels for Parameter
