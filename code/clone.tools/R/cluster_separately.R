@@ -5,7 +5,13 @@ separateMutationsBySamplePresence <- function(input_data) {
   pres <- ifelse(input_data$y > 0, 1, 0)
   pat <- apply(pres, 1, function(x) paste0(x, collapse=""))
   types <- sort(names(table(pat)), decreasing=TRUE)
-  type_indices <- sapply(types, function(x) which(pat == x))
+  if (length(types) == 1) {
+    type_indices <- list()
+    type_indices[[types]] <- seq_len(input_data$I)
+  } else {
+    type_indices <- sapply(types, function(x) which(pat == x))
+  }
+  
   sep_list <- list()
   for (t in seq_len(length(types))) {
     sep_list[[types[t]]] <- list(pattern = types[t],
