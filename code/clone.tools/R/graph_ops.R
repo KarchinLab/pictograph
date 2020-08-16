@@ -468,7 +468,7 @@ plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1
   igraph::E(ig)$lty <- ifelse(igraph::E(ig)$weight < 0.25, 2, 1)
   
   # make edge black if only 1 edge to vertex
-  e <- ends(ig, igraph::E(ig))
+  e <- igraph::ends(ig, igraph::E(ig))
   numTo <- table(e[,2])
   edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
   igraph::E(ig)$color <- edgeColors
