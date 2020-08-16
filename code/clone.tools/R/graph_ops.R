@@ -465,15 +465,15 @@ plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1
   ig <- igraph::graph_from_adjacency_matrix(admat, mode = "directed", weighted = TRUE,
                                     diag = FALSE, add.row = TRUE) 
   
-  E(ig)$lty <- ifelse(E(ig)$weight < 0.25, 2, 1)
+  igraph::E(ig)$lty <- ifelse(igraph::E(ig)$weight < 0.25, 2, 1)
   
   # make edge black if only 1 edge to vertex
-  e <- ends(ig, E(ig))
+  e <- ends(ig, igraph::E(ig))
   numTo <- table(e[,2])
   edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
-  E(ig)$color <- edgeColors
+  igraph::E(ig)$color <- edgeColors
   
-  V(ig)$label.cex <- 0.5
+  igraph::V(ig)$label.cex <- 0.5
   
   igraph::plot.igraph(ig, layout = layout_as_tree(ig),
               vertex.color = "white", vertex.label.family = "Helvetica",
