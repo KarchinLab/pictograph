@@ -431,7 +431,7 @@ getPosteriorAmLong <- function(am_chain) {
     group_by(edge) %>%
     mutate(posterior_prob = sum(connected) / num_trees) %>%
     ungroup() %>%
-    select(edge, parent, child, possible_edge, posterior_prob) %>%
+    select(edge, parent, child, posterior_prob) %>%
     distinct()
   post_am
 }
