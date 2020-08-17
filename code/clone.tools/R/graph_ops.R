@@ -14,10 +14,18 @@ constrainedEdges <- function(wmat, zero.thresh=0.01) {
     K <- nrow(wmat)
     S <- ncol(wmat)
     admat <- matrix(T, K, K)
+    
     for(i in 1:K){
         for(j in 1:K){
-            from.samples <- cluster.sample.presence[[i]]
-            to.samples <- cluster.sample.presence[[j]]
+          
+            if (is.matrix(cluster.sample.presence)) {
+                from.samples <- cluster.sample.presence[, i]
+                to.samples <- cluster.sample.presence[, j]
+            } else if (is.list(cluster.sample.presence)) {
+                from.samples <- cluster.sample.presence[[i]]
+                to.samples <- cluster.sample.presence[[j]]
+            }
+            
             if (setequal(from.samples, to.samples)) next()
             if(length(from.samples) < length(to.samples)) {
                 admat[i, j] <- F
