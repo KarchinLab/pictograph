@@ -169,20 +169,24 @@ calcMetric1Chain <- function(true_w, w_chain, mc.cores) {
   w_chain_list <- w_chain %>%
     group_by(Iteration) %>%
     group_split()
-  w_chain_list_matrix <- mclapply(w_chain_list, 
+  w_chain_list_matrix <- parallel::mclapply(w_chain_list, 
                                   wTibbleToMatrix, 
                                   mc.cores = mc.cores)
-  m1_chain <- sapply(w_chain_list_matrix, function(w_star) calcMetric1(true_w, w_star))
-  return(m1_chain)
+  m1_chain <- parallel::mclapply(w_chain_list_matrix, 
+                                 function(w_star) calcMetric1(true_w, w_star),
+                                 mc.cores = mc.cores)
+  return(unlist(m1_chain))
 }
 
 calcMetric2Chain <- function(true_w, w_chain, mc.cores) {
   w_chain_list <- w_chain %>%
     group_by(Iteration) %>%
     group_split()
-  w_chain_list_matrix <- mclapply(w_chain_list, 
+  w_chain_list_matrix <- parallel::mclapply(w_chain_list, 
                                   wTibbleToMatrix, 
                                   mc.cores = mc.cores)
-  m2_chain <- sapply(w_chain_list_matrix, function(w_star) calcMetric2(true_w, w_star))
-  return(m2_chain)
+  m2_chain <- parallel::mclapply(w_chain_list_matrix, 
+                       function(w_star) calcMetric2(true_w, w_star),
+                       mc.cores = mc.cores)
+  return(unlist(m2_chain))
 }
