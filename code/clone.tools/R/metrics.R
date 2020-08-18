@@ -7,7 +7,8 @@ getParent <- function(node, am.long) {
     mutate(parent = as.character(parent))
   e <- am.long %>% 
     filter(child == node, connected == 1)
-  e$parent
+  if (nrow(e) > 1) warning(paste0("node ", node, " has ", nrow(e), " parents"))
+  return(e$parent[1])
 }
 
 getPathFromRoot <- function(node, am.long) {
@@ -72,7 +73,7 @@ getMutRelTb <- function(z, mut_ind, am) {
                          cluster1 = z[all_mut_pairs[, 1]],
                          cluster2 = z[all_mut_pairs[, 2]])
   
-  full_join(true_mut_rel, rel_tb, by = c("cluster1", "cluster2"))
+  left_join(true_mut_rel, rel_tb, by = c("cluster1", "cluster2"))
 }
 
 calcPropRelationshipsCorrect <- function(test_mut_rel, true_mut_rel) {
@@ -81,6 +82,25 @@ calcPropRelationshipsCorrect <- function(test_mut_rel, true_mut_rel) {
   test_comp <- full_join(true_mut_rel, test_mut_rel, by = c("mut1", "mut2"))
   rel_same <- test_comp$relationship_type.x == test_comp$relationship_type.y
   return(sum(rel_same) / length(rel_same))
+}
+
+calcTreeMetricSingleIter <- function(w, z, am, sim_data) {
+  true_mut_rel <- getMutRelTb(sim_data$z, 1:sim_data$I, sim_data$am.long)
+  this_rel <- getMutRelTb(z$value, 1:sim_data$I, am)
+  prop_true <- calcPropRelationshipsCorrect(this_rel, true_mut_rel)
+  return(prop_true)
+}
+
+calcTreeMetricChain <- function(w_chain, z_chain, am_chain, sim_data) {
+  z_chain_list <- z_chain %>%
+    group_by(Iteration) %>%
+    group_split()
+  w_chain_list <- w_chain %>%
+    group_by(Iteration) %>%
+    group_split()
+  tree_metric <- mapply(function(w, z, am) calcTreeMetricSingleIter(w, z, am, sim_data), 
+                        w_chain_list, z_chain_list, am_chain)
+  return(tree_metric)
 }
 
 # -----------------------------------------------------------------------------
@@ -111,7 +131,6 @@ calcMetric1 <- function(true_w, w_star) {
   return(sum(min_diff))
 }
 
-
 calcMetric2 <- function(true_w, w_star) {
   # Metric 2 -- A measure of specificity, matches the reported clusters to
   #   the nearest true clones 
@@ -133,4 +152,20 @@ calcMetric2 <- function(true_w, w_star) {
   }
   
   return(sum(min_diff))
+}
+
+calcMetric1Chain <- function(true_w, w_chain) {
+  w_chain_list <- w_chain %>%
+    group_by(Iteration) %>%
+    group_split()
+  m1_chain <- sapply(w_chain, function(w_star) calcMetric1(true_w, w_star))
+  return(m1_chain)
+}
+
+calcMetric2Chain <- function(true_w, w_chain) {
+  w_chain_list <- w_chain %>%
+    group_by(Iteration) %>%
+    group_split()
+  m2_chain <- sapply(w_chain, function(w_star) calcMetric2(true_w, w_star))
+  return(m2_chain)
 }
