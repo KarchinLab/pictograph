@@ -91,15 +91,17 @@ calcTreeMetricSingleIter <- function(w, z, am, sim_data) {
   return(prop_true)
 }
 
-calcTreeMetricChain <- function(w_chain, z_chain, am_chain, sim_data) {
+calcTreeMetricChain <- function(w_chain, z_chain, am_chain, sim_data,
+                                mc.cores=1) {
   z_chain_list <- z_chain %>%
     group_by(Iteration) %>%
     group_split()
   w_chain_list <- w_chain %>%
     group_by(Iteration) %>%
     group_split()
-  tree_metric <- mapply(function(w, z, am) calcTreeMetricSingleIter(w, z, am, sim_data), 
-                        w_chain_list, z_chain_list, am_chain)
+  tree_metric <- parallel::mcmapply(function(w, z, am) calcTreeMetricSingleIter(w, z, am, sim_data), 
+                        w_chain_list, z_chain_list, am_chain,
+                        mc.cores = mc.cores)
   return(tree_metric)
 }
 
@@ -154,18 +156,33 @@ calcMetric2 <- function(true_w, w_star) {
   return(sum(min_diff))
 }
 
-calcMetric1Chain <- function(true_w, w_chain) {
+wTibbleToMatrix <- function(w_tb) {
+  # input: w_chain tibble with columns Iteration, Parameter, value for a single Iteration
+  # output: w_matrix with rows = clusters, columns = samples
+  S <- numberSamples(w_tb)
+  K <- numberClusters(w_tb)
+  w_mat <- matrix(w_tb$value, nrow = K, ncol = S, byrow = T)
+  return(w_mat)
+}
+
+calcMetric1Chain <- function(true_w, w_chain, mc.cores) {
   w_chain_list <- w_chain %>%
     group_by(Iteration) %>%
     group_split()
-  m1_chain <- sapply(w_chain, function(w_star) calcMetric1(true_w, w_star))
+  w_chain_list_matrix <- mclapply(w_chain_list, 
+                                  wTibbleToMatrix, 
+                                  mc.cores = mc.cores)
+  m1_chain <- sapply(w_chain_list_matrix, function(w_star) calcMetric1(true_w, w_star))
   return(m1_chain)
 }
 
-calcMetric2Chain <- function(true_w, w_chain) {
+calcMetric2Chain <- function(true_w, w_chain, mc.cores) {
   w_chain_list <- w_chain %>%
     group_by(Iteration) %>%
     group_split()
-  m2_chain <- sapply(w_chain, function(w_star) calcMetric2(true_w, w_star))
+  w_chain_list_matrix <- mclapply(w_chain_list, 
+                                  wTibbleToMatrix, 
+                                  mc.cores = mc.cores)
+  m2_chain <- sapply(w_chain_list_matrix, function(w_star) calcMetric2(true_w, w_star))
   return(m2_chain)
 }
