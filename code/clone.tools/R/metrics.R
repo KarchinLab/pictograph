@@ -84,23 +84,20 @@ calcPropRelationshipsCorrect <- function(test_mut_rel, true_mut_rel) {
   return(sum(rel_same) / length(rel_same))
 }
 
-calcTreeMetricSingleIter <- function(w, z, am, sim_data) {
+calcTreeMetricSingleIter <- function(z, am, sim_data) {
   true_mut_rel <- getMutRelTb(sim_data$z, 1:sim_data$I, sim_data$am.long)
   this_rel <- getMutRelTb(z$value, 1:sim_data$I, am)
   prop_true <- calcPropRelationshipsCorrect(this_rel, true_mut_rel)
   return(prop_true)
 }
 
-calcTreeMetricChain <- function(w_chain, z_chain, am_chain, sim_data,
+calcTreeMetricChain <- function(z_chain, am_chain, sim_data,
                                 mc.cores=1) {
   z_chain_list <- z_chain %>%
     group_by(Iteration) %>%
     group_split()
-  w_chain_list <- w_chain %>%
-    group_by(Iteration) %>%
-    group_split()
-  tree_metric <- parallel::mcmapply(function(w, z, am) calcTreeMetricSingleIter(w, z, am, sim_data), 
-                        w_chain_list, z_chain_list, am_chain,
+  tree_metric <- parallel::mcmapply(function(z, am) calcTreeMetricSingleIter(z, am, sim_data), 
+                        z_chain_list, am_chain,
                         mc.cores = mc.cores)
   return(tree_metric)
 }
