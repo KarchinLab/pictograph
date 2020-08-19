@@ -86,7 +86,16 @@ calcPropRelationshipsCorrect <- function(test_mut_rel, true_mut_rel) {
 
 calcTreeMetricSingleIter <- function(z, am, sim_data) {
   true_mut_rel <- getMutRelTb(sim_data$z, 1:sim_data$I, sim_data$am.long)
-  this_rel <- getMutRelTb(z$value, 1:sim_data$I, am)
+  if (length(unique(z$value)) == 1) {
+    this_rel <- tibble(mut1 = true_mut_rel$mut1,
+                       mut2 = true_mut_rel$mut2,
+                       cluster1 = 1,
+                       cluster2 = 1,
+                       relationship_type = 1)
+  } else {
+    this_rel <- getMutRelTb(z$value, 1:sim_data$I, am)
+  }
+  
   prop_true <- calcPropRelationshipsCorrect(this_rel, true_mut_rel)
   return(prop_true)
 }
