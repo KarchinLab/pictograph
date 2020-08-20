@@ -96,7 +96,7 @@ simDataFromScratch <- function(S, K, varPerClustMode,
   y <- matrix(NA, nrow=I, ncol=S)
   for (i in 1:I) {
     for (s in 1:S) {
-      y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+      y[i, s] <- max(1, rbinom(1, n[i, s], theta[i,s]))
     }
   }
   
