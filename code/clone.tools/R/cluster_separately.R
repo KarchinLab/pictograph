@@ -9,7 +9,8 @@ separateMutationsBySamplePresence <- function(input_data) {
     type_indices <- list()
     type_indices[[types]] <- seq_len(input_data$I)
   } else {
-    type_indices <- sapply(types, function(x) which(pat == x))
+    type_indices <- lapply(types, function(x) which(pat == x))
+    names(type_indices) <- types
   }
   
   sep_list <- list()
