@@ -352,7 +352,7 @@ initializeGraph <- function(mcf, max.num.root.children=1, zero.thresh=0.01){
 toWide <- function(am.long){
     am.long$child <- as.numeric(am.long$child)
     am.long %>% select(parent, child, connected) %>%
-        spread(child, connected) %>%
+        tidyr::spread(child, connected) %>%
         select(-parent) %>%
         as.matrix()
 }
@@ -448,7 +448,7 @@ toWidePostAm <- function(post_am) {
   post_am %>% 
     mutate(child = as.numeric(post_am$child)) %>%
     select(parent, child, posterior_prob) %>%
-    spread(child, posterior_prob) %>%
+    tidyr::spread(child, posterior_prob) %>%
     select(-parent) %>%
     as.matrix()
 }
@@ -483,10 +483,10 @@ plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1
   
   igraph::V(ig)$label.cex <- 0.5
   
-  igraph::plot.igraph(ig, layout = layout_as_tree(ig),
+  igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
               vertex.color = "white", vertex.label.family = "Helvetica",
               edge.arrow.size = 0.2, edge.arrow.width = 2,
-              edge.width = E(ig)$weight*3)
+              edge.width = igraph::E(ig)$weight*3)
 }
 
 labelMAPEdgesFromPostAM <- function(post_am) {
