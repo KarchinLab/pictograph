@@ -6,6 +6,7 @@ calcTheta2 <- function(m, tcn, w, p) {
   (m * w * p) / (tcn * p + 2*(1-p))
 }
 
+#' @import rjags
 runMCMC <- function(data, K, jags.file, inits, params,
                     n.iter=10000, thin=10, n.chains=1,
                     n.adapt=1000, n.burn=1000) {

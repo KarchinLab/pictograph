@@ -79,6 +79,7 @@ runMCMCForABox <- function(box,
   
 }
 
+#' @importFrom ggmcmc ggs
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
