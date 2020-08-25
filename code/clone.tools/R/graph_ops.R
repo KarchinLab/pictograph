@@ -502,11 +502,11 @@ getMAPGraphFromPostAM <- function(post_am) {
   return(map_am)
 }
 
-edgeTibbleToAmLong <- function(edge_tb) {
+edgeTibbleToAmLong <- function(edge_tb, root = 0) {
   K <- length(unique(c(edge_tb$From, edge_tb$To))) - 1
   am_long <- toLong(initEmptyAdmatFromK(K))
   edge_tb$From <- as.character(edge_tb$From)
-  edge_tb[edge_tb == "0"] <- "root"
+  edge_tb[edge_tb == as.character(root)] <- "root"
   for (i in seq_len(nrow(edge_tb))) {
     temp_edge <- getEdgeName(edge_tb$From[i], edge_tb$To[i])
     am_long$connected[which(am_long$edge == temp_edge)] <- 1

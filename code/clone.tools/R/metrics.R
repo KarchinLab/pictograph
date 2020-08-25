@@ -54,10 +54,13 @@ getMutRelTb <- function(z, mut_ind, am) {
   # am = am.long format of graph 
   # output: tibble with columns mut1, mut2, cluster1, cluster2, relationship_type
   # relationship_type is 1:4 -- see getRelationshipTypeOfCluster()
-  all_mut_pairs <- rbind(t(combn(mut_ind, 2)), t(combn(rev(mut_ind), 2)))
+  
+  # mutation pairs are all pairwise combinations, not including self
+  all_mut_pairs <- t(combn(mut_ind, 2)) 
+  
+  # cluster pairs are all permutations of 2, including self
   all_cluster_pairs <- rbind(t(combn(unique(z), 2)), t(combn(rev(unique(z)), 2)),
                              matrix(rep(unique(z), 2), nrow=length(unique(z)), byrow = F))
-  
   all_cluster_pairs_tb <- tibble(cluster1 = all_cluster_pairs[, 1],
                                  cluster2 = all_cluster_pairs[, 2])
   
@@ -79,7 +82,7 @@ getMutRelTb <- function(z, mut_ind, am) {
 calcPropRelationshipsCorrect <- function(test_mut_rel, true_mut_rel) {
   # input: tibbles from getMutRelTb()
   # returns proportion of relationships in test_mut_rel that match true_mut_rel
-  test_comp <- full_join(true_mut_rel, test_mut_rel, by = c("mut1", "mut2"))
+  test_comp <- left_join(true_mut_rel, test_mut_rel, by = c("mut1", "mut2"))
   rel_same <- test_comp$relationship_type.x == test_comp$relationship_type.y
   return(sum(rel_same) / length(rel_same))
 }
