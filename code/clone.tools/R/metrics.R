@@ -103,11 +103,9 @@ calcTreeMetricSingleIter <- function(z, am, sim_data) {
   return(prop_true)
 }
 
-calcTreeMetricChain <- function(z_chain, am_chain, sim_data,
+calcTreeMetricChain <- function(z_chain_list, am_chain, sim_data,
                                 mc.cores=1) {
-  z_chain_list <- z_chain %>%
-    group_by(Iteration) %>%
-    group_split()
+
   tree_metric <- parallel::mcmapply(function(z, am) calcTreeMetricSingleIter(z, am, sim_data), 
                         z_chain_list, am_chain,
                         mc.cores = mc.cores)
