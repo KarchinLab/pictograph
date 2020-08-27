@@ -43,7 +43,7 @@ runMCMCForABox <- function(box,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
                                         ".RNG.seed" = 123),
                            params = c("z", "w"),
-                           max_K = 5) {
+                           max_K = 10) {
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
   
