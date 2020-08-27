@@ -43,7 +43,7 @@ runMCMCForABox <- function(box,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
                                         ".RNG.seed" = 123),
                            params = c("z", "w"),
-                           max_K = 10) {
+                           max_K = 15) {
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
   
@@ -85,7 +85,7 @@ clusterSep <- function(input_data,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
                                     ".RNG.seed" = 123),
                        params = c("z", "w"),
-                       max_K = 10) {
+                       max_K = 15) {
   # 1. separate mutations by sample presence
   sep_list <- separateMutationsBySamplePresence(input_data)
   
