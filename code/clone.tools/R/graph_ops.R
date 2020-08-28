@@ -10,7 +10,7 @@ constrainedEdges <- function(wmat, zero.thresh=0.01) {
     ##
     ##cluster.sample.presence <- apply(w, 1, function(x) which( x> zero.thresh))
 
-    cluster.sample.presence <- apply(wmat, 1, function(x) which(x>zero.thresh))
+    cluster.sample.presence <- apply(wmat, 1, function(x) which(x>=zero.thresh))
     K <- nrow(wmat)
     S <- ncol(wmat)
     admat <- matrix(T, K, K)
