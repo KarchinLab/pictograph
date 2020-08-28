@@ -1,43 +1,48 @@
+constrainedEdgesMatrix <- function(wmat, zero.thresh=0.01) {
+  ##
+  ## Rules:
+  ##  - cluster (node) cannot connect to itself
+  ##  - a cluster with near-zero MCF cannot have children
+  ##  - a cluster present in X multiple samples cannot connect to a cluster present in Y samples
+  ##    if X < Y
+  ##         - X < Y implies ...
+  ##
+  ##cluster.sample.presence <- apply(w, 1, function(x) which( x>= zero.thresh))
+  cluster.sample.presence <- apply(wmat, 1, function(x) which(x>=zero.thresh))
+  K <- nrow(wmat)
+  S <- ncol(wmat)
+  admat <- matrix(T, K, K)
+  
+  for(i in 1:K){
+    for(j in 1:K){
+      
+      if (is.matrix(cluster.sample.presence)) {
+        from.samples <- cluster.sample.presence[, i]
+        to.samples <- cluster.sample.presence[, j]
+      } else if (is.list(cluster.sample.presence)) {
+        from.samples <- cluster.sample.presence[[i]]
+        to.samples <- cluster.sample.presence[[j]]
+      }
+      
+      if (setequal(from.samples, to.samples)) next()
+      if(length(from.samples) < length(to.samples)) {
+        admat[i, j] <- F
+        next()
+      }
+      if (all(to.samples %in% from.samples)) next()
+      admat[i, j] <- F 
+    }            
+  }
+  diag(admat) <- F
+  am2 <- rbind(T, admat)
+  dimnames(am2) <- list(c("root", 1:K), 1:K)
+  return(am2)
+}
+
+
 ## refactored base.admat
 constrainedEdges <- function(wmat, zero.thresh=0.01) {
-    ##
-    ## Rules:
-    ##  - cluster (node) cannot connect to itself
-    ##  - a cluster with near-zero MCF cannot have children
-    ##  - a cluster present in X multiple samples cannot connect to a cluster present in Y samples
-    ##    if X < Y
-    ##         - X < Y implies ...
-    ##
-    ##cluster.sample.presence <- apply(w, 1, function(x) which( x> zero.thresh))
-
-    cluster.sample.presence <- apply(wmat, 1, function(x) which(x>=zero.thresh))
-    K <- nrow(wmat)
-    S <- ncol(wmat)
-    admat <- matrix(T, K, K)
-    
-    for(i in 1:K){
-        for(j in 1:K){
-          
-            if (is.matrix(cluster.sample.presence)) {
-                from.samples <- cluster.sample.presence[, i]
-                to.samples <- cluster.sample.presence[, j]
-            } else if (is.list(cluster.sample.presence)) {
-                from.samples <- cluster.sample.presence[[i]]
-                to.samples <- cluster.sample.presence[[j]]
-            }
-            
-            if (setequal(from.samples, to.samples)) next()
-            if(length(from.samples) < length(to.samples)) {
-                admat[i, j] <- F
-                next()
-            }
-            if (all(to.samples %in% from.samples)) next()
-            admat[i, j] <- F 
-      }            
-    }
-    diag(admat) <- F
-    am2 <- rbind(T, admat)
-    dimnames(am2) <- list(c("root", 1:K), 1:K)
+    am2 <- constrainedEdgesMatrix(wmat, zero.thresh)
     am2.long <- as_tibble(am2) %>%
         mutate(parent=rownames(am2)) %>%
         pivot_longer(-parent,
@@ -49,6 +54,26 @@ constrainedEdges <- function(wmat, zero.thresh=0.01) {
         mutate(parent=factor(parent, levels=unique(parent))) %>%
         mutate(connected=0)
     am2.long
+}
+
+calcConstrianedTreeSpace <- function(mcf_matrix, zero.thresh = 0.01) {
+  # input: 
+  #     - mcf_matrix = matrix of cell fraction values where rows are clusters, columns are samples
+  #     - zero.thresh = minimum cell fraction to be considered "present" in sample (default = 0.01)
+  # output: number of possible trees, given constraints
+  ce <- constrainedEdgesMatrix(mcf_matrix, zero.thresh)
+  possible_from_edges_per_node <- colSums(ce)
+  tree_space <- prod(possible_from_edges_per_node)
+  return(tree_space)
+}
+
+calcUnconstrainedTreeSpace <- function(mcf_matrix) {
+  # input: 
+  #     - mcf_matrix = matrix of cell fraction values where rows are clusters, columns are samples
+  # output: number of possible trees, no constraints
+  K <- nrow(mcf_matrix)
+  tree_space <- K^K
+  return(tree_space)
 }
 
 getAllNodes <- function(am.long) {
