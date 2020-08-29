@@ -28,6 +28,7 @@ runTreeMH <- function(w_chain,
   # Metropolis Hastings -------------------------------------------------------
   num_accept <- 0
   
+  u_vec <- log(runif(num_iter, min = 0, max = 1))
   for (i in seq_len(num_iter)) {
     # propse new am.long
     am_star <- sampleNewEdge(am_prev, 
@@ -37,8 +38,8 @@ runTreeMH <- function(w_chain,
     
     # accept or reject proposal
     r <- log(fit_star) - log(fit_prev)
-    u <- log(runif(1, 0, 1))
-    if(u <= r) {
+    #u <- log(runif(1, 0, 1))
+    if(u[i] <= r) {
       am_prev <- am_star
       num_accept <- num_accept + 1
       fit_prev <- fit_star
