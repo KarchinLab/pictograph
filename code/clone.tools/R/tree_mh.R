@@ -2,7 +2,8 @@ runTreeMH <- function(w_chain,
                       max.num.root.children=1,
                       num_iter=10000, thin=10, burn=1000,
                       first_am=NULL, seed=123,
-                      post=NULL) {
+                      post=NULL,
+                      mc.cores=1) {
   set.seed(seed)
   mcf_stats <- summarizeWChain(w_chain)
   mcf_matrix <- get.map.w(w_chain)
@@ -29,7 +30,9 @@ runTreeMH <- function(w_chain,
   
   for (i in seq_len(num_iter)) {
     # propse new am.long
-    am_star <- sampleNewEdge(am_prev, max.num.root.children)
+    am_star <- sampleNewEdge(am_prev, 
+                             max.num.root.children = max.num.root.children, 
+                             mc.cores = mc.cores)
     fit_star <- calcTreeFitness(am_star, cpov, mcf_matrix)
     
     # accept or reject proposal

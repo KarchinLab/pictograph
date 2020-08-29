@@ -395,7 +395,17 @@ toLong <- function(am) {
   am.long
 }
 
-sampleNewEdge <- function(a, max.num.root.children){
+isMoveValid <- function(a, possible_move, max.num.root.children) {
+  # a = am.long format of current graph
+  # possible_move = a row in possible_moves tibble (am.long format)
+  # max.num.root.children = maximum number of nodes allowed to be connected to root
+  # returns TRUE or FALSE
+  astar <- addEdge(a, possible_move)
+  is_valid <- validGraph(astar) & (numNodesConnectedToRoot(astar) <= max.num.root.children)
+  return(is_valid)
+}
+
+sampleNewEdge <- function(a, max.num.root.children, mc.cores=1){
     condition1 <- a %>% group_by(child) %>%
         summarize(n=sum(connected==0)) %>%
         mutate(possible=which(n >= 1))
@@ -403,11 +413,16 @@ sampleNewEdge <- function(a, max.num.root.children){
     ##   for each child and for each zero of that child
     ##     determine whether changing the 1 to a zero and the zero to a 1 would be valid
     possible_moves <- filter(a, connected==0, possible_edge==T, child %in% condition1$child)
-    is_valid <- rep(NA, nrow(possible_moves))
-    for(i in seq_len(nrow(possible_moves))){
-        astar <- addEdge(a, possible_moves[i, ])
-        is_valid[i] <- validGraph(astar) & (numNodesConnectedToRoot(astar) <= max.num.root.children)
-    }
+    possible_moves_list <- possible_moves %>%
+      group_by(edge) %>%
+      group_split()
+    is_valid <- unlist(parallel::mclapply(possible_moves_list, function(x) isMoveValid(a, x, max.num.root.children),
+                                          mc.cores = mc.cores))
+    # is_valid <- rep(NA, nrow(possible_moves))
+    # for(i in seq_len(nrow(possible_moves))){
+    #     astar <- addEdge(a, possible_moves[i, ])
+    #     is_valid[i] <- validGraph(astar) & (numNodesConnectedToRoot(astar) <= max.num.root.children)
+    # }
     move_set <- possible_moves[is_valid, ]
     ix <- sample(seq_len(nrow(move_set)), 1)
     astar <- addEdge(a, move_set[ix, ])
