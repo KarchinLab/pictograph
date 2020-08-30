@@ -39,7 +39,7 @@ runTreeMH <- function(w_chain,
     # accept or reject proposal
     r <- log(fit_star) - log(fit_prev)
     #u <- log(runif(1, 0, 1))
-    if(u[i] <= r) {
+    if(u_vec[i] <= r) {
       am_prev <- am_star
       num_accept <- num_accept + 1
       fit_prev <- fit_star
