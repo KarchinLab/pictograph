@@ -146,7 +146,7 @@ orderW <- function(w, map_z){
 }
 
 
-
+#' @importFrom stringr str_replace
 numberClusters <- function(mcf_stats){
     params <- as.character(mcf_stats$Parameter)
     K <- strsplit(params, ",") %>%
@@ -157,11 +157,12 @@ numberClusters <- function(mcf_stats){
     K
 }
 
+#' @importFrom stringr str_replace
 numberSamples <- function(mcf_stats){
     params <- as.character(mcf_stats$Parameter)    
     nSamples <- strsplit(params, ",") %>%
         sapply("[", 2) %>%
-        str_replace("\\]", "") %>%
+        stringr::str_replace("\\]", "") %>%
         as.numeric() %>%
         max()
     nSamples
