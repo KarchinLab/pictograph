@@ -423,9 +423,9 @@ sampleNewEdge <- function(a, max.num.root.children, mc.cores=1){
     #     astar <- addEdge(a, possible_moves[i, ])
     #     is_valid[i] <- validGraph(astar) & (numNodesConnectedToRoot(astar) <= max.num.root.children)
     # }
-    move_set <- possible_moves[is_valid, ]
-    ix <- sample(seq_len(nrow(move_set)), 1)
-    astar <- addEdge(a, move_set[ix, ])
+    move_set <- possible_moves_list[is_valid]
+    ix <- sample(seq_len(length(move_set)), 1)
+    astar <- addEdge(a, move_set[[ix]])
     astar
 }
 
