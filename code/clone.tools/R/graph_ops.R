@@ -154,7 +154,14 @@ randAdmatUnchecked <- function(am.long, max.num.root.children) {
   node.pool <- node.pool[node.pool != temp.node]
   
   # connect nodes that are left 
-  for (n in node.pool) {
+  while(length(node.pool) > 0) {
+  #for (n in node.pool) {
+    if (length(node.pool) > 1) {
+      n <- sample(node.pool, 1)
+    } else {
+      n <- node.pool
+    }
+    
     # all possible edges to node n
     # check if there are constraints present 
     if (has_constraints) {
@@ -184,6 +191,8 @@ randAdmatUnchecked <- function(am.long, max.num.root.children) {
     
     # connect edge 
     am.long[am.long$edge == temp.edge, ]$connected <- 1
+    
+    node.pool <- node.pool[node.pool != n]
   }
   
   am.long <- am.long %>%
