@@ -186,7 +186,7 @@ randAdmatUnchecked <- function(am.long, max.num.root.children) {
       temp.edge <- temp.possible.edges$edge
     } else {
       # if no possible edges, start over
-      randAdmatUnchecked(blank, max.num.root.children)
+      return(randAdmatUnchecked(blank, max.num.root.children))
     }
     
     # connect edge 
