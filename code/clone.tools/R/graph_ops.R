@@ -346,24 +346,13 @@ bfsLong <- function(am.long) {
   nodes
 }
 
-
-addEdge <- function(am, new_edge){
-    ## Add the edge
-    child_levels <- levels(am$parent) # save levels to reorder later
-    new_edge$connected <- 1
-    disconnect_edge <- filter(am, child == new_edge$child)  %>%
-        filter(connected==1) %>%
-        mutate(connected=0)
-    updated_edges <- bind_rows(new_edge, disconnect_edge)
-    am2 <- filter(am, ! edge %in% updated_edges$edge ) %>%
-        bind_rows(updated_edges) %>%
-        arrange(parent) %>%
-        updateGraphElements()
-    am2 <- am2 %>%
-      mutate(child = as.numeric(am2$child)) %>%
-      arrange(parent, child)
-    am2 <- mutate(am2, child = as.character(am2$child))
-    am2
+addEdge <- function(am, new_edge) {
+  c <- new_edge$child
+  # disconnect existing edge connecting to child 
+  am[which(test$child == c & test$connected == 1), ]$connected <- 0
+  # connect new edge
+  am[which(test$edge == new_edge$edge), ]$connected <- 1
+  return(am)
 }
 
 initializeGraph <- function(mcf, max.num.root.children=1, zero.thresh=0.01){
