@@ -343,7 +343,7 @@ bfsLong <- function(am.long) {
     nodes <- c(nodes, temp.children)
     children <- children[-1]
   }
-  nodes
+  return(nodes)
 }
 
 addEdge <- function(am, new_edge) {
@@ -368,7 +368,7 @@ initializeGraph <- function(mcf, max.num.root.children=1, zero.thresh=0.01){
     while (!validGraph(am.long2)) {
       am.long2 <- randAdmatUnchecked(am.long, max.num.root.children)
     }
-    am.long2
+    return(am.long2)
 }
 
 
@@ -390,7 +390,7 @@ toLong <- function(am) {
     unite("edge", c("parent", "child"), sep="->",
           remove=FALSE) %>%
     mutate(parent=factor(parent, levels=unique(parent)))   
-  am.long
+  return(am.long)
 }
 
 isMoveValid <- function(a, possible_move, max.num.root.children) {
@@ -404,27 +404,17 @@ isMoveValid <- function(a, possible_move, max.num.root.children) {
 }
 
 sampleNewEdge <- function(a, max.num.root.children, mc.cores=1){
-    condition1 <- a %>% group_by(child) %>%
-        summarize(n=sum(connected==0)) %>%
-        mutate(possible=which(n >= 1))
-    ## condition 2:
-    ##   for each child and for each zero of that child
-    ##     determine whether changing the 1 to a zero and the zero to a 1 would be valid
-    possible_moves <- filter(a, connected==0, possible_edge==T, child %in% condition1$child)
+    ## a move is connecting a new edge and disconnecting the pre-existing edge connected to the new edge's child
+    possible_moves <- filter(a, connected==0, possible_edge==T)
     possible_moves_list <- possible_moves %>%
       group_by(edge) %>%
       group_split()
     is_valid <- unlist(parallel::mclapply(possible_moves_list, function(x) isMoveValid(a, x, max.num.root.children),
                                           mc.cores = mc.cores))
-    # is_valid <- rep(NA, nrow(possible_moves))
-    # for(i in seq_len(nrow(possible_moves))){
-    #     astar <- addEdge(a, possible_moves[i, ])
-    #     is_valid[i] <- validGraph(astar) & (numNodesConnectedToRoot(astar) <= max.num.root.children)
-    # }
-    move_set <- possible_moves_list[is_valid]
-    ix <- sample(seq_len(length(move_set)), 1)
-    astar <- addEdge(a, move_set[[ix]])
-    astar
+    move_set <- possible_moves[is_valid, ]
+    ix <- sample(seq_len(nrow(move_set)), 1)
+    astar <- addEdge(a, move_set[ix, ])
+    return(astar)
 }
 
 initEmptyAdmatFromK <- function(K) {
@@ -432,7 +422,7 @@ initEmptyAdmatFromK <- function(K) {
   diag(admat) <- NA
   am2 <- rbind(0, admat)
   dimnames(am2) <- list(c("root", 1:K), 1:K)
-  am2
+  return(am2)
 }
 
 generateRandomGraphFromK <- function(K, max.num.root.children) {
@@ -441,7 +431,7 @@ generateRandomGraphFromK <- function(K, max.num.root.children) {
   am.long <- toLong(initEmptyAdmatFromK(K))
   rand.am.long <- randAdmat(am.long, max.num.root.children)
   if (!validGraph(rand.am.long)) warning("graph is not valid")
-  rand.am.long
+  return(rand.am.long)
 }
 
 plotGraph <- function(am.long){
