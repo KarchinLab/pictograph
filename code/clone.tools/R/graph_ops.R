@@ -349,7 +349,7 @@ bfsLong <- function(am.long) {
 addEdge <- function(am, new_edge) {
   c <- new_edge$child
   # disconnect existing edge connecting to child 
-  am[which(am$child == c & test$connected == 1), ]$connected <- 0
+  am[which(am$child == c & am$connected == 1), ]$connected <- 0
   # connect new edge
   am[which(am$edge == new_edge$edge), ]$connected <- 1
   return(am)
