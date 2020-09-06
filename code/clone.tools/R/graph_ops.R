@@ -414,9 +414,9 @@ sampleNewEdge <- function(a, max.num.root.children, mc.cores=1){
       group_split()
     is_valid <- unlist(parallel::mclapply(possible_moves_list, function(x) isMoveValid(a, x, max.num.root.children),
                                           mc.cores = mc.cores))
-    move_set <- possible_moves[is_valid, ]
-    ix <- sample(seq_len(nrow(move_set)), 1)
-    astar <- addEdge(a, move_set[ix, ])
+    move_set <- possible_moves_list[is_valid]
+    ix <- sample(seq_len(length(move_set)), 1)
+    astar <- addEdge(a, move_set[[ix]])
     return(astar)
 }
 
