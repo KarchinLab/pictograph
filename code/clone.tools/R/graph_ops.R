@@ -352,6 +352,8 @@ addEdge <- function(am, new_edge) {
   am[which(am$child == c & am$connected == 1), ]$connected <- 0
   # connect new edge
   am[which(am$edge == new_edge$edge), ]$connected <- 1
+  # update graph elements
+  am <- updateGraphElements(am)
   return(am)
 }
 
@@ -399,6 +401,7 @@ isMoveValid <- function(a, possible_move, max.num.root.children) {
   # max.num.root.children = maximum number of nodes allowed to be connected to root
   # returns TRUE or FALSE
   astar <- addEdge(a, possible_move)
+  
   is_valid <- validGraph(astar) & (numNodesConnectedToRoot(astar) <= max.num.root.children)
   return(is_valid)
 }
