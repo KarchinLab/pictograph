@@ -19,6 +19,12 @@ runTreeMH <- function(w_chain,
     am_chain <- list(initializeGraphFromPost(post, max.num.root.children, thresh=0.1))
   }
   
+  if (length(filter(am_chain[[1]], possible_edge == TRUE)$child) == 
+      length(unique(filter(am_chain[[1]], possible_edge == TRUE)$child))) {
+    print("Only one possible tree")
+    print(am_chain[[1]] %>% filter(possible_edge == TRUE))
+    stop("Only one possible tree, so stopping MH")
+  }
   
   cpov <- create.cpov(mcf_stats)
   am_prev <- am_chain[[1]]
