@@ -2,7 +2,7 @@ runTreeMH <- function(w_chain,
                       max.num.root.children=1,
                       num_iter=10000, thin=10, burn=1000,
                       first_am=NULL, seed=123,
-                      post=NULL, post.thresh=0.1
+                      post=NULL, post.thresh=0.1,
                       mc.cores=1) {
   set.seed(seed)
   mcf_stats <- summarizeWChain(w_chain)
