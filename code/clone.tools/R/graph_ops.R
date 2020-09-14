@@ -437,7 +437,7 @@ sampleNewEdge <- function(a, max.num.root.children, mc.cores=1){
     move_set <- possible_moves_list[is_valid]
     #ix <- sample(seq_len(length(move_set)), 1)
     ix <- tryCatch(sample(seq_len(length(move_set)), 1), error=function(e) NULL)
-    if(is.null(ix)) saveRDS(list(am = a, possible_moves_list), "/mnt/disk005/data/projects/pictograph/scripts/method-comparison/pictograph/log-sample-error")
+    if(is.null(ix)) saveRDS(list(am = a, possible_moves_list), "/mnt/disk005/data/projects/pictograph/scripts/method-comparison/pictograph/log-sample-error/test.rds")
     astar <- addEdge(a, move_set[[ix]])
     return(astar)
 }
