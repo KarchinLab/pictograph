@@ -435,7 +435,9 @@ sampleNewEdge <- function(a, max.num.root.children, mc.cores=1){
     is_valid <- unlist(parallel::mclapply(possible_moves_list, function(x) isMoveValid(a, x, max.num.root.children),
                                           mc.cores = mc.cores))
     move_set <- possible_moves_list[is_valid]
-    ix <- sample(seq_len(length(move_set)), 1)
+    #ix <- sample(seq_len(length(move_set)), 1)
+    tryCatch(ix <- sample(seq_len(length(move_set)), 1), error=function(e) NULL)
+    if(is.null(ix)) saveRDS(list(am = a, possible_moves_list), "/mnt/disk005/data/projects/pictograph/scripts/method-comparison/pictograph/log-sample-error")
     astar <- addEdge(a, move_set[[ix]])
     return(astar)
 }
