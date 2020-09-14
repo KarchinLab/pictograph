@@ -2,7 +2,7 @@ runTreeMH <- function(w_chain,
                       max.num.root.children=1,
                       num_iter=10000, thin=10, burn=1000,
                       first_am=NULL, seed=123,
-                      post=NULL, post.thresh=0.1,
+                      post=NULL,
                       mc.cores=1) {
   set.seed(seed)
   mcf_stats <- summarizeWChain(w_chain)
@@ -16,7 +16,7 @@ runTreeMH <- function(w_chain,
       am_chain <- list(first_am)
     }
   } else {
-    am_chain <- list(initializeGraphFromPost(post, max.num.root.children, thresh=post.thresh))
+    am_chain <- list(initializeGraphFromPost2(post, max.num.root.children))
   }
   
   if (length(filter(am_chain[[1]], possible_edge == TRUE)$child) == 
