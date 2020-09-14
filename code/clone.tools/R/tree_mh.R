@@ -9,15 +9,15 @@ runTreeMH <- function(w_chain,
   mcf_matrix <- get.map.w(w_chain)
   
   # initialize chains ---------------------------------------------------------
-  #if (is.null(post)) {
+  if (is.null(post)) {
     if (is.null(first_am)) {
       am_chain <- list(initializeGraph(mcf_matrix, max.num.root.children))
     } else {
       am_chain <- list(first_am)
     }
-  #} else {
-    # @TODO update restrictions using posterior admat
-  #}
+  } else {
+    am_chain <- list(initializeGraphFromPost(post, max.num.root.children, thresh=0.1))
+  }
   
   
   cpov <- create.cpov(mcf_stats)

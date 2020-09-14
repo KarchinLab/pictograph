@@ -149,7 +149,8 @@ randAdmatUnchecked <- function(am.long, max.num.root.children) {
   
   # choose node to connect to root
   # select "to" node from parent.pool to prevent getting stuck if max.num.root.children == 1
-  temp.node <- sample(parent.pool[parent.pool != "root"], 1)
+  temp.possible.root.children <- filter(possible.edges, parent == "root")$child
+  temp.node <- sample(temp.possible.root.children, 1)
   am.long[am.long$edge == getEdgeName("root", temp.node), ]$connected <- 1
   node.pool <- node.pool[node.pool != temp.node]
   
@@ -373,6 +374,20 @@ initializeGraph <- function(mcf, max.num.root.children=1, zero.thresh=0.01){
     return(am.long2)
 }
 
+initializeGraphFromPost <- function(post_am, max.num.root.children=1, thresh=0.1) {
+  constrained_am <- post_am %>%
+    group_by(child) %>%
+    mutate(max_post_for_child = max(posterior_prob)) %>%
+    ungroup() %>%
+    mutate(possible_edge = (max_post_for_child-posterior_prob) <= thresh) %>%
+    mutate(connected = 0) %>%
+    select(edge, parent, child, possible_edge, connected)
+  am <- randAdmatUnchecked(constrained_am, max.num.root.children)
+  while (!validGraph(am)) {
+    am <- randAdmatUnchecked(constrained_am, max.num.root.children)
+  }
+  return(am)
+}
 
 toWide <- function(am.long){
     am.long$child <- as.numeric(am.long$child)
