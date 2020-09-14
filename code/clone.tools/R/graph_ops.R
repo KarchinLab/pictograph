@@ -394,6 +394,21 @@ initializeGraphFromPost <- function(post_am, max.num.root.children=1, thresh=0.1
   return(am)
 }
 
+initializeGraphFromPost2 <- function(post_am, max.num.root.children=1) {
+  K <- length(unique(post_am$child))
+  thresh <- (1/K)/2
+  constrained_am <- post_am %>%
+    mutate(possible_edge = posterior_prob >= thresh) %>%
+    mutate(connected = 0) %>%
+    select(edge, parent, child, possible_edge, connected)
+  am <- randAdmatUnchecked(constrained_am, max.num.root.children)
+  while (!validGraph(am)) {
+    am <- randAdmatUnchecked(constrained_am, max.num.root.children)
+  }
+  return(am)
+}
+
+
 toWide <- function(am.long){
     am.long$child <- as.numeric(am.long$child)
     am.long %>% select(parent, child, connected) %>%
