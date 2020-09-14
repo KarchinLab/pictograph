@@ -150,7 +150,12 @@ randAdmatUnchecked <- function(am.long, max.num.root.children) {
   # choose node to connect to root
   # select "to" node from parent.pool to prevent getting stuck if max.num.root.children == 1
   temp.possible.root.children <- filter(possible.edges, parent == "root")$child
-  temp.node <- sample(temp.possible.root.children, 1)
+  if (length(temp.possible.root.children) > 1) {
+    temp.node <- sample(temp.possible.root.children, 1)
+  } else {
+    temp.node <- temp.possible.root.children
+  }
+  
   am.long[am.long$edge == getEdgeName("root", temp.node), ]$connected <- 1
   node.pool <- node.pool[node.pool != temp.node]
   
