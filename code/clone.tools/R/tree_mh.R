@@ -40,6 +40,7 @@ runTreeMH <- function(w_chain,
     am_star <- sampleNewEdge(am_prev, 
                              max.num.root.children = max.num.root.children, 
                              mc.cores = mc.cores)
+    if (all.equal(am_star, am_prev)) am_star <- initializeGraphFromPost2(post, max.num.root.children)
     fit_star <- calcTreeFitness(am_star, cpov, mcf_matrix)
     
     # accept or reject proposal
