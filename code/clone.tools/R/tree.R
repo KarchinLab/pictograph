@@ -50,8 +50,10 @@ initializeAdjacencyMatrix <- function(mcf_stats=NULL, mcf_matrix=NULL, zero.thre
   ##
   K <- nrow(MCF)
   S <- ncol(MCF)
-  cluster.sample.presence <- apply(MCF, 1, function(x)
-    which(x > zero.thresh))
+  # cluster.sample.presence should be a list
+  MCF_list <- split(MCF, seq(nrow(MCF)))
+  cluster.sample.presence <- lapply(MCF_list, 
+                                    function(x) which(x > zero.thresh))
   all.samples <- seq_len(S)
   ## initialize adjacency matrix
   ##admat <- matrix(data=0, nrow=(1+K), ncol=K)
