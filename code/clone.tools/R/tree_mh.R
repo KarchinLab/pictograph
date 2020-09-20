@@ -7,6 +7,7 @@ runTreeMH <- function(w_chain,
   set.seed(seed)
   mcf_stats <- summarizeWChain(w_chain)
   mcf_matrix <- get.map.w(w_chain)
+  cpov <- create.cpov(mcf_stats)
   
   # initialize chains ---------------------------------------------------------
   if (is.null(post)) {
@@ -23,10 +24,12 @@ runTreeMH <- function(w_chain,
       length(unique(filter(am_chain[[1]], possible_edge == TRUE)$child))) {
     print("Possible edges:")
     print(am_chain[[1]] %>% filter(possible_edge == TRUE))
-    stop("Only one possible tree, so stopping MH")
+    print("Only one possible tree, so stopping MH and returning single tree")
+    results <- list(am_chain = am_chain,
+                    score_chain = calcTreeFitness(am_chain[[1]], cpov, mcf_matrix))
+    return(results)
   }
-  
-  cpov <- create.cpov(mcf_stats)
+
   am_prev <- am_chain[[1]]
   score_chain <- calcTreeFitness(am_prev, cpov, mcf_matrix)
   fit_prev <- score_chain[1]
