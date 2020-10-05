@@ -527,22 +527,43 @@ toWidePostAm <- function(post_am) {
     as.matrix()
 }
 
-plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1) {
+filterAdmat <- function(admat, filter1 = TRUE, filter1.threshold = 0.1,
+                        filter2 = TRUE, filter2.threshold = 0.1) {
   # filter1 filters columns (am wide format) for edges with posterior prob > (max(column) - filter1.threshold)
+  # filter2 filters entire matrix for prob > filter2.threshold
+  
+  if (filter1) {
+    admat <- apply(admat, 2, function(x) ifelse(x > (max(x)-filter1.threshold), x, 0))
+  } 
+  
+  if (filter2) {
+    admat[admat <= filter2.threshold] <- 0
+  }
+  
+  return(admat)
+}
+
+prepPostAmForGraphing <- function(post_am) {
   post_am_mat <- toWidePostAm(post_am)
   
   # add column for root
   post_am_mat <- cbind(0, post_am_mat) 
   colnames(post_am_mat)[1] <- "root"
   rownames(post_am_mat) <- colnames(post_am_mat)
-  admat <- as.matrix(post_am_mat)
+  admat <- round(as.matrix(post_am_mat), 2)
   admat[is.na(admat)] <- 0 
+  
+  return(admat)
+}
 
-  # filter edges
-  if (filter1) {
-    #thresh <- apply(admat, 2, max) - filter1.threshold
-    admat <- apply(admat, 2, function(x) ifelse(x > (max(x)-filter1.threshold), x, 0))
-  } 
+plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1,
+                                filter2 = TRUE, filter2.threshold = 0.1) {
+  # filter1 filters columns (am wide format) for edges with posterior prob > (max(column) - filter1.threshold)
+  admat <- prepPostAmForGraphing(post_am)
+  
+  # filter edges of low freq
+  admat <- filterAdmat(admat, filter1 = filter1, filter1.threshold = filter1.threshold,
+                       filter2 = filter2, filter2.threshold = filter2.threshold)
   
   ig <- igraph::graph_from_adjacency_matrix(admat, mode = "directed", weighted = TRUE,
                                     diag = FALSE, add.row = TRUE) 
@@ -561,6 +582,73 @@ plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1
               vertex.color = "white", vertex.label.family = "Helvetica",
               edge.arrow.size = 0.2, edge.arrow.width = 2,
               edge.width = igraph::E(ig)$weight*3)
+}
+
+plotPosteriorAmLong2 <- function(post_am, cluster_key_genes_tb,
+                                filter1 = TRUE, filter1.threshold = 0.1,
+                                filter2 = TRUE, filter2.threshold = 0.1) {
+  # filter1 filters columns (am wide format) for edges with posterior prob > (max(column) - filter1.threshold)
+  admat <- prepPostAmForGraphing(post_am)
+  
+  # filter edges of low freq
+  admat <- filterAdmat(admat, filter1 = filter1, filter1.threshold = filter1.threshold,
+                       filter2 = filter2, filter2.threshold = filter2.threshold)
+  
+  ig <- igraph::graph_from_adjacency_matrix(admat, mode = "directed", weighted = TRUE,
+                                            diag = FALSE, add.row = TRUE) 
+  
+  igraph::E(ig)$lty <- ifelse(igraph::E(ig)$weight < 0.25, 2, 1)
+  
+  # make edge black if only 1 edge to vertex
+  e <- igraph::ends(ig, igraph::E(ig))
+  numTo <- table(e[,2])
+  edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
+  igraph::E(ig)$color <- edgeColors
+  
+  igraph::V(ig)$label.cex <- 0.5
+  vertex_colors <- c("white", ifelse(cluster_key_genes_tb$contains_key_gene, "lightblue", "white"))
+  igraph::V(ig)$color <- vertex_colors
+  
+  igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
+                      #vertex.color = "white", 
+                      vertex.label.family = "Helvetica",
+                      edge.arrow.size = 0.2, edge.arrow.width = 2,
+                      edge.width = igraph::E(ig)$weight*3)
+}
+
+plotPosteriorAmLong3 <- function(post_am, cluster_key_genes_tb,
+                                 filter1 = TRUE, filter1.threshold = 0.1,
+                                 filter2 = TRUE, filter2.threshold = 0.1) {
+  # don't plot edges with low freq (<0.25)
+  # filter1 filters columns (am wide format) for edges with posterior prob > (max(column) - filter1.threshold)
+  admat <- prepPostAmForGraphing(post_am)
+  
+  # filter edges of low freq
+  admat <- filterAdmat(admat, filter1 = filter1, filter1.threshold = filter1.threshold,
+                       filter2 = filter2, filter2.threshold = filter2.threshold)
+  
+  # filter out edges < 0.2 prob
+  admat[admat < 0.2] <- 0
+  ig <- igraph::graph_from_adjacency_matrix(admat, mode = "directed", weighted = TRUE,
+                                            diag = FALSE, add.row = TRUE) 
+  # edges < 0.25 prob
+  igraph::E(ig)$lty <- ifelse(igraph::E(ig)$weight < 0.25, 2, 1)
+  
+  # make edge black if only 1 edge to vertex
+  e <- igraph::ends(ig, igraph::E(ig))
+  numTo <- table(e[,2])
+  edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
+  igraph::E(ig)$color <- edgeColors
+  
+  igraph::V(ig)$label.cex <- 0.5
+  vertex_colors <- c("white", ifelse(cluster_key_genes_tb$contains_key_gene, "lightblue", "white"))
+  igraph::V(ig)$color <- vertex_colors
+  
+  igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
+                      #vertex.color = "white", 
+                      vertex.label.family = "Helvetica",
+                      edge.arrow.size = 0.2, edge.arrow.width = 2,
+                      edge.width = igraph::E(ig)$weight*3)
 }
 
 labelMAPEdgesFromPostAM <- function(post_am) {
