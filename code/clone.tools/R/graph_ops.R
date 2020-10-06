@@ -608,6 +608,8 @@ plotPosteriorAmLong2 <- function(post_am, cluster_key_genes_tb,
   igraph::V(ig)$label.cex <- 0.5
   vertex_colors <- c("white", ifelse(cluster_key_genes_tb$contains_key_gene, "lightblue", "white"))
   igraph::V(ig)$color <- vertex_colors
+  # highlight single sample vertices
+  igraph::V(ig)$frame.color <- c("black", ifelse(cluster_key_genes_tb$single_sample, "#E69F00", "black"))
   
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
                       #vertex.color = "white", 
@@ -643,7 +645,9 @@ plotPosteriorAmLong3 <- function(post_am, cluster_key_genes_tb,
   igraph::V(ig)$label.cex <- 0.5
   vertex_colors <- c("white", ifelse(cluster_key_genes_tb$contains_key_gene, "lightblue", "white"))
   igraph::V(ig)$color <- vertex_colors
-  
+  # highlight single sample vertices
+  igraph::V(ig)$frame.color <- c("black", ifelse(cluster_key_genes_tb$single_sample, "#E69F00", "black"))
+
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
                       #vertex.color = "white", 
                       vertex.label.family = "Helvetica",
