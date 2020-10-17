@@ -497,6 +497,7 @@ plotGraph <- function(am.long){
   ig <- igraph::graph_from_adjacency_matrix(am, mode = "directed", weighted = TRUE,
                                     diag = FALSE, add.row = TRUE) 
   
+  par(mar=c(0,0,0,0)+.1)
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
               vertex.color = "white", vertex.label.family = "Helvetica",
               edge.arrow.size = 0.2, edge.arrow.width = 2)
@@ -520,7 +521,8 @@ getPosteriorAmLong <- function(am_chain) {
 
 toWidePostAm <- function(post_am) {
   post_am %>% 
-    mutate(child = as.numeric(post_am$child)) %>%
+    mutate(child = as.numeric(post_am$child),
+           parent = factor(parent, levels = c("root", 1:max(post_am$child)))) %>%
     select(parent, child, posterior_prob) %>%
     tidyr::spread(child, posterior_prob) %>%
     select(-parent) %>%
@@ -578,10 +580,42 @@ plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1
   
   igraph::V(ig)$label.cex <- 0.5
   
+  par(mar=c(0,0,0,0)+.1)
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
               vertex.color = "white", vertex.label.family = "Helvetica",
               edge.arrow.size = 0.2, edge.arrow.width = 2,
               edge.width = igraph::E(ig)$weight*3)
+}
+
+plotPosteriorAmLongSim <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1,
+                                filter2 = TRUE, filter2.threshold = 0.1) {
+  # filter1 filters columns (am wide format) for edges with posterior prob > (max(column) - filter1.threshold)
+  admat <- prepPostAmForGraphing(post_am)
+  
+  # filter edges of low freq
+  admat <- filterAdmat(admat, filter1 = filter1, filter1.threshold = filter1.threshold,
+                       filter2 = filter2, filter2.threshold = filter2.threshold)
+  
+  ig <- igraph::graph_from_adjacency_matrix(admat, mode = "directed", weighted = TRUE,
+                                            diag = FALSE, add.row = TRUE) 
+  
+  igraph::E(ig)$lty <- ifelse(igraph::E(ig)$weight < 0.25, 2, 1)
+  
+  # make edge black if only 1 edge to vertex
+  e <- igraph::ends(ig, igraph::E(ig))
+  numTo <- table(e[,2])
+  edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
+  igraph::E(ig)$color <- edgeColors
+  
+  igraph::V(ig)$label.cex <- 1
+  
+  par(mar=c(0,0,0,0)+.1)
+  igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
+                      vertex.color = "white", vertex.label.family = "Helvetica",
+                      vertex.size = 30,
+                      edge.arrow.size = 0.6, edge.arrow.width = 2,
+                      edge.width = igraph::E(ig)$weight*5,
+                      asp = 0)
 }
 
 plotPosteriorAmLong2 <- function(post_am, cluster_key_genes_tb,
@@ -611,6 +645,7 @@ plotPosteriorAmLong2 <- function(post_am, cluster_key_genes_tb,
   # highlight single sample vertices
   igraph::V(ig)$frame.color <- c("black", ifelse(cluster_key_genes_tb$single_sample, "#E69F00", "black"))
   
+  par(mar=c(0,0,0,0)+.1)
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
                       #vertex.color = "white", 
                       vertex.label.family = "Helvetica",
@@ -648,6 +683,7 @@ plotPosteriorAmLong3 <- function(post_am, cluster_key_genes_tb,
   # highlight single sample vertices
   igraph::V(ig)$frame.color <- c("black", ifelse(cluster_key_genes_tb$single_sample, "#E69F00", "black"))
 
+  par(mar=c(0,0,0,0)+.1)
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
                       #vertex.color = "white", 
                       vertex.label.family = "Helvetica",
