@@ -521,8 +521,8 @@ getPosteriorAmLong <- function(am_chain) {
 
 toWidePostAm <- function(post_am) {
   post_am %>% 
-    mutate(child = as.numeric(post_am$child),
-           parent = factor(parent, levels = c("root", 1:max(post_am$child)))) %>%
+    mutate(child = as.numeric(post_am$child)) %>%
+    mutate(parent = factor(parent, levels = c("root", 1:max(post_am$child)))) %>%
     select(parent, child, posterior_prob) %>%
     tidyr::spread(child, posterior_prob) %>%
     select(-parent) %>%
