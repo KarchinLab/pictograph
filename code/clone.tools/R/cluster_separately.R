@@ -59,7 +59,8 @@ runMCMCForABox <- function(box,
   
   
   
-  samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
+  samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
+                      inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
   if(box$I == 1) {
     colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "z")] <- "z[1]"
   }
@@ -68,7 +69,8 @@ runMCMCForABox <- function(box,
   max_K <- min(max_K, length(box$mutation_indices)) 
   if (max_K > 1) {
     samps_2 <- parallel::mclapply(2:max_K,
-                                  function(k) runMCMC(box_input_data, k, jags.file, inits, params,
+                                  function(k) runMCMC(box_input_data, k,
+                                                      jags.file, inits, params,
                                                       n.iter=n.iter, thin=thin,
                                                       n.burn=n.burn),
                                   mc.cores=mc.cores)
@@ -98,45 +100,89 @@ clusterSep <- function(input_data,
     temp_max_K <- min(max_K, length(temp_box$mutation_indices))
     if (temp_max_K == 1) {
       temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, thin = thin, mc.cores = mc.cores,
+                                        n.iter = n.iter, n.burn = n.burn, 
+                                        thin = thin, mc.cores = mc.cores,
                                         inits = inits,
                                         params = params,
                                         max_K = temp_max_K)
-      sep_samps_list[[i]] <- temp_samps_list
+      temp_z <- get.parameter.chain("z", ggs(temp_samps_list)) %>%
+        mutate(Parameter = as.character(Parameter))
+      temp_w <- get.parameter.chain("w", ggs(temp_samps_list)) %>%
+        mutate(Parameter = as.character(Parameter))
+      sep_samps_list[[i]] <- list(w_chain = temp_w,
+                                  z_chain = temp_z)
       best_K_vals[i] <- 1
     } else {
       temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, thin = thin, mc.cores = mc.cores,
+                                        n.iter = n.iter, n.burn = n.burn, 
+                                        thin = thin, mc.cores = mc.cores,
                                         inits = inits,
                                         params = params,
                                         max_K = temp_max_K)
       # calc BIC and choose K by minimum BIC 
       temp_BIC <- mapply(function(samps, k)
-        calcBIC(temp_box$I*temp_box$S, k, calcChainLogLik(samps, getBoxInputData(temp_box), k)),
+        calcBIC(temp_box$I*temp_box$S, k, 
+                calcChainLogLik(samps, getBoxInputData(temp_box), k)),
         samps = temp_samps_list, k = 1:temp_max_K)
       temp_min_BIC_K <- which.min(temp_BIC)
-      best_K_vals[i] <- temp_min_BIC_K
-      sep_samps_list[[i]] <- temp_samps_list[[temp_min_BIC_K]]
+      
+      
+      # clean up empty clusters by map_z
+      best_samps_list <- temp_samps_list[[temp_min_BIC_K]]
+      temp_z <- get.parameter.chain("z", ggs(best_samps_list)) %>%
+        mutate(Parameter = as.character(Parameter))
+      temp_w <- get.parameter.chain("w", ggs(best_samps_list)) %>%
+        mutate(Parameter = as.character(Parameter))
+      map_z <- get.map.z(temp_z)
+      
+      if (length(unique(map_z$value)) < temp_min_BIC_K) {
+        # relabel clusters if there are empty clusters
+        # new cluster labels
+        new_labs <- 1:length(unique(map_z$value))
+        old_labs <- unique(map_z$value)
+        # relabel z chain
+        temp_z <- temp_z %>%
+          filter(temp_z$value %in% old_labs) # remove clusters that are empty in map_z
+        temp_z <- temp_z %>%
+          mutate(value = new_labs[match(temp_z$value, old_labs)])
+        # relabel w chain
+        temp_w <- temp_w %>%
+          mutate(k = as.numeric(gsub("w\\[", "", 
+                                     sapply(temp_w$Parameter, 
+                                            function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
+          mutate(s = as.numeric(gsub("\\]", "", 
+                                     sapply(temp_w$Parameter, 
+                                            function(x) strsplit(as.character(x), ",")[[1]][2])))) %>%
+          filter(k %in% old_labs) 
+        temp_w <- temp_w %>%
+          mutate(k = new_labs[match(temp_w$k, old_labs)]) %>%
+          mutate(Parameter = paste0("w[", k, ",", s, "]")) %>%
+          select(Iteration, Chain, Parameter, value)
+      }
+      
+      # store chain and best K
+      sep_samps_list[[i]] <- list(w_chain = temp_w,
+                                  z_chain = temp_z)
+      best_K_vals[i] <- length(unique(map_z$value))
     }
   }
   
   # 3. Relabel z_chain and w_chain for alls and merge 
   # first set doens't need to change cluster labels
-  w_chain <- get.parameter.chain("w", ggs(sep_samps_list[[1]])) %>%
-    mutate(Parameter = as.character(Parameter))
-  temp_z_chain <- get.parameter.chain("z", ggs(sep_samps_list[[1]])) %>%
-    mutate(Parameter = as.character(Parameter))
+  w_chain <- sep_samps_list[[1]]$w_chain
+  temp_z_chain <- sep_samps_list[[1]]$z_chain
   # still need to change mutation indices
   z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[1]]$mutation_indices)
   
   if (length(sep_list) > 1) {
     for (i in 2:length(sep_samps_list)) {
-      temp_w_chain <- get.parameter.chain("w", ggs(sep_samps_list[[i]]))
-      temp_z_chain <- get.parameter.chain("z", ggs(sep_samps_list[[i]]))
+      temp_w_chain <- sep_samps_list[[i]]$w_chain
+      temp_z_chain <- sep_samps_list[[i]]$z_chain
       new_cluster_labels <- seq_len(best_K_vals[i]) + sum(best_K_vals[1:(i-1)])
       
       temp_relabeled_w_chain <- relabel_w_chain(temp_w_chain, new_cluster_labels)
-      temp_relabeled_z_chain <- relabel_z_chain(temp_z_chain, new_cluster_labels, sep_list[[i]]$mutation_indices)
+      temp_relabeled_z_chain <- relabel_z_chain(temp_z_chain, new_cluster_labels, 
+                                                sep_list[[i]]$mutation_indices)
       
       w_chain <- rbind(w_chain, temp_relabeled_w_chain)
       z_chain <- rbind(z_chain, temp_relabeled_z_chain)
@@ -147,7 +193,9 @@ clusterSep <- function(input_data,
   w_chain <- w_chain %>%
     mutate(Parameter = factor(Parameter, levels = unique(w_chain$Parameter)))
   z_chain_param_order <- tibble(Parameter = unique(z_chain$Parameter)) %>%
-    mutate(Variant = as.numeric(gsub("z\\[", "", gsub("\\]", "", unique(z_chain$Parameter))))) %>%
+    mutate(Variant = as.numeric(gsub("z\\[", "", 
+                                     gsub("\\]", "", 
+                                          unique(z_chain$Parameter))))) %>%
     arrange(Variant)
   z_chain <- z_chain %>%
     mutate(Parameter = factor(Parameter, levels = z_chain_param_order$Parameter))
@@ -158,8 +206,12 @@ clusterSep <- function(input_data,
 relabel_w_chain <- function(w_chain, new_cluster_labels) {
   # new_cluster_labels = numeric vector of labels that map to 1:length(new_cluster_labels)
   new_w <- w_chain %>% 
-    mutate(k = as.numeric(gsub("w\\[", "", sapply(w_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
-    mutate(s = as.numeric(gsub("\\]", "", sapply(w_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][2]))))
+    mutate(k = as.numeric(gsub("w\\[", "", 
+                               sapply(w_chain$Parameter, 
+                                      function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
+    mutate(s = as.numeric(gsub("\\]", "", 
+                               sapply(w_chain$Parameter, 
+                                      function(x) strsplit(as.character(x), ",")[[1]][2]))))
   if (length(new_cluster_labels) != length(unique(new_w$k))) {
     stop("number of supplied new cluster labels does not match the number of clusters in w_chain")
   }
@@ -180,7 +232,10 @@ relabel_z_chain <- function(z_chain, new_cluster_labels, mutation_indices) {
     stop("number of supplied new cluster labels does not match the number of clusters in z_chain")
   }
   new_z <- z_chain %>%
-    mutate(i = as.numeric(gsub("\\]", "", gsub("z\\[", "", sapply(z_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))))
+    mutate(i = as.numeric(gsub("\\]", "", 
+                               gsub("z\\[", "", 
+                                    sapply(z_chain$Parameter, 
+                                           function(x) strsplit(as.character(x), ",")[[1]][1])))))
   new_z <- new_z %>%
     mutate(new_i = mutation_indices[i],
            value = new_cluster_labels[new_z$value]) %>%
@@ -197,7 +252,10 @@ relabel_z_chain_mut_only <- function(z_chain, mutation_indices) {
     stop("number of supplied mutation indices does not match the number of mutations in z_chain")
   }
   new_z <- z_chain %>%
-    mutate(i = as.numeric(gsub("\\]", "", gsub("z\\[", "", sapply(z_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))))
+    mutate(i = as.numeric(gsub("\\]", "", 
+                               gsub("z\\[", "", 
+                                    sapply(z_chain$Parameter, 
+                                           function(x) strsplit(as.character(x), ",")[[1]][1])))))
   new_z <- new_z %>%
     mutate(new_i = mutation_indices[i]) %>%
     mutate(Parameter = paste0("z[", new_i, "]")) %>% 
