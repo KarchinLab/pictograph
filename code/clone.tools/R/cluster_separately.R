@@ -43,7 +43,7 @@ runMCMCForABox <- function(box,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
                                         ".RNG.seed" = 123),
                            params = c("z", "w"),
-                           max_K = 15) {
+                           max_K = 10) {
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
   
@@ -55,8 +55,14 @@ runMCMCForABox <- function(box,
     jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
   }
   
-  jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
-  
+  #jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
+  jags.file <- file.path(extdir, "spike_and_slab_purity_ident.jags") # fixing order of CCFs in one sample
+  # choose sample in which mutations are present
+  if (box$I > 1) {
+    sample_to_sort <- which(colSums(box$y) > 0)[1] 
+  } else {
+    sample_to_sort <- which(box$y > 0)[1]
+  }
   
   
   samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
@@ -68,6 +74,7 @@ runMCMCForABox <- function(box,
   # Max number of clusters cannot be more than number of mutations
   max_K <- min(max_K, length(box$mutation_indices)) 
   if (max_K > 1) {
+    box_input_data$sample_to_sort <- sample_to_sort
     samps_2 <- parallel::mclapply(2:max_K,
                                   function(k) runMCMC(box_input_data, k,
                                                       jags.file, inits, params,
@@ -87,7 +94,7 @@ clusterSep <- function(input_data,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
                                     ".RNG.seed" = 123),
                        params = c("z", "w"),
-                       max_K = 15) {
+                       max_K = 10) {
   # 1. separate mutations by sample presence
   sep_list <- separateMutationsBySamplePresence(input_data)
   
