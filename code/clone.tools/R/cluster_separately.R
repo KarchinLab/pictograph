@@ -197,8 +197,17 @@ clusterSep <- function(input_data,
   }
   
   # set levels for Parameter
-  w_chain <- w_chain %>%
-    mutate(Parameter = factor(Parameter, levels = unique(w_chain$Parameter)))
+  w_chain <- w_chain %>% 
+    mutate(k = as.numeric(gsub("w\\[", "", 
+                               sapply(w_chain$Parameter, 
+                                      function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
+    mutate(s = as.numeric(gsub("\\]", "", 
+                               sapply(w_chain$Parameter, 
+                                      function(x) strsplit(as.character(x), ",")[[1]][2])))) %>%
+    arrange(k, s) %>%
+    mutate(Parameter = factor(Parameter, levels = unique(w_chain$Parameter))) %>%
+    select(Iteration, Chain, Parameter, value)
+  
   z_chain_param_order <- tibble(Parameter = unique(z_chain$Parameter)) %>%
     mutate(Variant = as.numeric(gsub("z\\[", "", 
                                      gsub("\\]", "", 
