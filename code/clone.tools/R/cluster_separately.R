@@ -140,7 +140,7 @@ clusterSep <- function(input_data,
         mutate(Parameter = as.character(Parameter))
       temp_w_old <- get.parameter.chain("w", ggs(best_samps_list)) %>%
         mutate(Parameter = as.character(Parameter))
-      map_z_old <- get.map.z(temp_z)
+      map_z_old <- get.map.z(temp_z_old)
       
       
       # if there are empty clusters, remove empty ones and relabel clusters 
