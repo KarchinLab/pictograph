@@ -136,40 +136,58 @@ clusterSep <- function(input_data,
       
       # clean up empty clusters by map_z
       best_samps_list <- temp_samps_list[[temp_min_BIC_K]]
-      temp_z <- get.parameter.chain("z", ggs(best_samps_list)) %>%
+      temp_z_old <- get.parameter.chain("z", ggs(best_samps_list)) %>%
         mutate(Parameter = as.character(Parameter))
-      temp_w <- get.parameter.chain("w", ggs(best_samps_list)) %>%
+      temp_w_old <- get.parameter.chain("w", ggs(best_samps_list)) %>%
         mutate(Parameter = as.character(Parameter))
-      map_z <- get.map.z(temp_z)
+      map_z_old <- get.map.z(temp_z)
       
-      if (length(unique(map_z$value)) < temp_min_BIC_K) {
-        # relabel clusters if there are empty clusters
-        # new cluster labels
-        new_labs <- 1:length(unique(map_z$value))
-        old_labs <- unique(map_z$value)
+      
+      # if there are empty clusters, remove empty ones and relabel clusters 
+      if (length(unique(map_z_old$value)) < temp_min_BIC_K) {
+        
+        # new_labs <- 1:length(unique(map_z$value))
+        old_labs <- unique(map_z_old$value)
+        
+        # remove clusters that are empty in map_z
+        temp_z_remove_empty <- temp_z_old %>%
+          filter(value %in% old_labs)
         # relabel z chain
-        temp_z <- temp_z %>%
-          filter(temp_z$value %in% old_labs) # remove clusters that are empty in map_z
-        temp_z <- temp_z %>%
-          mutate(value = new_labs[match(temp_z$value, old_labs)])
+        z_relabeled <- temp_z_remove_empty %>%
+          mutate(new_value = match(value, old_labs)) %>%
+          select(Iteration, Chain, Parameter, new_value) %>%
+          rename(value = new_value)
+        # order by variant
+        z_relabeled <- z_relabeled %>%
+          mutate(Variant = as.numeric(gsub("z\\[", "", 
+                                         gsub("\\]", "", 
+                                              Parameter)))) %>%
+          arrange(Variant, Iteration) %>%
+          mutate(Parameter = factor(Parameter, levels = unique(z_relabeled$Parameter))) 
+        z_relabeled$Variant <- NULL
+          
+        
         # relabel w chain
-        temp_w <- temp_w %>%
+        # remove clusters that are empty in map_z
+        temp_w_remove_empty <- temp_w_old %>%
           mutate(k = as.numeric(gsub("w\\[", "", 
-                                     sapply(temp_w$Parameter, 
+                                     sapply(Parameter, 
                                             function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
           mutate(s = as.numeric(gsub("\\]", "", 
-                                     sapply(temp_w$Parameter, 
+                                     sapply(Parameter, 
                                             function(x) strsplit(as.character(x), ",")[[1]][2])))) %>%
           filter(k %in% old_labs) 
-        temp_w <- temp_w %>%
-          mutate(k = new_labs[match(temp_w$k, old_labs)]) %>%
-          mutate(Parameter = paste0("w[", k, ",", s, "]")) %>%
+        # relabel w chain 
+        w_relabeled <- temp_w_remove_empty %>%
+          mutate(new_k = match(k, old_labs)) %>%
+          mutate(Parameter = paste0("w[", new_k, ",", s, "]")) %>%
+          arrange(new_k, s) %>%
           select(Iteration, Chain, Parameter, value)
       }
       
       # store chain and best K
-      sep_samps_list[[i]] <- list(w_chain = temp_w,
-                                  z_chain = temp_z)
+      sep_samps_list[[i]] <- list(w_chain = w_relabeled,
+                                  z_chain = z_relabeled)
       best_K_vals[i] <- length(unique(map_z$value))
     }
   }
@@ -178,10 +196,10 @@ clusterSep <- function(input_data,
   # first set doens't need to change cluster labels
   w_chain <- sep_samps_list[[1]]$w_chain
   temp_z_chain <- sep_samps_list[[1]]$z_chain
-  # still need to change mutation indices
-  z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[1]]$mutation_indices)
   
   if (length(sep_list) > 1) {
+    # still need to change mutation indices if more than 1 box
+    z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[1]]$mutation_indices)
     for (i in 2:length(sep_samps_list)) {
       temp_w_chain <- sep_samps_list[[i]]$w_chain
       temp_z_chain <- sep_samps_list[[i]]$z_chain
@@ -194,6 +212,8 @@ clusterSep <- function(input_data,
       w_chain <- rbind(w_chain, temp_relabeled_w_chain)
       z_chain <- rbind(z_chain, temp_relabeled_z_chain)
     }
+  } else {
+    z_chain <- temp_z_chain
   }
   
   # set levels for Parameter
