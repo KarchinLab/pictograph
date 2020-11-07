@@ -188,7 +188,7 @@ clusterSep <- function(input_data,
       # store chain and best K
       sep_samps_list[[i]] <- list(w_chain = w_relabeled,
                                   z_chain = z_relabeled)
-      best_K_vals[i] <- length(unique(map_z$value))
+      best_K_vals[i] <- length(unique(map_z_old$value))
     }
   }
   
