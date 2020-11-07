@@ -183,11 +183,17 @@ clusterSep <- function(input_data,
           mutate(Parameter = paste0("w[", new_k, ",", s, "]")) %>%
           arrange(new_k, s) %>%
           select(Iteration, Chain, Parameter, value)
+        
+        w_to_store <- w_relabeled
+        z_to_store <- z_relabeled
+      } else {
+        w_to_store <- temp_w_old
+        z_to_store <- temp_z_old
       }
       
       # store chain and best K
-      sep_samps_list[[i]] <- list(w_chain = w_relabeled,
-                                  z_chain = z_relabeled)
+      sep_samps_list[[i]] <- list(w_chain = w_to_store,
+                                  z_chain = z_to_store)
       best_K_vals[i] <- length(unique(map_z_old$value))
     }
   }
