@@ -128,7 +128,8 @@ calcMassCost <- function(am, mcf_matrix, am_format="long") {
       }
       
       mc_s <- ifelse(parent_w >= children_w, 0, children_w - parent_w)
-      mass_cost[i] <- sqrt(sum(mc_s^2))
+      #mass_cost[i] <- sqrt(sum(mc_s^2))
+      mass_cost[i] <- max(mc_s) # take max across samples instead of euclidean distance
     }
     return(sum(mass_cost))
     
