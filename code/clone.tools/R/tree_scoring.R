@@ -168,3 +168,34 @@ calcTreeFitness <- function(admat, cpov, mcf_matrix, am_format = "long", weight_
   fitness <- exp(-scaling_coeff * Z)
   fitness
 }
+
+satisfiesCCFSumProperties <- function(am_long, mcf_matrix, threshold = 0.2) {
+  # threshold = max value that children CCFs can be larger than parent;
+  #   i.e. function returns false if (sum of children CCFs) - parent CCF > threshold
+  
+  edges <- getEdges(am_long)
+  parent_nodes <- unique(edges$parent)
+  
+  for (i in seq_len(length(parent_nodes))) {
+    parent_node <- parent_nodes[i]
+    
+    # root CCF is 1
+    if (parent_node == "root") {
+      parent_w <- rep(1, ncol(mcf_matrix))
+    } else {
+      parent_w <- mcf_matrix[as.numeric(parent_node), ]
+    }
+    
+    kids <- getChildren(am_long, parent_node)
+    if (length(kids) > 1) {
+      children_w <- colSums(mcf_matrix[as.numeric(kids), ])
+    } else {
+      children_w <- mcf_matrix[as.numeric(kids), ]
+    }
+    
+    # return false if violates sum properties
+    if (any(children_w - parent_w > threshold)) return(FALSE)
+  }
+  
+  return(TRUE)
+}
