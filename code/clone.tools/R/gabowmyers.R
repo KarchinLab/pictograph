@@ -19,17 +19,17 @@ bridgeTestBFS <- function(graph_G, edge_e) {
   !(node_to_check %in% nodes_connected_to_root)
 }
 
-bfsLong2 <- function(am.long) {
+bfsLong2 <- function(graph_G) {
   # returns vector of nodes in main tree (connected to root) including "root" 
   # starting at root
   # does not stop if there is a cycle in graph 
-  am.long$parent <- as.character(am.long$parent)
-  children <- am.long[(am.long$parent == "root" & am.long$connected == 1), ]$child
+  graph_G$parent <- as.character(graph_G$parent)
+  children <- graph_G[(graph_G$parent == "root"), ]$child
   nodes <- c("root", children)
   
   while(length(children) > 0) {
     c <- children[1]
-    temp.children <- am.long[(am.long$parent == c & am.long$connected == 1), ]$child
+    temp.children <- graph_G[(graph_G$parent == c), ]$child
     
     # remove children already seen
     if (any(temp.children %in% nodes)) {
@@ -48,8 +48,7 @@ grow <- function(tree_T, all_vertices) {
   
   if (length(verticesInGraph(tree_T)) == length(all_vertices) & nrow(tree_T) == (length(all_vertices)-1)) {
     assign("all_spanning_trees", c(all_spanning_trees, list(tree_T)), envir = .GlobalEnv)
-    assign("i", i+1, envir = .GlobalEnv)
-    return(tree_T)
+    #return(tree_T)
     
   } else {
     FF <- tibble(parent = character(), child = character())
@@ -113,3 +112,54 @@ grow <- function(tree_T, all_vertices) {
   }
 }
 
+prepareGraphForGabowMyers <- function(w, zero.thresh=0.01) {
+  # input: matrix of cellular prevalences (rows = clusters, columns = samples)
+  # output: tibble of possible edges with columns edge, parent, child
+  graph_G <- constrainedEdges(w, zero.thresh=zero.thresh) %>%
+    filter(possible_edge == TRUE) %>%
+    mutate(parent = as.character(parent)) %>%
+    select(edge, parent, child)
+  return(graph_G)
+}
+
+enumerateSpanningTrees <- function(graph_G) {
+  # all_spanning_trees must be set as an empty list, global variable, before function is called
+  # graph_G must be set as global variable before function is called
+  F_tb <- assign("F_tb", filter(graph_G, parent == "root"), envir = .GlobalEnv)
+  all_vertices <- verticesInGraph(graph_G)
+  tree_T <- tibble(parent = character(), child = character())
+  
+  grow(tree_T, all_vertices)
+  
+  return(all_spanning_trees)
+}
+
+satisfiesSumCondition <- function(edges, w, thresh = 0.1) {
+  # returns TRUE if sum condition is not violated with given threshold (default 0.1)
+  
+  edges$parent <- as.character(edges$parent)
+  all_parents <- unique(edges$parent)
+  
+  for (p in all_parents) {
+    # get parent CCF
+    if (p == "root") {
+      parent_ccf <- rep(1, ncol(w))
+    } else {
+      parent_ccf <- w[as.numeric(p), ]
+    }
+    
+    # get children CCF (sum if more than 1 child)
+    children <- as.numeric(filter(edges, parent == p)$child)
+    if (length(children) > 1) {
+      children_ccf <- colSums(w[children, ])
+    } else {
+      children_ccf <- w[children, ]
+    }
+    
+    diff <- children_ccf - parent_ccf
+    if (any(diff > thresh)) return(FALSE)
+  }
+  
+  # sum condition is never violated, return TRUE
+  return(TRUE)
+}
