@@ -337,6 +337,7 @@ validGraph <- function(am) {
 bfsLong <- function(am.long) {
   # returns vector of nodes in main tree (connected to root) including "root" 
   # starting at root
+  # stops if there is a cycle present in graph
   am.long$parent <- as.character(am.long$parent)
   children <- am.long[(am.long$parent == "root" & am.long$connected == 1), ]$child
   nodes <- c("root", children)
@@ -718,4 +719,32 @@ edgeTibbleToAmLong <- function(edge_tb, root = 0) {
     am_long$connected[which(am_long$edge == temp_edge)] <- 1
   }
   return(am_long)
+}
+
+# getParents <- function(am_long, node, prev_parents = c()) {
+#   temp_parent <- filter(am_long, connected == 1, child == node)$parent
+#   if (temp_parent == "root") {
+#     return(c(prev_parents, "root"))
+#   } else {
+#     return(getParents(am_long, temp_parent, c(prev_parents, temp_parent)))
+#   }
+# }
+
+getBTColumn <- function(am_long, node) {
+  BT_column <- rep(0, length(unique(am_long$child)))
+  path <- getPathFromRoot(node, am_long)
+  BT_column[path] <- 1
+  return(BT_column)
+}
+
+amToBT <- function(am_long) {
+  # returns binary perfect phylogeny matrix
+  # where columns are clones and rows are mutation clusters
+  # clones have the same numeric ID as the last mutation cluster on their path from the root
+  children <- unique(am_long$child)
+  children_num <- sort(as.numeric(children))
+  
+  BT_cols <- sapply(children_num, function(node) getBTColumn(am_long, node))
+  
+  return(BT_cols)
 }
