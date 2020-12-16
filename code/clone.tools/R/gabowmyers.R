@@ -163,3 +163,33 @@ satisfiesSumCondition <- function(edges, w, thresh = 0.1) {
   # sum condition is never violated, return TRUE
   return(TRUE)
 }
+
+filterEdgesBasedOnCCFs <- function(graph_G, w, thresh = 0.2) {
+  check_edges_logical <- apply(graph_G, 1, function(edge) checkEdge(edge, w, thresh))
+  filtered_graph_G <- graph_G[check_edges_logical, ]
+  return(filtered_graph_G)
+}
+
+checkEdge <- function(edge, w, thresh = 0.2) {
+  # returns TRUE if satisfies lineage precedence with given threshold
+  # returns FALSE if violates i.e. child_ccf - parent_ccf > thresh in any sample
+  # edge is in the format c(edge_name, parent, child)
+  
+  # in case of factors
+  p <- as.character(edge[2])
+  c <- as.character(edge[3])
+  
+  if (p == "root") {
+    parent_ccfs <- rep(1, ncol(w))
+  } else {
+    parent_ccfs <- w[as.numeric(p), ]
+  }
+  child_ccfs <- w[as.numeric(c), ]
+  
+  diff <- child_ccfs - parent_ccfs
+  if (any(diff > thresh)) {
+    return(FALSE)
+  } else {
+    return(TRUE)
+  }
+}
