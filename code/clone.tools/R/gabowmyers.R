@@ -193,3 +193,15 @@ checkEdge <- function(edge, w, thresh = 0.2) {
     return(TRUE)
   }
 }
+
+calcTreeSpaceUpperBound <- function(w, zero.thresh = 0.01, 
+                                    lineage.precedence.filter = 0.1) {
+  graph_G_pre <- prepareGraphForGabowMyers(w, zero.thresh = zero.thresh)
+  graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, sim_data$w, thresh = lineage.precedence.filter)
+  num_edges_to_each_child <- graph_G %>% 
+    group_by(child) %>%
+    summarize(n = n()) %>%
+    pull(n)
+  upper_bound <- prod(num_edges_to_each_child)
+  return(upper_bound)
+}
