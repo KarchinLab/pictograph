@@ -161,7 +161,33 @@ calcMassCost <- function(am, mcf_matrix, am_format="long") {
   }
 }
 
+edgesToAmLong <- function(edges) {
+  am_wide <- initEmptyAdmatFromK(length(edges$child))
+  edges[edges$parent == "root", "parent"] <- "0"
+  edges <- edges %>%
+    mutate(parent = as.numeric(parent) + 1,
+           child = as.numeric(child)) %>%
+    select(parent, child)
+  edges <- as.matrix(edges)
+  for (r in 1:nrow(edges)) {
+    am_wide[edges[r,1], edges[r,2]] <- 1
+  }
+  admat <- toLong(am_wide)
+  admat <- reversedEdges(admat) %>%
+    mutate(reversed_connected=reversedConnection(.),
+           bi_directional=NA,
+           root_connected=NA)    
+  admat <- updateGraphElements(admat)
+  return(admat)
+}
+
 calcTreeFitness <- function(admat, cpov, mcf_matrix, am_format = "long", weight_mass = 1, weight_topology = 1, scaling_coeff=5) {
+  # if only edges are given, change into long format
+  if (am_format == "edges") {
+    admat <- edgesToAmLong(admat)
+    am_format <- "long"
+  }
+  
   TC <- calcTopologyCost(admat, cpov, am_format)
   MC <- calcMassCost(admat, mcf_matrix, am_format)
   Z <- weight_topology * TC + weight_mass * MC
