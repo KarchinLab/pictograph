@@ -44,11 +44,14 @@ bfsLong2 <- function(graph_G) {
   return(nodes)
 }
 
-grow <- function(tree_T, all_vertices) {
+grow <- function(tree_T, all_vertices, w, thresh=0.1) {
   
   if (length(verticesInGraph(tree_T)) == length(all_vertices) & nrow(tree_T) == (length(all_vertices)-1)) {
     assign("all_spanning_trees", c(all_spanning_trees, list(tree_T)), envir = .GlobalEnv)
-    #return(tree_T)
+    
+    if (satisfiesSumCondition(tree_T, w, thresh)) {
+      assign("filtered_trees", c(filtered_trees, list(tree_T)), envir = .GlobalEnv)
+    }
     
   } else {
     FF <- tibble(parent = character(), child = character())
@@ -74,7 +77,7 @@ grow <- function(tree_T, all_vertices) {
       assign("F_tb", filter(F_tb, !edge %in% removed_edges$edge), envir = .GlobalEnv)
 
       # recurse
-      grow(tree_T, all_vertices)
+      grow(tree_T, all_vertices, w, thresh)
       tree_L <- all_spanning_trees[[length(all_spanning_trees)]]
       
       # restore F
@@ -122,16 +125,22 @@ prepareGraphForGabowMyers <- function(w, zero.thresh=0.01) {
   return(graph_G)
 }
 
-enumerateSpanningTrees <- function(graph_G) {
+enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.1) {
   # all_spanning_trees must be set as an empty list, global variable, before function is called
   # graph_G must be set as global variable before function is called
+  all_spanning_trees <- assign("all_spanning_trees", list(), envir = .GlobalEnv)
+  filtered_trees <- assign("filtered_trees", list(), envir = .GlobalEnv)
   F_tb <- assign("F_tb", filter(graph_G, parent == "root"), envir = .GlobalEnv)
   all_vertices <- verticesInGraph(graph_G)
   tree_T <- tibble(parent = character(), child = character())
   
-  grow(tree_T, all_vertices)
   
-  return(all_spanning_trees)
+  
+  grow(tree_T, all_vertices, w, sum_filter_thresh)
+  
+  #return(all_spanning_trees)
+#   return(list(all_spanning_trees = all_spanning_trees,
+#               filtered_trees = filtered_trees))
 }
 
 satisfiesSumCondition <- function(edges, w, thresh = 0.1) {
@@ -196,6 +205,7 @@ checkEdge <- function(edge, w, thresh = 0.2) {
 
 calcTreeSpaceUpperBound <- function(w, zero.thresh = 0.01, 
                                     lineage.precedence.filter = 0.1) {
+  # calculates upper bound of tree space given CCF matrix (w)
   graph_G_pre <- prepareGraphForGabowMyers(w, zero.thresh = zero.thresh)
   graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w, thresh = lineage.precedence.filter)
   num_edges_to_each_child <- graph_G %>% 
@@ -204,4 +214,39 @@ calcTreeSpaceUpperBound <- function(w, zero.thresh = 0.01,
     pull(n)
   upper_bound <- prod(num_edges_to_each_child)
   return(upper_bound)
+}
+
+calcTreeSpaceUpperBound2 <- function(edges) {
+  # calculates upper bound of tree space given tibble of edges (rows = edge, parent, child)
+  num_edges_to_each_child <- edges %>% 
+    group_by(child) %>%
+    summarize(n = n()) %>%
+    pull(n)
+  upper_bound <- prod(num_edges_to_each_child)
+  return(upper_bound)
+}
+
+splitGraphG <- function(graph_G, num_trees_per_run = 100000) {
+  # returns list of graph_Gs
+  # figure out which nodes for which to keep edges constant 
+  # each split graph_G should have tree space upper bound < num_trees_per_run 
+  num_edges_per_child <- graph_G %>%
+    group_by(child) %>%
+    summarize(n = n()) %>%
+    arrange(desc(n))
+  nodes_to_hold <- c()
+  for (i in seq_len(nrow(num_edges_per_child))) {
+    upper_bound_per_run <- prod(num_edges_per_child$n[i:nrow(num_edges_per_child)])
+    if (upper_bound_per_run <= num_trees_per_run) break
+    nodes_to_hold <- c(nodes_to_hold, num_edges_per_child$child[i])
+  }
+  
+  common_edges <- filter(graph_G, ! child %in% nodes_to_hold)
+  edges_to_split <- filter(graph_G, child %in% nodes_to_hold) %>%
+    group_by(child) %>%
+    group_split()
+  edges_list <- lapply(edges_to_split, function(x) x$edge) 
+  all_combinations <- expand.grid(edges_list, stringsAsFactors = F)
+  split_graph_Gs <- apply(all_combinations, 1, function(x) rbind(filter(graph_G, edge %in% x), common_edges))
+  return(split_graph_Gs)
 }
