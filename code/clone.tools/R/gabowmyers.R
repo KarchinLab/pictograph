@@ -234,19 +234,26 @@ splitGraphG <- function(graph_G, num_trees_per_run = 100000) {
     group_by(child) %>%
     summarize(n = n()) %>%
     arrange(desc(n))
-  nodes_to_hold <- c()
-  for (i in seq_len(nrow(num_edges_per_child))) {
-    upper_bound_per_run <- prod(num_edges_per_child$n[i:nrow(num_edges_per_child)])
-    if (upper_bound_per_run <= num_trees_per_run) break
-    nodes_to_hold <- c(nodes_to_hold, num_edges_per_child$child[i])
-  }
   
-  common_edges <- filter(graph_G, ! child %in% nodes_to_hold)
-  edges_to_split <- filter(graph_G, child %in% nodes_to_hold) %>%
-    group_by(child) %>%
-    group_split()
-  edges_list <- lapply(edges_to_split, function(x) x$edge) 
-  all_combinations <- expand.grid(edges_list, stringsAsFactors = F)
-  split_graph_Gs <- apply(all_combinations, 1, function(x) rbind(filter(graph_G, edge %in% x), common_edges))
-  return(split_graph_Gs)
+  # split graph_G tree space is larger than num_trees_per_run 
+  if (prod(num_edges_per_child$n) > num_trees_per_run) {
+    nodes_to_hold <- c()
+    for (i in seq_len(nrow(num_edges_per_child))) {
+      upper_bound_per_run <- prod(num_edges_per_child$n[i:nrow(num_edges_per_child)])
+      if (upper_bound_per_run <= num_trees_per_run) break
+      nodes_to_hold <- c(nodes_to_hold, num_edges_per_child$child[i])
+    }
+    
+    common_edges <- filter(graph_G, ! child %in% nodes_to_hold)
+    edges_to_split <- filter(graph_G, child %in% nodes_to_hold) %>%
+      group_by(child) %>%
+      group_split()
+    edges_list <- lapply(edges_to_split, function(x) x$edge) 
+    all_combinations <- expand.grid(edges_list, stringsAsFactors = F)
+    split_graph_Gs <- apply(all_combinations, 1, function(x) rbind(filter(graph_G, edge %in% x), common_edges))
+    return(split_graph_Gs)
+    
+  } else {
+    return(list(graph_G))
+  }
 }
