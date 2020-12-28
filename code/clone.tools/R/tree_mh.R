@@ -177,7 +177,7 @@ calcEachIterMH <- function(filtered_trees, cpov, mcf_matrix, num_iter, am_chain,
   
   for (i in seq_len(num_iter)) {
     # propse new am.long
-    am_star <- edgesToAmLong(filtered_trees[[tree_ind[1]]])
+    am_star <- edgesToAmLong(filtered_trees[[tree_ind[i]]])
     fit_star <- calcTreeFitness(am_star, cpov, mcf_matrix)
     
     # accept or reject proposal
