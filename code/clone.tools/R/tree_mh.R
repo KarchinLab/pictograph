@@ -96,7 +96,8 @@ runTreeMH2 <- function(filtered_trees, w_chain = NULL, mcf_matrix = NULL,
   if (length(filtered_trees) == 1) {
     print("Only one possible tree, so stopping MH and returning single tree")
     results <- list(am_chain = filtered_trees,
-                    score_chain = calcTreeFitness(filtered_trees[[1]], cpov, mcf_matrix))
+                    score_chain = calcTreeFitness(filtered_trees[[1]], cpov, mcf_matrix,
+                                                  am_format = "edges"))
     return(results)
   }
   # initalize chains -----------------------------------------------------------
