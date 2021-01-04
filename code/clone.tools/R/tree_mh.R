@@ -95,7 +95,7 @@ runTreeMH2 <- function(filtered_trees, w_chain = NULL, mcf_matrix = NULL,
   # don't run MH if only 1 possible tree --------------------------------------
   if (length(filtered_trees) == 1) {
     print("Only one possible tree, so stopping MH and returning single tree")
-    results <- list(am_chain = filtered_trees,
+    results <- list(am_chain = list(edgesToAmLong(filtered_trees[[1]])),
                     score_chain = calcTreeFitness(filtered_trees[[1]], cpov, mcf_matrix,
                                                   am_format = "edges"))
     return(results)
