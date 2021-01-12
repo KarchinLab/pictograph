@@ -162,7 +162,7 @@ calcMassCost <- function(am, mcf_matrix, am_format="long") {
 }
 
 edgesToAmLong <- function(edges) {
-  am_wide <- initEmptyAdmatFromK(length(edges$child))
+  am_wide <- initEmptyAdmatFromK(length(unique(edges$child)))
   edges[edges$parent == "root", "parent"] <- "0"
   edges <- edges %>%
     mutate(parent = as.numeric(parent) + 1,
