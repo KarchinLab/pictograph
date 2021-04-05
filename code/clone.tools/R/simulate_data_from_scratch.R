@@ -116,6 +116,66 @@ simDataFromScratch <- function(S, K, varPerClustMode,
   test.data
 }
 
+simDataFromScratch2 <- function(S, K, 
+                                varPerClustMode, 
+                                minVarPerClust, maxVarPerClust, 
+                                varPerClust, 
+                                avg.cov=100,
+                                max.num.root.children,
+                                min.purity = 0.5, max.purity = 0.9) {
+  purity <- samplePurityFromUnif(min.purity = min.purity, max.purity = max.purity, S)
+  rand.am <- generateRandomGraphFromK(K, max.num.root.children)
+  w <- generateRandomCCFsFromGraph(rand.am, S, K, purity)
+  
+  # make sure w is valid (all clusters have distinct CCFs and no all 0's)
+  while(!.isValidW(w)) w <- generateRandomCCFsFromGraph(rand.am, S, K, purity)
+  
+  if (varPerClustMode == "variable") {
+    z <- unlist(mapply(function(clust, numVar) rep(clust, numVar), 
+                       1:K, 
+                       sample(minVarPerClust:maxVarPerClust, K, replace = T)))
+  } else if (varPerClustMode == "constant") {
+    z <- rep(1:K, each = varPerClust)
+  } else stop("mutPerClust must be either variable or constant")
+  
+  I <- length(z)
+  
+  tcn <- matrix(2, nrow=I, ncol=S)
+  m <- matrix(rep(sample(1:2, size = I, replace = T), S), 
+              nrow=I, ncol=S)
+  
+  # variant x sample matrices
+  W <- w[z, ]
+  P <- matrix(rep(purity, each = I), nrow = I, ncol = S)
+  
+  theta <- calcTheta2(m, tcn, W, P)
+  ##
+  ## Simulate altered reads
+  ##
+  n <- replicate(S, rpois(I, avg.cov))
+  y <- matrix(NA, nrow=I, ncol=S)
+  for (i in 1:I) {
+    for (s in 1:S) {
+      if (theta[i,s] == 0) {
+        y[i, s] <- 0
+      } else {
+        y[i, s] <- rbinom(1, n[i, s], theta[i,s])
+      }
+    }
+  }
+  
+  colnames(w) <- colnames(m) <- paste0("sample", 1:S)
+  test.data <- list("I" = I, "S" = S, "K" = K, 
+                    "y" = y, "n" = n,
+                    "m" = m, "tcn" = tcn,
+                    z=z,
+                    w=w,
+                    theta=theta,
+                    purity=purity,
+                    am.long=rand.am)
+  test.data
+}
+
 inputDataFromSim <- function(sim.data) {
   sim.data[c("y", "n", "purity", "tcn", "m", "I", "S")]
 }
