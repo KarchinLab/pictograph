@@ -1,0 +1,87 @@
+---
+title: "pictograph-example"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{pictograph-example}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+#library(clone.tools)
+library(tidyverse)
+devtools::load_all()
+```
+
+```{r cluster}
+input_data <- list(y = sim_data_1$y,
+                   n = sim_data_1$n,
+                   purity = sim_data_1$purity,
+                   tcn = sim_data_1$tcn,
+                   m = sim_data_1$m,
+                   I = sim_data_1$I,
+                   S = sim_data_1$S)
+
+chains_w_z <- clusterSep(input_data,
+                         n.iter = 1000, n.burn = 100, thin = 1, mc.cores = 2,
+                         inits = list(".RNG.name" = "base::Wichmann-Hill",
+                                      ".RNG.seed" = 123),
+                         params = c("z", "w"),
+                         max_K = 7)
+```
+
+
+```{r CCF-estimates}
+w_chain <- chains_w_z[[1]]
+w_mat <- get.map.w(w_chain)
+w_mat
+```
+
+## Tree inference 
+
+We can then use the mutation cluster CCF estimates for tree inference. We first determine the possible edges by applying sample presence and lineage precedence filters. 
+
+```{r possible-edges}
+# determine possible edges 
+graph_G_pre <- prepareGraphForGabowMyers(w_mat, zero.thresh = 0.01)
+graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
+```
+
+Next, we enumerate this constrained tree space, and apply a filtered based on the sum condition. Here we use a threshold of 0.2 for the maximum allowed violation of the sum condition. 
+```{r enumerate-trees}
+# enumerate tree space
+enumerateSpanningTrees(graph_G, w_mat, sum_filter_thresh=0.2)
+```
+
+All spanning trees given by the possible edges are stored in `all_spanning_trees` and those passing the sum condition filter are stored in `filtered_trees`. 
+```{r tree-space}
+length(all_spanning_trees)
+head(all_spanning_trees)
+
+length(filtered_trees)
+```
+
+We then calculate a fitness score for all the trees that have passed our filtering, and return the highest scoring tree. 
+```{r tree-scoring}
+# calculate SCHISM fitness score for all trees
+mcf_stats <- summarizeWChain(w_chain)
+cpov <- create.cpov(mcf_stats)
+schism_scores <- sapply(filtered_trees, 
+                        function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges"))
+
+# highest scoring tree(s)
+max(schism_scores)
+max_score_ind <- which.max(schism_scores)
+best_tree <- filtered_trees[[max_score_ind]]
+plotGraph(edgesToAmLong(best_tree))
+```
+
+
+
