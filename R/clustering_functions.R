@@ -27,7 +27,7 @@ runClusteringForRangeK <- function(data, kToTest,
                                    n.adapt=1000, n.burn=1000,
                                    mc.cores=8) {
   # jags files stored in clone.tools
-  extdir <- system.file("extdata", package="clone.tools")
+  extdir <- system.file("extdata", package="pictograph")
   jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
   jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
   

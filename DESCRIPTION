@@ -1,4 +1,4 @@
-Package: clone.tools
+Package: pictograph
 Title: Tools for modeling clonal evolution of a cancer
 Version: 0.0.2
 Authors@R: 

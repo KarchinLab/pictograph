@@ -47,7 +47,7 @@ runMCMCForABox <- function(box,
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
   
-  extdir <- system.file("extdata", package="clone.tools")
+  extdir <- system.file("extdata", package="pictograph")
   if (box$I == 1) {
     jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1_I1.jags")
     box_input_data$I <- NULL
