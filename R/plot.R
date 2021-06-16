@@ -9,7 +9,7 @@ get.parameter.chain <- function(param, chains) {
   chains[grep(paste0(param, "\\["), chains$Parameter), ]
 }
 
-plot.variant.z <- function(z_chain) {
+plotClusterAssignmentProb <- function(z_chain) {
   I <- length(unique(z_chain$Parameter))
   K <- max(unique(z_chain$value))
   num_iter <- max(z_chain$Iteration)
@@ -33,5 +33,30 @@ plot.variant.z <- function(z_chain) {
                  aes(x=Parameter, xend=Parameter,
                      y=z1, yend=z2),
                  color="black", linetype=2) +
-    geom_point()
+    geom_point() +
+    theme(panel.grid.minor = element_blank())
+  z.plot
+}
+
+plotDensityCCF <- function(w_chain) {
+  w_chain <- w_chain %>% 
+    mutate(Cluster = as.numeric(gsub("w\\[", "", sapply(w_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
+    mutate(Sample = gsub("\\]", "", sapply(w_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][2])))
+  K <- max(as.numeric(w_chain$Cluster))
+  S <- max(as.numeric(w_chain$Sample))
+  ggplot(w_chain, aes(x = value)) +
+    geom_density() +
+    facet_wrap(~Cluster + Sample, ncol = S, scales = "free_y") +
+    theme_light() +
+    ylab("Density") + xlab("CCF") + 
+    theme(panel.grid.major = element_blank(), 
+          panel.grid.minor = element_blank(),
+          strip.background = element_blank(),
+          #strip.text = element_text(colour = 'black'),
+          strip.text.x = element_blank(),
+          #axis.text.x=element_blank(),
+          #axis.ticks.x=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks.y=element_blank()) +
+    scale_x_continuous(breaks=c(0, 0.5, 1))
 }
