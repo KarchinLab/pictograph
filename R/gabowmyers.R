@@ -44,7 +44,7 @@ bfsLong2 <- function(graph_G) {
   return(nodes)
 }
 
-grow <- function(tree_T, all_vertices, w, thresh=0.1) {
+grow <- function(tree_T, all_vertices, w, thresh=0.2) {
   
   if (length(verticesInGraph(tree_T)) == length(all_vertices) & nrow(tree_T) == (length(all_vertices)-1)) {
     assign("all_spanning_trees", c(all_spanning_trees, list(tree_T)), envir = .GlobalEnv)
@@ -115,9 +115,13 @@ grow <- function(tree_T, all_vertices, w, thresh=0.1) {
   }
 }
 
+#' Create tibble of possible edges from CCF values based on sample-presence
+#' 
+#' @export
+#' @param w matrix of CCF values (rows = clusters, columns = samples)
+#' @param zero.thresh lower CCF threshold for consider a mutation to be present
+#' @return graph_G tibble of possible edges with columns edge, parent, child
 prepareGraphForGabowMyers <- function(w, zero.thresh=0.01) {
-  # input: matrix of cellular prevalences (rows = clusters, columns = samples)
-  # output: tibble of possible edges with columns edge, parent, child
   graph_G <- constrainedEdges(w, zero.thresh=zero.thresh) %>%
     filter(possible_edge == TRUE) %>%
     mutate(parent = as.character(parent)) %>%
@@ -125,7 +129,13 @@ prepareGraphForGabowMyers <- function(w, zero.thresh=0.01) {
   return(graph_G)
 }
 
-enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.1) {
+#' Enumerate all spanning trees and filter based on Sum Condition
+#' 
+#' @export
+#' @param graph_G tibble of possible edges with columns edge, parent, child
+#' @param w matrix of CCF values (rows = clusters, columns = samples)
+#' @param sum_filter_thresh thresh maximum allowed violation of Sum Condition (default = 0.2)
+enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.2) {
   # all_spanning_trees must be set as an empty list, global variable, before function is called
   # graph_G must be set as global variable before function is called
   all_spanning_trees <- assign("all_spanning_trees", list(), envir = .GlobalEnv)
@@ -134,17 +144,14 @@ enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.1) {
   all_vertices <- verticesInGraph(graph_G)
   tree_T <- tibble(parent = character(), child = character())
   
-  
-  
   grow(tree_T, all_vertices, w, sum_filter_thresh)
   
-  #return(all_spanning_trees)
 #   return(list(all_spanning_trees = all_spanning_trees,
 #               filtered_trees = filtered_trees))
 }
 
-satisfiesSumCondition <- function(edges, w, thresh = 0.1) {
-  # returns TRUE if sum condition is not violated with given threshold (default 0.1)
+satisfiesSumCondition <- function(edges, w, thresh = 0.2) {
+  # returns TRUE if sum condition is not violated with given threshold (default 0.2)
   
   edges$parent <- as.character(edges$parent)
   all_parents <- unique(edges$parent)
@@ -173,7 +180,13 @@ satisfiesSumCondition <- function(edges, w, thresh = 0.1) {
   return(TRUE)
 }
 
-filterEdgesBasedOnCCFs <- function(graph_G, w, thresh = 0.2) {
+#' Filter possible edges based on lineage precedence 
+#' 
+#' @export
+#' @param graph_G tibble of possible edges with columns edge, parent, child
+#' @param w matrix of CCF values (rows = clusters, columns = samples)
+#' @param thresh maximum allowed violation of lineage precedence (default = 0.1)
+filterEdgesBasedOnCCFs <- function(graph_G, w, thresh = 0.1) {
   check_edges_logical <- apply(graph_G, 1, function(edge) checkEdge(edge, w, thresh))
   filtered_graph_G <- graph_G[check_edges_logical, ]
   return(filtered_graph_G)
@@ -201,29 +214,6 @@ checkEdge <- function(edge, w, thresh = 0.2) {
   } else {
     return(TRUE)
   }
-}
-
-calcTreeSpaceUpperBound <- function(w, zero.thresh = 0.01, 
-                                    lineage.precedence.filter = 0.1) {
-  # calculates upper bound of tree space given CCF matrix (w)
-  graph_G_pre <- prepareGraphForGabowMyers(w, zero.thresh = zero.thresh)
-  graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w, thresh = lineage.precedence.filter)
-  num_edges_to_each_child <- graph_G %>% 
-    group_by(child) %>%
-    summarize(n = n()) %>%
-    pull(n)
-  upper_bound <- prod(num_edges_to_each_child)
-  return(upper_bound)
-}
-
-calcTreeSpaceUpperBound2 <- function(edges) {
-  # calculates upper bound of tree space given tibble of edges (rows = edge, parent, child)
-  num_edges_to_each_child <- edges %>% 
-    group_by(child) %>%
-    summarize(n = n()) %>%
-    pull(n)
-  upper_bound <- prod(num_edges_to_each_child)
-  return(upper_bound)
 }
 
 splitGraphG <- function(graph_G, num_trees_per_run = 100000) {

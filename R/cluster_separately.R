@@ -88,8 +88,12 @@ runMCMCForABox <- function(box,
   
 }
 
+#' Run MCMC to cluster mutations and estimate CCFs
+#' 
+#' @export
 #' @importFrom ggmcmc ggs
-# opt_K = strategy for choosing optimum K (min_BIC or elbow1)
+#' @param input_data list of input data objects; 
+#' @param opt_K strategy for choosing optimum K ("min_BIC" or "elbow1")
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
@@ -152,7 +156,7 @@ clusterSep <- function(input_data,
         mutate(Parameter = as.character(Parameter))
       temp_w_old <- get.parameter.chain("w", ggs(best_samps_list)) %>%
         mutate(Parameter = as.character(Parameter))
-      map_z_old <- get.map.z(temp_z_old)
+      map_z_old <- estimateClusterAssignments(temp_z_old)
       
       
       # if there are empty clusters, remove empty ones and relabel clusters 

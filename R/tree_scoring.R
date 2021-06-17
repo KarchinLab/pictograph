@@ -225,3 +225,16 @@ satisfiesCCFSumProperties <- function(am_long, mcf_matrix, threshold = 0.2) {
   
   return(TRUE)
 }
+
+#' Calculate SCHISM fitness scores for trees
+#' 
+#' @export
+#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
+#' @param trees list of tibbles, where each tibble contains edges of a tree with columns edge, parent, child
+calcTreeScores <- function(w_chain, trees) {
+  mcf_stats <- summarizeWChain(w_chain)
+  cpov <- create.cpov(mcf_stats)
+  schism_scores <- sapply(trees, 
+                          function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges"))
+  return(schism_scores)
+}

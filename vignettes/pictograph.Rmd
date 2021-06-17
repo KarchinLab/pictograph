@@ -16,8 +16,7 @@ knitr::opts_chunk$set(
 
 ```{r setup, include = FALSE}
 library(tidyverse)
-devtools::load_all()
-#library(pictograph)
+library(pictograph)
 ```
 
 ## 1. Introduction
@@ -31,6 +30,7 @@ The input data are organized as a list of 7 objects. Variant read count (y), dep
 Here we use a toy example with 3 tumor samples and 42 mutations. This data was simulated from a true tree containing 5 mutation clusters. 
 
 ```{r input_data}
+data("sim_data_1")
 input_data <- list(y = sim_data_1$y,
                    n = sim_data_1$n,
                    purity = sim_data_1$purity,
@@ -55,15 +55,16 @@ PICTograph samples the posterior distribution of cluster CCFs. We can visualize 
 ```{r CCF-estimates}
 w_chain <- chains_w_z[[1]]
 plotDensityCCF(w_chain)
-w_mat <- get.map.w(w_chain)
+w_mat <- estimateCCFs(w_chain)
 w_mat
 ```
 
-We can also visualize the posterior probabilities of mutation cluster assignments. In this toy example, there is high concordance of the cluster assignments of mutations across the MCMC chain.  
+We can also visualize the posterior probabilities of mutation cluster assignments and determine the most probable cluster assignments. In this toy example, there is high concordance of the cluster assignments of mutations across the MCMC chain.  
 
 ```{r cluster-assignments, fig.height = 3, fig.width = 7.5}
 z_chain <- chains_w_z[[2]]
 plotClusterAssignmentProb(z_chain)
+estimateClusterAssignments(z_chain)
 ```
 
 ## 4. Tree inference 
@@ -75,12 +76,12 @@ graph_G_pre <- prepareGraphForGabowMyers(w_mat, zero.thresh = 0.01)
 graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
 ```
 
-Next, we enumerate this constrained tree space, and apply a filtered based on the sum condition. Here we use a threshold of 0.2 for the maximum allowed violation of the sum condition. 
+Next, we enumerate this constrained tree space, and apply a filtered based on the Sum Condition. Here we use a threshold of 0.2 for the maximum allowed violation of the Sum Condition. 
 ```{r enumerate-trees}
 enumerateSpanningTrees(graph_G, w_mat, sum_filter_thresh=0.2)
 ```
 
-All spanning trees given by the possible edges are stored in `all_spanning_trees` and those passing the sum condition filter are stored in `filtered_trees`. 
+All spanning trees given by the possible edges are stored in `all_spanning_trees` and those passing the Sum Condition filter are stored in `filtered_trees`. 
 ```{r tree-space}
 length(all_spanning_trees)
 length(filtered_trees)
@@ -90,24 +91,17 @@ filtered_trees
 We then calculate a fitness score for all the trees that have passed our filtering and identify the highest scoring tree. 
 ```{r tree-scoring}
 # calculate SCHISM fitness score for all trees
-mcf_stats <- summarizeWChain(w_chain)
-cpov <- create.cpov(mcf_stats)
-schism_scores <- sapply(filtered_trees, 
-                        function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges"))
-
+scores <- calcTreeScores(w_chain, filtered_trees)
+scores
 # highest scoring tree
-max(schism_scores)
-max_score_ind <- which.max(schism_scores)
-best_tree <- filtered_trees[[max_score_ind]]
+best_tree <- filtered_trees[[which.max(scores)]]
 # plot tree
-plotGraph(edgesToAmLong(best_tree))
+plotTree(best_tree)
 ```
 
 In this toy example, there is only one tree with the maximum score. In some cases, multiple trees will share the maximum score. We can plot an ensemble tree to visualize the evolutionary relationships (edges) that are shared among multiple trees. In the ensemble tree, edges are weighted by the number of trees in which they are represented. To illustrate this plotting function, here we plot an ensemble of the two trees that pass filtering. The solid black edges represent those supported in both trees.  
 
 ```{r ensemble-tree}
-am_chain <- lapply(filtered_trees, edgesToAmLong)
-post_am <- getPosteriorAmLong(am_chain)
-plotPosteriorAmLong(post_am)
+plotEnsembleTree(filtered_trees)
 ```
 

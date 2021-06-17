@@ -192,9 +192,13 @@ sample.w <- function(w.chain, K) {
   matrix(w.sample$value, nrow = K, byrow = T)
 }
 
-get.map.z <- function(z.chain) {
-  it <- max(z.chain$Iteration)
-  mcmc_z <- z.chain %>%
+#' Determine most probable mutation cluster assignments by taking those with highest posterior probability
+#' 
+#' @export
+#' @param z_chain MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}
+estimateClusterAssignments <- function(z_chain) {
+  it <- max(z_chain$Iteration)
+  mcmc_z <- z_chain %>%
     group_by(Parameter, value) %>%
     summarize(n=n(),
               maxiter=it) %>%
@@ -203,14 +207,19 @@ get.map.z <- function(z.chain) {
   map_z <- mcmc_z %>%
     group_by(Parameter) %>%
     summarize(value=value[probability==max(probability)])
-  map_z
+  return(map_z)
 }
 
-get.map.w <- function(w.chain) {
-  S <- numberSamples(w.chain)
-  K <- numberClusters(w.chain)
+#' Determine the most probable cluster CCF values by taking the mode of the posterior distributions
+#' 
+#' @export
+#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
+#' @return matrix of estimated cluster CCFs
+estimateCCFs <- function(w_chain) {
+  S <- numberSamples(w_chain)
+  K <- numberClusters(w_chain)
   # density plot 
-  w.dens <- ggplot(w.chain, aes(x = value)) +
+  w.dens <- ggplot(w_chain, aes(x = value)) +
     geom_density() +
     facet_wrap(~Parameter, ncol = S, scales = "free_y") +
     theme_light()
@@ -221,11 +230,11 @@ get.map.w <- function(w.chain) {
     group_by(PANEL) %>%
     summarize(value = x[max(y) == y])
   w.map <- w.map %>%
-    mutate(Parameter = unique(w.chain$Parameter),
+    mutate(Parameter = unique(w_chain$Parameter),
            value_rounded = round(value, 2))
   # return w matrix
   w.map.matrix <- matrix(w.map$value_rounded, K, S, byrow=TRUE)
-  w.map.matrix
+  return(w.map.matrix)
 }
 
 # function to check if clustering respects sample presence 

@@ -9,6 +9,10 @@ get.parameter.chain <- function(param, chains) {
   chains[grep(paste0(param, "\\["), chains$Parameter), ]
 }
 
+#' Plot probabilities of mutation cluster assignments
+#' 
+#' @export
+#' @param z_chain MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}
 plotClusterAssignmentProb <- function(z_chain) {
   I <- length(unique(z_chain$Parameter))
   K <- max(unique(z_chain$value))
@@ -38,6 +42,10 @@ plotClusterAssignmentProb <- function(z_chain) {
   z.plot
 }
 
+#' Plot cluster CCF posterior distributions
+#' 
+#' @export
+#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 plotDensityCCF <- function(w_chain) {
   w_chain <- w_chain %>% 
     mutate(Cluster = as.numeric(gsub("w\\[", "", sapply(w_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
@@ -59,4 +67,22 @@ plotDensityCCF <- function(w_chain) {
           axis.text.y=element_blank(),
           axis.ticks.y=element_blank()) +
     scale_x_continuous(breaks=c(0, 0.5, 1))
+}
+
+#' Plot single tree 
+#' 
+#' @export
+#' @param edges tibble of edges with columns edge, parent, child
+plotTree <- function(edges) {
+  plotGraph(edgesToAmLong(edges))
+}
+
+#' Plot ensemble tree
+#' 
+#' @export
+#' @param trees list of tibbles of edges, each with columns edge, parent, child
+plotEnsembleTree <- function(trees) {
+  am_chain <- lapply(trees, edgesToAmLong)
+  post_am <- getPosteriorAmLong(am_chain)
+  plotPosteriorAmLong(post_am)
 }

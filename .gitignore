@@ -7,3 +7,5 @@
 cluster_first_schism_scoring_files/
 *.RData
 code/dag_likelihood_files
+/doc/
+/Meta/
