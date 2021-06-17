@@ -12,6 +12,7 @@ get.parameter.chain <- function(param, chains) {
 #' Plot probabilities of mutation cluster assignments
 #' 
 #' @export
+#' @import tidyverse
 #' @param z_chain MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}
 plotClusterAssignmentProb <- function(z_chain) {
   I <- length(unique(z_chain$Parameter))
@@ -45,6 +46,7 @@ plotClusterAssignmentProb <- function(z_chain) {
 #' Plot cluster CCF posterior distributions
 #' 
 #' @export
+#' @import tidyverse
 #' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 plotDensityCCF <- function(w_chain) {
   w_chain <- w_chain %>% 
@@ -73,6 +75,7 @@ plotDensityCCF <- function(w_chain) {
 #' 
 #' @export
 #' @param edges tibble of edges with columns edge, parent, child
+#' @import tidyverse
 plotTree <- function(edges) {
   plotGraph(edgesToAmLong(edges))
 }
@@ -81,6 +84,7 @@ plotTree <- function(edges) {
 #' 
 #' @export
 #' @param trees list of tibbles of edges, each with columns edge, parent, child
+#' @import tidyverse
 plotEnsembleTree <- function(trees) {
   am_chain <- lapply(trees, edgesToAmLong)
   post_am <- getPosteriorAmLong(am_chain)
