@@ -119,6 +119,7 @@ grow <- function(tree_T, all_vertices, w, thresh=0.2) {
 #' 
 #' @export
 #' @import tidyverse
+#' @importFrom tidyr pivot_longer unite
 #' @param w matrix of CCF values (rows = clusters, columns = samples)
 #' @param zero.thresh lower CCF threshold for consider a mutation to be present
 #' @return graph_G tibble of possible edges with columns edge, parent, child

@@ -12,7 +12,7 @@ get.parameter.chain <- function(param, chains) {
 #' Plot probabilities of mutation cluster assignments
 #' 
 #' @export
-#' @import tidyverse
+#' @import ggplot2
 #' @param z_chain MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}
 plotClusterAssignmentProb <- function(z_chain) {
   I <- length(unique(z_chain$Parameter))
@@ -46,6 +46,7 @@ plotClusterAssignmentProb <- function(z_chain) {
 #' Plot cluster CCF posterior distributions
 #' 
 #' @export
+#' @importFrom ggplot2 ggplot
 #' @import tidyverse
 #' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 plotDensityCCF <- function(w_chain) {
@@ -54,21 +55,23 @@ plotDensityCCF <- function(w_chain) {
     mutate(Sample = gsub("\\]", "", sapply(w_chain$Parameter, function(x) strsplit(as.character(x), ",")[[1]][2])))
   K <- max(as.numeric(w_chain$Cluster))
   S <- max(as.numeric(w_chain$Sample))
-  ggplot(w_chain, aes(x = value)) +
-    geom_density() +
-    facet_wrap(~Cluster + Sample, ncol = S, scales = "free_y") +
-    theme_light() +
-    ylab("Density") + xlab("CCF") + 
-    theme(panel.grid.major = element_blank(), 
-          panel.grid.minor = element_blank(),
-          strip.background = element_blank(),
-          #strip.text = element_text(colour = 'black'),
-          strip.text.x = element_blank(),
-          #axis.text.x=element_blank(),
-          #axis.ticks.x=element_blank(),
-          axis.text.y=element_blank(),
-          axis.ticks.y=element_blank()) +
-    scale_x_continuous(breaks=c(0, 0.5, 1))
+  suppressWarnings(print(
+    ggplot(w_chain, aes(x = value)) +
+      geom_density() +
+      facet_wrap(~Cluster + Sample, ncol = S, scales = "free_y") +
+      theme_light() +
+      ylab("Density") + xlab("CCF") + 
+      theme(panel.grid.major = element_blank(), 
+            panel.grid.minor = element_blank(),
+            strip.background = element_blank(),
+            #strip.text = element_text(colour = 'black'),
+            strip.text.x = element_blank(),
+            #axis.text.x=element_blank(),
+            #axis.ticks.x=element_blank(),
+            axis.text.y=element_blank(),
+            axis.ticks.y=element_blank()) +
+      scale_x_continuous(breaks=c(0, 0.5, 1))
+  ))
 }
 
 #' Plot single tree 
@@ -76,6 +79,7 @@ plotDensityCCF <- function(w_chain) {
 #' @export
 #' @param edges tibble of edges with columns edge, parent, child
 #' @import tidyverse
+#' @import igraph
 plotTree <- function(edges) {
   plotGraph(edgesToAmLong(edges))
 }
@@ -85,6 +89,7 @@ plotTree <- function(edges) {
 #' @export
 #' @param trees list of tibbles of edges, each with columns edge, parent, child
 #' @import tidyverse
+#' @import igraph
 plotEnsembleTree <- function(trees) {
   am_chain <- lapply(trees, edgesToAmLong)
   post_am <- getPosteriorAmLong(am_chain)
