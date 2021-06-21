@@ -118,7 +118,9 @@ grow <- function(tree_T, all_vertices, w, thresh=0.2) {
 #' Create tibble of possible edges from CCF values based on sample-presence
 #' 
 #' @export
-#' @import tidyverse
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
 #' @importFrom tidyr pivot_longer unite
 #' @param w matrix of CCF values (rows = clusters, columns = samples)
 #' @param zero.thresh lower CCF threshold for consider a mutation to be present
@@ -134,7 +136,9 @@ prepareGraphForGabowMyers <- function(w, zero.thresh=0.01) {
 #' Enumerate all spanning trees and filter based on Sum Condition
 #' 
 #' @export
-#' @import tidyverse
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
 #' @param graph_G tibble of possible edges with columns edge, parent, child
 #' @param w matrix of CCF values (rows = clusters, columns = samples)
 #' @param sum_filter_thresh thresh maximum allowed violation of Sum Condition (default = 0.2)
@@ -186,7 +190,9 @@ satisfiesSumCondition <- function(edges, w, thresh = 0.2) {
 #' Filter possible edges based on lineage precedence 
 #' 
 #' @export
-#' @import tidyverse
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
 #' @param graph_G tibble of possible edges with columns edge, parent, child
 #' @param w matrix of CCF values (rows = clusters, columns = samples)
 #' @param thresh maximum allowed violation of lineage precedence (default = 0.1)

@@ -288,7 +288,7 @@ plot_ppd <- function(samps, test.data, K) {
       ggtitle(paste0("K = ", K))
 }
 
-#' @export
+
 simulateVAF <- function(mcf, nvarClust, avg_depth=100, sd_depth=20){
     nClust <- nrow(mcf)
     nSamp <- ncol(mcf)
@@ -323,7 +323,6 @@ simulateVAF <- function(mcf, nvarClust, avg_depth=100, sd_depth=20){
 }
 
 
-#' @export
 listJagInputs <- function(dat){
     w <- group_by(dat, cluster, sample) %>%
         summarize(mcf=unique(mcf)) %>%

@@ -3,9 +3,12 @@
 #' @docType package
 #' @name clone.tools
 #' @import methods
-#' @import tidyverse
 #' @import dplyr
 #' @import readr
 #' @import magrittr
-#' @import tidyverse
+#' @import rjags
+#' @import tidyr
+#' @import ggplot2
+#' @import ggmcmc
+#' @import igraph
 NULL

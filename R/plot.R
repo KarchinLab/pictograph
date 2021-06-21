@@ -46,8 +46,10 @@ plotClusterAssignmentProb <- function(z_chain) {
 #' Plot cluster CCF posterior distributions
 #' 
 #' @export
-#' @importFrom ggplot2 ggplot
-#' @import tidyverse
+#' @import ggplot2
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
 #' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 plotDensityCCF <- function(w_chain) {
   w_chain <- w_chain %>% 
@@ -78,7 +80,10 @@ plotDensityCCF <- function(w_chain) {
 #' 
 #' @export
 #' @param edges tibble of edges with columns edge, parent, child
-#' @import tidyverse
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
+#' @import ggplot2
 #' @import igraph
 plotTree <- function(edges) {
   plotGraph(edgesToAmLong(edges))
@@ -88,7 +93,10 @@ plotTree <- function(edges) {
 #' 
 #' @export
 #' @param trees list of tibbles of edges, each with columns edge, parent, child
-#' @import tidyverse
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
+#' @import ggplot2
 #' @import igraph
 plotEnsembleTree <- function(trees) {
   am_chain <- lapply(trees, edgesToAmLong)
