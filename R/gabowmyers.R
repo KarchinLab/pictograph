@@ -215,7 +215,7 @@ enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.2) {
   # all_spanning_trees must be set as an empty list, global variable, before function is called
   # graph_G must be set as global variable before function is called
   all_spanning_trees <- assign("all_spanning_trees", list(), envir = .GlobalEnv)
-  #filtered_trees <- assign("filtered_trees", list(), envir = .GlobalEnv)
+  filtered_trees <- assign("filtered_trees", list(), envir = .GlobalEnv)
   F_tb <- assign("F_tb", filter(graph_G, parent == "root"), envir = .GlobalEnv)
   all_vertices <- verticesInGraph(graph_G)
   tree_T <- tibble(parent = character(), child = character())
