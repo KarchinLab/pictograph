@@ -1,0 +1,106 @@
+---
+title: "PICTograph"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{PICTograph}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup, include = FALSE}
+library(pictograph)
+```
+
+## 1. Introduction
+
+This tutorial walks through how to run PICTograph on a toy example. PICTograph infers the clonal evolution of tumors from multi-region sequencing data. It models uncertainty in assigning mutations to subclones using a Bayesian hierarchical model and reduces the space of possible evolutionary trees by using constraints based on principles of sample-presence, lineage precedence, and Sum Condition. The inputs to PICTograph are variant read counts of single nucleotide variants (SNVs), sequencing depth of mutation loci, number of mutant alleles (multiplicity), DNA copy number of the tumor genome containing the mutation, and the tumor purity of each sample. PICTograph summarizes the posterior distributions of the mutation cluster assignments and the cancer cell fractions (CCF) for each cluster by the mode. The estimates of cluster CCFs are then used to determine the most probable trees. Multiple trees that share the same score can be summarized as an ensemble tree, where edges are weighted by their concordance among constituent trees in the ensemble. 
+
+## 2. Input data
+
+The input data are organized as a list of 7 objects. Variant read count (y), depth (n), total copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.
+
+Here we use a toy example with 3 tumor samples and 42 mutations. This data was simulated from a true tree containing 5 mutation clusters. 
+
+```{r input_data}
+data("sim_data_1")
+input_data <- list(y = sim_data_1$y,
+                   n = sim_data_1$n,
+                   purity = sim_data_1$purity,
+                   tcn = sim_data_1$tcn,
+                   m = sim_data_1$m,
+                   I = sim_data_1$I,
+                   S = sim_data_1$S)
+```
+
+## 3. Clustering mutations and estimating CCFs
+
+The first step of evolutionary analysis is clustering mutations and estimating their CCFs. In toy example, we run a short MCMC chain with only 1000 iterations (`n.iter`), burn-in of 100 (`n.burn`), and no thinning (`thin`). In practice, we recommend running the MCMC for longer e.g. 10,000 iterations, burn-in of 1000, and thinning by 10. PICTograph separates mutations into sets by sample-presence patterns, and clusters mutations separately within each set. We can set the maximum number of clusters to evaluate with `max_K`.
+
+```{r cluster}
+chains_w_z <- clusterSep(input_data,
+                         n.iter = 1000, n.burn = 100, thin = 1,
+                         max_K = 5)
+```
+
+PICTograph samples the posterior distribution of cluster CCFs. We can visualize the posterior distributions and use the mode as an estimate. The plot facets are organized with samples as columns and clusters as rows. 
+
+```{r CCF-estimates}
+w_chain <- chains_w_z[[1]]
+plotDensityCCF(w_chain)
+w_mat <- estimateCCFs(w_chain)
+w_mat
+```
+
+We can also visualize the posterior probabilities of mutation cluster assignments and determine the most probable cluster assignments. In this toy example, there is high concordance of the cluster assignments of mutations across the MCMC chain.  
+
+```{r cluster-assignments, fig.height = 3, fig.width = 7.5}
+z_chain <- chains_w_z[[2]]
+plotClusterAssignmentProb(z_chain)
+estimateClusterAssignments(z_chain)
+```
+
+## 4. Tree inference 
+
+We can then use the mutation cluster CCF estimates for tree inference. We first determine the possible edges by applying sample presence and lineage precedence filters. Note: the filtered edges must be in an object named `graph_G`. 
+
+```{r possible-edges}
+graph_G_pre <- prepareGraphForGabowMyers(w_mat, zero.thresh = 0.01)
+graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
+```
+
+Next, we enumerate this constrained tree space, and apply a filtered based on the Sum Condition. Here we use a threshold of 0.2 for the maximum allowed violation of the Sum Condition. 
+```{r enumerate-trees}
+enumerateSpanningTrees(graph_G, w_mat, sum_filter_thresh=0.2)
+```
+
+All spanning trees given by the possible edges are stored in `all_spanning_trees` and those passing the Sum Condition filter are stored in `filtered_trees`. 
+```{r tree-space}
+length(all_spanning_trees)
+length(filtered_trees)
+filtered_trees
+```
+
+We then calculate a fitness score for all the trees that have passed our filtering and identify the highest scoring tree. 
+```{r tree-scoring}
+# calculate SCHISM fitness score for all trees
+scores <- calcTreeScores(w_chain, filtered_trees)
+scores
+# highest scoring tree
+best_tree <- filtered_trees[[which.max(scores)]]
+# plot tree
+plotTree(best_tree)
+```
+
+In this toy example, there is only one tree with the maximum score. In some cases, multiple trees will share the maximum score. We can plot an ensemble tree to visualize the evolutionary relationships (edges) that are shared among multiple trees. In the ensemble tree, edges are weighted by the number of trees in which they are represented. To illustrate this plotting function, here we plot an ensemble of the two trees that pass filtering. The solid black edges represent those supported in both trees.  
+
+```{r ensemble-tree}
+plotEnsembleTree(filtered_trees)
+```
+

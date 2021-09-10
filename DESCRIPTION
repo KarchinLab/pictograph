@@ -1,0 +1,27 @@
+Package: pictograph
+Title: Tools for modeling clonal evolution of a cancer
+Version: 0.0.2
+Authors@R: 
+    person(given = "Lily",
+           family = "Zheng",
+           role = c("aut", "cre"),
+           email = "lily@jhu.edu",
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: Implements a Bayesian models to sample evolutionary clone trees
+License: Artistic-2.0
+Encoding: UTF-8
+LazyData: true
+Suggests: 
+    testthat,
+    knitr,
+    rmarkdown
+RoxygenNote: 7.1.1
+VignetteBuilder: knitr
+Imports: 
+    igraph,
+    ggplot2,
+    tidyr,
+    dplyr,
+    rjags,
+    ggmcmc,
+    stringr
