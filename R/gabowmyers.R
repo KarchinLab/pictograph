@@ -44,14 +44,14 @@ bfsLong2 <- function(graph_G) {
   return(nodes)
 }
 
-grow <- function(tree_T, all_vertices, w, thresh=0.2) {
+grow <- function(tree_T, all_vertices, w, sum_thresh=0.2) {
   
   if (length(verticesInGraph(tree_T)) == length(all_vertices) & nrow(tree_T) == (length(all_vertices)-1)) {
     assign("all_spanning_trees", c(all_spanning_trees, list(tree_T)), envir = .GlobalEnv)
     
-    if (satisfiesSumCondition(tree_T, w, thresh)) {
-      assign("filtered_trees", c(filtered_trees, list(tree_T)), envir = .GlobalEnv)
-    }
+    # if (satisfiesSumCondition(tree_T, w, sum_thresh)) {
+    #   assign("filtered_trees", c(filtered_trees, list(tree_T)), envir = .GlobalEnv)
+    # }
     
   } else {
     FF <- tibble(parent = character(), child = character())
@@ -64,32 +64,35 @@ grow <- function(tree_T, all_vertices, w, thresh=0.2) {
       v <- edge_e$child
       tree_T <- rbind(tree_T, edge_e)
       
-      # update F
-      ## push each edge (v,w), w not in T onto F
-      in_T <- verticesInGraph(tree_T)
-      temp_add_to_F <- filter(graph_G, parent == v, !(child %in% in_T))
-      # temp_add_to_F
-      assign("F_tb", rbind(temp_add_to_F, F_tb), envir = .GlobalEnv)
-
-      ## remove each edge (w,v), w in T from F
-      w_in_T <- verticesInGraph(tree_T)
-      removed_edges <- filter(F_tb, parent %in% w_in_T, child == v)
-      assign("F_tb", filter(F_tb, !edge %in% removed_edges$edge), envir = .GlobalEnv)
-
-      # recurse
-      grow(tree_T, all_vertices, w, thresh)
-      tree_L <- all_spanning_trees[[length(all_spanning_trees)]]
-      
-      # restore F
-      # pop each edge (v,w), w not in T, from F
-      not_in_T <- all_vertices[!all_vertices %in% verticesInGraph(tree_T)]
-      if (length(not_in_T) > 0 & nrow(F_tb) > 0) {
-        edges_to_remove_9 <- paste0(v, "->", not_in_T)
-        assign("F_tb", filter(F_tb, !edge %in% edges_to_remove_9), envir = .GlobalEnv)
-      }
-      # restore each edge (w,v), w in T, in F
-      assign("F_tb", rbind(removed_edges, F_tb), envir = .GlobalEnv)
+      # check if adding this node does not violate the constraint
+      if (satisfiesSumCondition(tree_T, w, sum_thresh)) {
+        # update F
+        ## push each edge (v,w), w not in T onto F
+        in_T <- verticesInGraph(tree_T)
+        temp_add_to_F <- filter(graph_G, parent == v, !(child %in% in_T))
+        # temp_add_to_F
+        assign("F_tb", rbind(temp_add_to_F, F_tb), envir = .GlobalEnv)
+  
+        ## remove each edge (w,v), w in T from F
+        w_in_T <- verticesInGraph(tree_T)
+        removed_edges <- filter(F_tb, parent %in% w_in_T, child == v)
+        assign("F_tb", filter(F_tb, !edge %in% removed_edges$edge), envir = .GlobalEnv)
+  
+        # recurse
+        grow(tree_T, all_vertices, w, sum_thresh)
+        #tree_L <- all_spanning_trees[[length(all_spanning_trees)]]
+        
+        # restore F
+        # pop each edge (v,w), w not in T, from F
+        not_in_T <- all_vertices[!all_vertices %in% verticesInGraph(tree_T)]
+        if (length(not_in_T) > 0 & nrow(F_tb) > 0) {
+          edges_to_remove_9 <- paste0(v, "->", not_in_T)
+          assign("F_tb", filter(F_tb, !edge %in% edges_to_remove_9), envir = .GlobalEnv)
+        }
+        # restore each edge (w,v), w in T, in F
+        assign("F_tb", rbind(removed_edges, F_tb), envir = .GlobalEnv)
      
+      }
       # delete e from T and from G, add e to FF
       tree_T <- tree_T[tree_T$edge != edge_e$edge, ]
       assign("graph_G",graph_G[graph_G$edge != edge_e$edge, ], envir = .GlobalEnv)
@@ -146,7 +149,7 @@ enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.2) {
   # all_spanning_trees must be set as an empty list, global variable, before function is called
   # graph_G must be set as global variable before function is called
   all_spanning_trees <- assign("all_spanning_trees", list(), envir = .GlobalEnv)
-  filtered_trees <- assign("filtered_trees", list(), envir = .GlobalEnv)
+  #filtered_trees <- assign("filtered_trees", list(), envir = .GlobalEnv)
   F_tb <- assign("F_tb", filter(graph_G, parent == "root"), envir = .GlobalEnv)
   all_vertices <- verticesInGraph(graph_G)
   tree_T <- tibble(parent = character(), child = character())
