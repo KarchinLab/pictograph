@@ -234,6 +234,7 @@ satisfiesCCFSumProperties <- function(am_long, mcf_matrix, threshold = 0.2) {
 calcTreeScores <- function(w_chain, trees) {
   mcf_stats <- summarizeWChain(w_chain)
   cpov <- create.cpov(mcf_stats)
+  w_mat <- estimateCCFs(w_chain)
   schism_scores <- sapply(trees, 
                           function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges"))
   return(schism_scores)
