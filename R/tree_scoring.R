@@ -236,7 +236,7 @@ calcTreeScores <- function(w_chain, trees, mc.cores = 1) {
   cpov <- create.cpov(mcf_stats)
   w_mat <- estimateCCFs(w_chain)
   schism_scores <- unlist(parallel:::mclapply(trees, 
-                          function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges")),
-                          mc.cores = mc.cores)
+                          function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges"),
+                          mc.cores = mc.cores))
   return(schism_scores)
 }
