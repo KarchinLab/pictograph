@@ -231,11 +231,12 @@ satisfiesCCFSumProperties <- function(am_long, mcf_matrix, threshold = 0.2) {
 #' @export
 #' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 #' @param trees list of tibbles, where each tibble contains edges of a tree with columns edge, parent, child
-calcTreeScores <- function(w_chain, trees) {
+calcTreeScores <- function(w_chain, trees, mc.cores = 1) {
   mcf_stats <- summarizeWChain(w_chain)
   cpov <- create.cpov(mcf_stats)
   w_mat <- estimateCCFs(w_chain)
-  schism_scores <- sapply(trees, 
-                          function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges"))
+  schism_scores <- unlist(parallel:::mclapply(trees, 
+                          function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges")),
+                          mc.cores = mc.cores)
   return(schism_scores)
 }
