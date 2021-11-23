@@ -3,6 +3,7 @@
 export(calcTreeScores)
 export(clusterSep)
 export(enumerateSpanningTrees)
+export(enumerateSpanningTreesModified)
 export(estimateCCFs)
 export(estimateClusterAssignments)
 export(filterEdgesBasedOnCCFs)

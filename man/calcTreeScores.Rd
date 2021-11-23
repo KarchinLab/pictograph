@@ -4,7 +4,7 @@
 \alias{calcTreeScores}
 \title{Calculate SCHISM fitness scores for trees}
 \usage{
-calcTreeScores(w_chain, trees)
+calcTreeScores(w_chain, trees, mc.cores = 1)
 }
 \arguments{
 \item{w_chain}{MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}}
