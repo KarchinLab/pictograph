@@ -226,6 +226,15 @@ enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.2) {
 #               filtered_trees = filtered_trees))
 }
 
+#' Enumerate all spanning trees using modified Gabow-Myers
+#' 
+#' @export
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
+#' @param graph_G tibble of possible edges with columns edge, parent, child
+#' @param w matrix of CCF values (rows = clusters, columns = samples)
+#' @param sum_filter_thresh thresh maximum allowed violation of Sum Condition (default = 0.2)
 enumerateSpanningTreesModified <- function(graph_G, w, sum_filter_thresh=0.2) {
   # all_spanning_trees must be set as an empty list, global variable, before function is called
   # graph_G must be set as global variable before function is called
