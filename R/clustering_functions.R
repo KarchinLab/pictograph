@@ -66,7 +66,7 @@ calcLogLik <- function(z.iter, w.iter, input.data) {
     theta <- calcTheta(input.data$m, input.data$tcn, W)
   } else {
     purity <- input.data$purity
-    P <- matrix(rep(purity, each = I), nrow = nrow(W), ncol = ncol(W))
+    P <- matrix(rep(purity, each = input.data$I), nrow = input.data$I, ncol = input.data$S)
     theta <- calcTheta2(input.data$m, input.data$tcn, W, P)
   }
   
