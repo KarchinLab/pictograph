@@ -104,7 +104,7 @@ runMCMCForABox2 <- function(box,
     jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
   }
   
-  jags.file <- here("code", "model-test.jags") # fixes order of CCFs in one sample, not spike and slab 
+  jags.file <- file.path(extdir, "model-test.jags") # fixes order of CCFs in one sample, not spike and slab 
   #jags.file <- file.path(extdir, "spike_and_slab_purity_ident.jags") # fixing order of CCFs in one sample
   # choose sample in which mutations are present
   if (box$I > 1) {
