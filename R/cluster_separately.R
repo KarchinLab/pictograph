@@ -43,7 +43,7 @@ runMCMCForABox <- function(box,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
                                         ".RNG.seed" = 123),
                            params = c("z", "w"),
-                           max_K = 10) {
+                           max_K = 5) {
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
   
@@ -85,6 +85,55 @@ runMCMCForABox <- function(box,
   } else {
     return(samps_K1)
   }
+}
+
+runMCMCForABox2 <- function(box, 
+                           n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
+                           inits = list(".RNG.name" = "base::Wichmann-Hill",
+                                        ".RNG.seed" = 123),
+                           params = c("z", "w"),
+                           max_K = 5) {
+  # returns samps_list 
+  box_input_data <- getBoxInputData(box)
+  
+  extdir <- system.file("extdata", package="pictograph")
+  if (box$I == 1) {
+    jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1_I1.jags")
+    box_input_data$I <- NULL
+  } else {
+    jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
+  }
+  
+  jags.file <- here("code", "model-test.jags") # fixes order of CCFs in one sample, not spike and slab 
+  #jags.file <- file.path(extdir, "spike_and_slab_purity_ident.jags") # fixing order of CCFs in one sample
+  # choose sample in which mutations are present
+  if (box$I > 1) {
+    sample_to_sort <- which(colSums(box$y) > 0)[1] 
+  } else {
+    sample_to_sort <- which(box$y > 0)[1]
+  }
+  
+  
+  samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
+                      inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
+  if(box$I == 1) {
+    colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "z")] <- "z[1]"
+  }
+  
+  # Max number of clusters cannot be more than number of mutations
+  max_K <- min(max_K, length(box$mutation_indices)) 
+  if (max_K > 1) {
+    box_input_data$sample_to_sort <- sample_to_sort
+    samps_2 <- parallel::mclapply(2:max_K,
+                                  function(k) runMCMC(box_input_data, k,
+                                                      jags.file, inits, params,
+                                                      n.iter=n.iter, thin=thin,
+                                                      n.burn=n.burn),
+                                  mc.cores=mc.cores)
+    return(c(list(samps_K1), samps_2))
+  } else {
+    return(samps_K1)
+  }
   
 }
 
@@ -94,13 +143,15 @@ runMCMCForABox <- function(box,
 #' @importFrom ggmcmc ggs
 #' @param input_data list of input data objects; 
 #' @param opt_K strategy for choosing optimum K ("min_BIC" or "elbow1")
+#' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
                                     ".RNG.seed" = 123),
                        params = c("z", "w"),
                        max_K = 10,
-                       opt_K = "min_BIC") {
+                       opt_K = "min_BIC", 
+                       model_type = "spike_and_slab") {
   # 1. separate mutations by sample presence
   sep_list <- separateMutationsBySamplePresence(input_data)
   
@@ -126,12 +177,22 @@ clusterSep <- function(input_data,
                                   z_chain = temp_z)
       best_K_vals[i] <- 1
     } else {
-      temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, 
-                                        thin = thin, mc.cores = mc.cores,
-                                        inits = inits,
-                                        params = params,
-                                        max_K = temp_max_K)
+      
+      if (model_type == "spike_and_slab") {
+        temp_samps_list <- runMCMCForABox(temp_box,
+                                          n.iter = n.iter, n.burn = n.burn, 
+                                          thin = thin, mc.cores = mc.cores,
+                                          inits = inits,
+                                          params = params,
+                                          max_K = temp_max_K)
+      } else if (model_type == "simple") {
+        temp_samps_list <- runMCMCForABox2(temp_box,
+                                           n.iter = n.iter, n.burn = n.burn, 
+                                           thin = thin, mc.cores = mc.cores,
+                                           inits = inits,
+                                           params = params,
+                                           max_K = temp_max_K)
+      } else stop("provide model_type either 'spike_and_slab' or 'simple'")
 
 
       # calc BIC for each K
