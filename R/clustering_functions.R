@@ -51,6 +51,7 @@ runClusteringForRangeK <- function(data, kToTest,
 getParamChain <- function(samps, param) {
   chains <- do.call(rbind, samps)
   chain <- chains[, grep(param, colnames(chains))]
+  chain
 }
 
 reshapeW <- function(w, S, K) {

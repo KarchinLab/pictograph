@@ -147,13 +147,13 @@ clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
                                     ".RNG.seed" = 123),
-                       params = c("z", "w"),
                        max_K = 5,
                        model_type = "spike_and_slab") {
   # 1. separate mutations by sample presence
   sep_list <- separateMutationsBySamplePresence(input_data)
   
   # 2. For each presence set, run clustering MCMC and choose K 
+  params = c("z", "w", "ystar")
   best_K_vals <- c()
   sep_samps_list <- list()
   for (i in seq_len(length(sep_list))) {
@@ -171,8 +171,11 @@ clusterSep <- function(input_data,
         mutate(Parameter = as.character(Parameter))
       temp_w <- get.parameter.chain("w", ggs(temp_samps_list)) %>%
         mutate(Parameter = as.character(Parameter))
+      temp_ystar <- get.parameter.chain("ystar", ggmcmc::ggs(temp_samps_list)) %>%
+        mutate(Parameter = as.character(Parameter))
       sep_samps_list[[i]] <- list(w_chain = temp_w,
-                                  z_chain = temp_z)
+                                  z_chain = temp_z,
+                                  ystar_chain = temp_ystar)
       best_K_vals[i] <- 1
     } else {
       
@@ -208,13 +211,16 @@ clusterSep <- function(input_data,
      
       
       
-      # clean up empty clusters by map_z
+      # clean up empty clusters by map_z -----------------------------------------
       best_samps_list <- temp_samps_list[[temp_min_BIC_K]]
       temp_z_old <- get.parameter.chain("z", ggs(best_samps_list)) %>%
         mutate(Parameter = as.character(Parameter))
       temp_w_old <- get.parameter.chain("w", ggs(best_samps_list)) %>%
         mutate(Parameter = as.character(Parameter))
       map_z_old <- estimateClusterAssignments(temp_z_old)
+      # don't need to modify ystar
+      ystar_to_store <- get.parameter.chain("ystar", ggmcmc::ggs(best_samps_list)) %>%
+        mutate(Parameter = as.character(Parameter))
       
       
       # if there are empty clusters, remove empty ones and relabel clusters 
@@ -267,33 +273,42 @@ clusterSep <- function(input_data,
       
       # store chain and best K
       sep_samps_list[[i]] <- list(w_chain = w_to_store,
-                                  z_chain = z_to_store)
+                                  z_chain = z_to_store,
+                                  ystar_chain = ystar_to_store)
       best_K_vals[i] <- length(unique(map_z_old$value))
     }
   }
   
-  # 3. Relabel z_chain and w_chain for alls and merge 
-  # first set doens't need to change cluster labels
+  # 3. Relabel chains for all sets and merge 
+  # first set doesn't need to change cluster labels
   w_chain <- sep_samps_list[[1]]$w_chain
   temp_z_chain <- sep_samps_list[[1]]$z_chain
+  temp_ystar_chain <- sep_samps_list[[1]]$ystar_chain
   
   if (length(sep_list) > 1) {
     # still need to change mutation indices if more than 1 box
     z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[1]]$mutation_indices)
+    ystar_chain <- relabel_ystar_chain(temp_ystar_chain,
+                                       sep_list[[1]]$mutation_indices)
     for (i in 2:length(sep_samps_list)) {
       temp_w_chain <- sep_samps_list[[i]]$w_chain
       temp_z_chain <- sep_samps_list[[i]]$z_chain
+      temp_ystar_chain <- sep_samps_list[[i]]$ystar_chain
       new_cluster_labels <- seq_len(best_K_vals[i]) + sum(best_K_vals[1:(i-1)])
       
       temp_relabeled_w_chain <- relabel_w_chain(temp_w_chain, new_cluster_labels)
       temp_relabeled_z_chain <- relabel_z_chain(temp_z_chain, new_cluster_labels, 
                                                 sep_list[[i]]$mutation_indices)
+      temp_relabeled_ystar_chain <- relabel_ystar_chain(temp_ystar_chain,
+                                                        sep_list[[i]]$mutation_indices)
       
       w_chain <- rbind(w_chain, temp_relabeled_w_chain)
       z_chain <- rbind(z_chain, temp_relabeled_z_chain)
+      ystar_chain <- rbind(ystar_chain, temp_relabeled_ystar_chain)
     }
   } else {
     z_chain <- temp_z_chain
+    ystar_chain <- temp_ystar_chain
   }
   
   # set levels for Parameter
@@ -316,7 +331,22 @@ clusterSep <- function(input_data,
   z_chain <- z_chain %>%
     mutate(Parameter = factor(Parameter, levels = z_chain_param_order$Parameter))
   
-  return(list(w_chain, z_chain))
+  ystar_chain <- ystar_chain %>%
+    mutate(Mutation_index = as.numeric(gsub("ystar\\[", "",
+                                            sapply(ystar_chain$Parameter,
+                                                   function(x) strsplit(as.character(x), ",")[[1]][1]))),
+           s = as.numeric(gsub("\\]", "",
+                               sapply(ystar_chain$Parameter,
+                                      function(x) strsplit(as.character(x), ",")[[1]][2]))))
+  ystar_chain <- ystar_chain %>%
+    arrange(Mutation_index, s) %>%
+    mutate(Parameter = factor(Parameter, levels = unique(Parameter)))
+  
+  chains <- list(w_chain = w_chain,
+                 z_chain = z_chain,
+                 ystar_chain = ystar_chain)
+  
+  return(chains)
 }
 
 relabel_w_chain <- function(w_chain, new_cluster_labels) {
@@ -359,6 +389,26 @@ relabel_z_chain <- function(z_chain, new_cluster_labels, mutation_indices) {
     arrange(new_i) %>%
     select(Iteration, Chain, Parameter, value)
   return(new_z)
+}
+
+relabel_ystar_chain <- function(ystar_chain, mutation_indices) {
+  # mutation_indices = numeric vector of original mutation indices prior to separating by sample presence
+  
+  new_ystar <- ystar_chain %>%
+    mutate(i = as.numeric(gsub("\\]", "",
+                               gsub("ystar\\[", "",
+                                    sapply(ystar_chain$Parameter,
+                                           function(x) strsplit(as.character(x), ",")[[1]][1])))),
+           s = as.numeric(gsub("\\]", "",
+                               gsub("ystar\\[", "",
+                                    sapply(ystar_chain$Parameter,
+                                           function(x) strsplit(as.character(x), ",")[[1]][2])))))
+  new_ystar <- new_ystar %>%
+    mutate(new_i = mutation_indices[i]) %>%
+    mutate(Parameter = paste0("ystar[", new_i, ",", s, "]")) %>%
+    arrange(new_i) %>%
+    select(Iteration, Chain, Parameter, value)
+  return(new_ystar)
 }
 
 # find elbow of bic plot
