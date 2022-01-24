@@ -103,3 +103,31 @@ plotEnsembleTree <- function(trees) {
   post_am <- getPosteriorAmLong(am_chain)
   plotPosteriorAmLong(post_am)
 }
+
+#' Plot CCF chain trace 
+#'
+#' @export
+#' @import ggplot2
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
+plotChainsCCF <- function(w_chain) {
+  cluster <- strsplit(as.character(w_chain$Parameter), ",") %>%
+    sapply(., function(x) gsub("w\\[", "", x[1])) %>%
+    as.numeric
+  sample <- strsplit(as.character(w_chain$Parameter), ",") %>%
+    sapply(., function(x) gsub("\\]", "", x[2])) %>%
+    as.numeric
+  
+  w_chain <- w_chain %>%
+    mutate(Cluster = factor(paste0("Cluster ", cluster), 
+                            levels = paste0("Cluster ", sort(unique(cluster)))), 
+           Sample = factor(paste0("Sample ", sample),
+                           levels = paste0("Sample ", sort(unique(sample)))))
+  
+  ggplot(w_chain, aes(x = Iteration, y = value)) +
+    geom_line() +
+    theme_light() +
+    facet_grid(Cluster ~ Sample) +
+    ylab("Cancer Cell Fraction")
+}
