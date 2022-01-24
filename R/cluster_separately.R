@@ -142,15 +142,13 @@ runMCMCForABox2 <- function(box,
 #' @export
 #' @importFrom ggmcmc ggs
 #' @param input_data list of input data objects; 
-#' @param opt_K strategy for choosing optimum K ("min_BIC" or "elbow1")
 #' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
                                     ".RNG.seed" = 123),
                        params = c("z", "w"),
-                       max_K = 10,
-                       opt_K = "min_BIC", 
+                       max_K = 5,
                        model_type = "spike_and_slab") {
   # 1. separate mutations by sample presence
   sep_list <- separateMutationsBySamplePresence(input_data)
@@ -202,12 +200,11 @@ clusterSep <- function(input_data,
         samps = temp_samps_list, k = 1:temp_max_K)
 
       # choose optimum K
-      if (opt_K == "elbow1" & temp_max_K >= 5) {
-        temp_min_BIC_K <- findElbow1(temp_BIC)
-        
-      } else {
+     # if (opt_K == "elbow1" & temp_max_K >= 5) {
+     #   temp_min_BIC_K <- findElbow1(temp_BIC)
+      #} else {
         temp_min_BIC_K <- which.min(temp_BIC)
-      }
+      #}
      
       
       
