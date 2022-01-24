@@ -111,6 +111,7 @@ plotEnsembleTree <- function(trees) {
 #' @import tibble
 #' @import dplyr
 #' @import tidyr
+#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 plotChainsCCF <- function(w_chain) {
   cluster <- strsplit(as.character(w_chain$Parameter), ",") %>%
     sapply(., function(x) gsub("w\\[", "", x[1])) %>%
@@ -130,4 +131,102 @@ plotChainsCCF <- function(w_chain) {
     theme_light() +
     facet_grid(Cluster ~ Sample) +
     ylab("Cancer Cell Fraction")
+}
+
+#' Plot posterior predictive distribution for number of variant reads
+#' 
+#' @export
+#' @import ggplot2
+#' @import tibble
+#' @import tidyr
+#' @param ystar_chain MCMC chain of ystar values, which is the third item in the list returned by \code{clusterSep}
+#' @param indata List of input data items 
+#' @param Sample_names Vector of sample names. If not provided, function will use the Sample_names in indata
+#' @param Mutation_ID Vector of mutation IDs. If not provided, function will use the MutID in indata
+plotPPD <- function(ystar_chain, indata, 
+                    Sample_names = NULL,
+                    Mutation_ID = NULL) {
+  I <- indata$I
+  if (is.null(Sample_names)) Sample_names <- indata$Sample_names
+  if (is.null(Mutation_ID)) Mutation_ID <- indata$Mut_ID
+  
+  ppd.summaries <- ystar_chain %>%
+    group_by(Parameter) %>%
+    summarize(mean=mean(value),
+              median=median(value),
+              q1=quantile(value, 0.025),
+              q3=quantile(value, 0.975))
+  
+  observed_y <- indata$y %>%
+    as_tibble() %>%
+    mutate(Mutation_index = 1:I) %>%
+    pivot_longer(cols = Sample_names,
+                 names_to = "Sample",
+                 values_to = "observed_y") %>%
+    mutate(s = match(Sample, colnames(input_data$y)),
+           Parameter = paste0("ystar[", Mutation_index, ",", s, "]"))
+  
+  ppd.summaries2 <- ppd.summaries %>%
+    left_join(., observed_y, by = "Parameter")
+  points <- ppd.summaries2 %>%
+    select(Parameter, Mutation_index, Sample, observed_y, median) %>%
+    rename("Observed variant read count" = observed_y,
+           "Posterior median" = median) %>%
+    pivot_longer(cols = c("Observed variant read count", "Posterior median"),
+                 names_to = "type",
+                 values_to = "value") %>%
+    left_join(., ppd.summaries2, by = c("Parameter",
+                                        "Mutation_index",
+                                        "Sample"))
+  points_order <- ppd.summaries2 %>%
+    filter(Sample == Sample_names[1]) %>%
+    arrange(observed_y) %>%
+    pull(Mutation_index)
+  
+  variant_gene_names <- Mutation_ID %>%
+    sapply(., function(x) strsplit(x, "_")[[1]][1]) %>%
+    as.character()
+  variant_gene_names_ordered <- variant_gene_names[points_order]
+  points2 <- points %>%
+    mutate(Mutation_index = factor(Mutation_index,
+                                   levels = points_order))
+  
+  # plot
+  points3 <- points2 %>%
+    mutate(type=gsub("Observed variant read count",
+                     "Observed variant\nread count",
+                     type))
+  colors <- setNames(c("gray40", "steelblue"), unique(points3$type))
+  fill <- setNames(c("white", "steelblue"), unique(points3$type))
+  points3 %>%
+    ggplot(aes(x=mean, y=Mutation_index,
+               xmin=q1,
+               xmax=q3)) +
+    geom_errorbar(color="gray") +
+    geom_point(aes(x = value, y = Mutation_index, color=type, fill=type),
+               size=2, pch=21) +
+    scale_y_discrete(labels = variant_gene_names_ordered,
+                     breaks = points_order) +
+    theme_bw(base_size=15) +
+    theme(#axis.text.y=element_blank(),
+      axis.title.x=element_text(size=20),
+      axis.text.x=element_text(size=17),
+      strip.text=element_text(size=22),
+      panel.grid=element_blank(),
+      axis.ticks.y=element_blank(),
+      legend.text=element_text(size=18),
+      panel.background=element_rect(fill="white",
+                                    color="black"),
+      legend.pos="bottom",
+      strip.background=element_blank()) +
+    scale_color_manual(name="",
+                       labels=names(colors),
+                       values=colors) +
+    scale_fill_manual(name="",
+                      labels=names(colors),
+                      values=fill) +
+    xlab("Variant allele count") +
+    ylab("") +
+    facet_wrap(~Sample) +
+    guides(color=guide_legend(override.aes=list(size=3)))
 }

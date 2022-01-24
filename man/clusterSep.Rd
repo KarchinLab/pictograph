@@ -11,15 +11,14 @@ clusterSep(
   thin = 10,
   mc.cores = 1,
   inits = list(.RNG.name = "base::Wichmann-Hill", .RNG.seed = 123),
-  params = c("z", "w"),
-  max_K = 10,
-  opt_K = "min_BIC"
+  max_K = 5,
+  model_type = "spike_and_slab"
 )
 }
 \arguments{
 \item{input_data}{list of input data objects;}
 
-\item{opt_K}{strategy for choosing optimum K ("min_BIC" or "elbow1")}
+\item{model_type}{hierarchical model type for ("spike_and_slab" or "simple)}
 }
 \description{
 Run MCMC to cluster mutations and estimate CCFs
