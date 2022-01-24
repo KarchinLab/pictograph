@@ -1,7 +1,7 @@
-#' clone tools
+#' pictograph
 #'
 #' @docType package
-#' @name clone.tools
+#' @name pictograph
 #' @import methods
 #' @import dplyr
 #' @import readr

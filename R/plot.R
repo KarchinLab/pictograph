@@ -84,7 +84,6 @@ plotDensityCCF <- function(w_chain) {
 #' @import dplyr
 #' @import tidyr
 #' @import ggplot2
-#' @import igraph
 plotTree <- function(edges) {
   plotGraph(edgesToAmLong(edges))
 }
@@ -97,7 +96,6 @@ plotTree <- function(edges) {
 #' @import dplyr
 #' @import tidyr
 #' @import ggplot2
-#' @import igraph
 plotEnsembleTree <- function(trees) {
   am_chain <- lapply(trees, edgesToAmLong)
   post_am <- getPosteriorAmLong(am_chain)
