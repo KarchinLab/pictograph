@@ -142,10 +142,10 @@ plotChainsCCF <- function(w_chain) {
 #' @param Sample_names Vector of sample names. If not provided, function will use the Sample_names in indata
 #' @param Mutation_ID Vector of mutation IDs. If not provided, function will use the MutID in indata
 plotPPD <- function(ystar_chain, indata, 
-                    Sample_names = NULL,
+                    Sample_ID = NULL,
                     Mutation_ID = NULL) {
   I <- indata$I
-  if (is.null(Sample_names)) Sample_names <- indata$Sample_names
+  if (is.null(Sample_ID)) Sample_ID <- indata$Sample_ID
   if (is.null(Mutation_ID)) Mutation_ID <- indata$Mut_ID
   
   ppd.summaries <- ystar_chain %>%
@@ -156,12 +156,13 @@ plotPPD <- function(ystar_chain, indata,
               q3=quantile(value, 0.975))
   
   observed_y <- indata$y %>%
+    magrittr::set_colnames(Sample_ID) %>%
     as_tibble() %>%
     mutate(Mutation_index = 1:I) %>%
-    pivot_longer(cols = Sample_names,
+    pivot_longer(cols = Sample_ID,
                  names_to = "Sample",
                  values_to = "observed_y") %>%
-    mutate(s = match(Sample, colnames(input_data$y)),
+    mutate(s = match(Sample, Sample_ID),
            Parameter = paste0("ystar[", Mutation_index, ",", s, "]"))
   
   ppd.summaries2 <- ppd.summaries %>%
@@ -177,7 +178,7 @@ plotPPD <- function(ystar_chain, indata,
                                         "Mutation_index",
                                         "Sample"))
   points_order <- ppd.summaries2 %>%
-    filter(Sample == Sample_names[1]) %>%
+    filter(Sample == Sample_ID[1]) %>%
     arrange(observed_y) %>%
     pull(Mutation_index)
   
