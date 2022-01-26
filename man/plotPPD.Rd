@@ -4,16 +4,16 @@
 \alias{plotPPD}
 \title{Plot posterior predictive distribution for number of variant reads}
 \usage{
-plotPPD(ystar_chain, indata, Sample_names = NULL, Mutation_ID = NULL)
+plotPPD(ystar_chain, indata, Sample_ID = NULL, Mutation_ID = NULL)
 }
 \arguments{
 \item{ystar_chain}{MCMC chain of ystar values, which is the third item in the list returned by \code{clusterSep}}
 
 \item{indata}{List of input data items}
 
-\item{Sample_names}{Vector of sample names. If not provided, function will use the Sample_names in indata}
-
 \item{Mutation_ID}{Vector of mutation IDs. If not provided, function will use the MutID in indata}
+
+\item{Sample_names}{Vector of sample names. If not provided, function will use the Sample_names in indata}
 }
 \description{
 Plot posterior predictive distribution for number of variant reads

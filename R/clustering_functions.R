@@ -211,6 +211,20 @@ estimateClusterAssignments <- function(z_chain) {
   return(map_z)
 }
 
+#' Determine most probable mutation cluster assignments by taking those with highest posterior probability. 
+#' 
+#' @export
+#' @param z_chain MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}
+#' @param Mut_ID Vector of mutation IDs, same order as provided as input data (e.g. indata$Mut_ID)
+#' @return A tibble listing mutation IDs and their cluster assignments
+writeClusterAssignmentsTable <- function(z_chain, Mut_ID) {
+  map_z <- estimateClusterAssignments(z_chain) %>%
+    mutate(Mut_ID = Mut_ID, Cluster = value) %>%
+    select(Mut_ID, Cluster) %>%
+    arrange(Cluster)
+  return(map_z)
+}
+
 #' Determine the most probable cluster CCF values by taking the mode of the posterior distributions
 #' 
 #' @export
@@ -236,6 +250,21 @@ estimateCCFs <- function(w_chain) {
   # return w matrix
   w.map.matrix <- matrix(w.map$value_rounded, K, S, byrow=TRUE)
   return(w.map.matrix)
+}
+
+#' Determine the most probable cluster CCF values by taking the mode of the posterior distributions
+#' 
+#' @export
+#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
+#' @param Sample_ID Vector of sample IDs, same order as provided as input data (e.g. indata$Sample_ID)
+#' @return A tibble of estimated cluster CCFs in each sample 
+writeClusterCCFsTable <- function(w_chain, Sample_ID) {
+  map_w <- as.data.frame(estimateCCFs(chains$w_chain))
+  colnames(map_w) <- Sample_ID
+  map_w <- map_w %>%
+    as_tibble() %>%
+    bind_cols(tibble(Cluster = 1:nrow(map_w)), .)
+  return(map_w)
 }
 
 # function to check if clustering respects sample presence 
