@@ -83,12 +83,13 @@ plotDensityCCF <- function(w_chain) {
 #' @import tibble
 #' @import dplyr
 #' @import tidyr
+#' @importFrom stringr str_replace_all
 #' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 #' @param indata List of input data items 
 plotCCFViolin <- function(w_chain, indata) {
   # process data
   vdat <- violinProcessData(w_chain, indata)
-  
+
   # plot violins
   vplot <- plotViolin(vdat)
   return(vplot)
