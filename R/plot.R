@@ -40,7 +40,110 @@ plotClusterAssignmentProb <- function(z_chain) {
                  color="black", linetype=2) +
     geom_point() +
     theme(panel.grid.minor = element_blank())
-  z.plot
+  return(z.plot)
+}
+
+summarizeZPost <- function(z_chain) {
+  I <- length(unique(z_chain$Parameter))
+  K <- max(unique(z_chain$value))
+  num_iter <- max(z_chain$Iteration)
+  mcmc_z <- z_chain %>%
+    group_by(Parameter, value) %>%
+    summarize(n=n(),
+              num_iter=num_iter) %>%
+    mutate(probability=n/num_iter) %>%
+    ungroup()
+  return(mcmc_z)
+}
+
+#' Plot probabilities of mutation cluster assignments - vertical
+#' 
+#' @export
+#' @import ggplot2
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
+#' @param z_chain MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}
+#' @param filter_thresh Lowest posterior probability to include cluster assignment. Default value is 0.05 (inclusive)
+#' @param MutID (Optional) Vector of mutation IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Mut_ID)
+plotClusterAssignmentProbVertical <- function(z_chain, 
+                                              w_chain,
+                                              filter_thresh = 0.05,
+                                              MutID = NULL,
+                                              SampleID = NULL) {
+  
+  map_z <- estimateClusterAssignments(z_chain)
+  map_w <- estimateCCFs(w_chain)
+  
+  I <- length(unique(z_chain$Parameter))
+  K <- max(unique(z_chain$value))
+  num_iter <- max(z_chain$Iteration)
+  S <- ncol(map_w)
+  
+  if (is.null(MutID)) {
+    mut_labels <- 1:I
+  } else {
+    mut_labels <- MutID
+  }
+  if (is.null(SampleID)) {
+    sample_labels <- paste0("Sample ", 1:S)
+  } else {
+    sample_labels <- SampleID
+  }
+  
+  tiers <- generateTiers(map_w, sample_labels)
+  
+  mcmc_z <- summarizeZPost(z_chain) %>%
+    filter(probability >= filter_thresh)
+  
+  # Variant sample presence 
+  var_sample_pres <- map_z %>%
+    mutate(cluster_num = value,
+           Variant = 1:I,
+           Mut_ID = mut_labels,
+           Sample_presence = tiers$samples[value])
+  # sample presence order 
+  sample_pres_order <- tiers %>% 
+    select(samples, tier) %>% 
+    distinct() %>% 
+    arrange(-tier) %>% 
+    pull(samples)
+  # variant order 
+  var_order <- map_z %>%
+    arrange(-value) %>%
+    mutate(Variant = as.numeric(Parameter),
+           Mut_ID = mut_labels[Variant]) %>%
+    pull(Mut_ID)
+  
+  z.seg.tb <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(z1 = min(value), z2 = max(value)) %>%
+    ungroup() %>%
+    mutate(Variant = 1:I,
+           Mut_ID = factor(mut_labels, var_order),
+           Sample_presence = factor(var_sample_pres$Sample_presence, sample_pres_order))
+  
+  mcmc_z <- mcmc_z %>%
+    mutate(Variant = as.numeric(Parameter),
+           Mut_ID = factor(mut_labels[Variant], var_order),
+           Sample_presence = factor(var_sample_pres$Sample_presence[Variant],
+                                    sample_pres_order))
+  
+  z.plot <- ggplot(mcmc_z, aes(x = value, y = Mut_ID, color = probability)) +
+    theme_light() +
+    scale_y_discrete(drop = T, name = "Variant") +
+    scale_x_discrete(breaks = 1:K, name = "Cluster") +
+    geom_segment(data = z.seg.tb, 
+                 aes(y=Mut_ID, yend=Mut_ID,
+                     x=z1, xend=z2),
+                 color="black", linetype=2) +
+    geom_point() +
+    theme(panel.grid.minor = element_blank(),
+          strip.background=element_blank(),
+          strip.text = element_text(colour = 'black'),
+          strip.text.y = element_text(angle = 0)) +
+    facet_grid(Sample_presence~., scales = "free", space = "free")
+  return(z.plot)
 }
 
 #' Plot cluster CCF posterior distributions
@@ -101,6 +204,7 @@ generateTiers <- function(w_mat, Sample_ID) {
   samples <- apply(bin, 1, function(x) paste(Sample_ID[x], collapse = ",\n"))
   tier <- rowSums(bin)
   tiers <- tibble(cluster = clusters,
+                  cluster_num = seq_len(nrow(w_mat)),
                   samples = samples,
                   tier = tier)
   return(tiers)
