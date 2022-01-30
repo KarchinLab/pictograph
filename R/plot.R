@@ -64,8 +64,10 @@ summarizeZPost <- function(z_chain) {
 #' @import dplyr
 #' @import tidyr
 #' @param z_chain MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}
+#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 #' @param filter_thresh Lowest posterior probability to include cluster assignment. Default value is 0.05 (inclusive)
 #' @param MutID (Optional) Vector of mutation IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Mut_ID)
+#' @param SampleID (Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID)
 plotClusterAssignmentProbVertical <- function(z_chain, 
                                               w_chain,
                                               filter_thresh = 0.05,

@@ -15,9 +15,13 @@ plotClusterAssignmentProbVertical(
 \arguments{
 \item{z_chain}{MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}}
 
+\item{w_chain}{MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}}
+
 \item{filter_thresh}{Lowest posterior probability to include cluster assignment. Default value is 0.05 (inclusive)}
 
 \item{MutID}{(Optional) Vector of mutation IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Mut_ID)}
+
+\item{SampleID}{(Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID)}
 }
 \description{
 Plot probabilities of mutation cluster assignments - vertical
