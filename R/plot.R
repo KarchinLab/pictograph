@@ -76,6 +76,82 @@ plotDensityCCF <- function(w_chain) {
   ))
 }
 
+#' Plot cluster CCF posterior distributions as violin plots
+#' 
+#' @export
+#' @import ggplot2
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
+#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
+#' @param indata List of input data items 
+plotCCFViolin <- function(w_chain, indata) {
+  # process data
+  vdat <- violinProcessData(w_chain, indata)
+  
+  # plot violins
+  vplot <- plotViolin(vdat)
+  return(vplot)
+}
+
+generateTiers <- function(w_mat, Sample_ID) {
+  clusters <- paste0("Cluster ", seq_len(nrow(w_mat)))
+  bin <- w_mat > 0
+  samples <- apply(bin, 1, function(x) paste(Sample_ID[x], collapse = ",\n"))
+  tier <- rowSums(bin)
+  tiers <- tibble(cluster = clusters,
+                  samples = samples,
+                  tier = tier)
+  return(tiers)
+}
+
+violinProcessData <- function(w_chain, indata) {
+  w_mat <- estimateCCFs(w_chain)
+  est_K <- nrow(w_mat)
+  
+  vdat <- w_chain %>%
+    mutate(sample=str_replace_all(Parameter, "w\\[[:digit:]+,", ""),
+           sample=str_replace_all(sample, "\\]", ""),
+           cluster=str_replace_all(Parameter, "w\\[", ""),
+           cluster=str_replace_all(cluster, ",[:digit:]\\]", "")) %>%
+    mutate(sample=as.numeric(sample),
+           sample=indata$Sample_ID[sample],
+           sample=factor(sample, indata$Sample_ID),
+           cluster=as.numeric(cluster),
+           cluster=paste0("Cluster ", cluster),
+           cluster=factor(cluster, level=paste("Cluster", 1:est_K)))
+  
+  tiers <- generateTiers(w_mat, indata$Sample_ID)
+  
+  vdat <- vdat %>%
+    mutate(cluster=as.character(cluster)) %>%
+    left_join(tiers, by="cluster") %>%
+    mutate(cluster=factor(cluster, tiers$cluster),
+           tier=factor(tier, sort(unique(tiers$tier))))
+  return(vdat)
+}
+
+plotViolin <- function(vdat) {
+  vplot <- ggplot(vdat, aes(sample, value)) +
+    geom_violin(aes(fill=tier),
+                alpha=0.6,
+                scale="width",
+                draw_quantiles=c(0.25, 0.5, 0.75),
+                color="white") +
+    geom_violin(fill="transparent", color="black",
+                scale="width", draw_quantiles=0.5) +
+    theme_bw(base_size=20) +
+    theme(strip.background=element_blank(),
+          axis.text.x=element_text(size=14),
+          panel.grid=element_blank(),
+          legend.pos="bottom") +
+    facet_wrap(~cluster, nrow=1) +
+    ylab("Posterior CCF") + xlab("") +ylim(c(0, 1)) +
+    guides(fill=guide_legend("Sample-presence set")) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+  return(vplot)
+}
+
 #' Plot single tree 
 #' 
 #' @export
