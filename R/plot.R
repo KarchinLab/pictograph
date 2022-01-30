@@ -111,10 +111,10 @@ violinProcessData <- function(w_chain, indata) {
   est_K <- nrow(w_mat)
   
   vdat <- w_chain %>%
-    mutate(sample=str_replace_all(Parameter, "w\\[[:digit:]+,", ""),
-           sample=str_replace_all(sample, "\\]", ""),
-           cluster=str_replace_all(Parameter, "w\\[", ""),
-           cluster=str_replace_all(cluster, ",[:digit:]\\]", "")) %>%
+    mutate(sample=stringr::str_replace_all(Parameter, "w\\[[:digit:]+,", ""),
+           sample=stringr::str_replace_all(sample, "\\]", ""),
+           cluster=stringr::str_replace_all(Parameter, "w\\[", ""),
+           cluster=stringr::str_replace_all(cluster, ",[:digit:]\\]", "")) %>%
     mutate(sample=as.numeric(sample),
            sample=indata$Sample_ID[sample],
            sample=factor(sample, indata$Sample_ID),
