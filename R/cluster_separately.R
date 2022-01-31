@@ -42,7 +42,7 @@ runMCMCForABox <- function(box,
                            n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
                                         ".RNG.seed" = 123),
-                           params = c("z", "w"),
+                           params = c("z", "w", "ystar"),
                            max_K = 5) {
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
@@ -81,8 +81,11 @@ runMCMCForABox <- function(box,
                                                       n.iter=n.iter, thin=thin,
                                                       n.burn=n.burn),
                                   mc.cores=mc.cores)
-    return(c(list(samps_K1), samps_2))
+    samps_list <- c(list(samps_K1), samps_2)
+    names(samps_list) <- paste0("K", 1:max_K)
+    return(samps_list)
   } else {
+    names(samps_K1) <- "K1"
     return(samps_K1)
   }
 }
@@ -91,7 +94,7 @@ runMCMCForABox2 <- function(box,
                            n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
                                         ".RNG.seed" = 123),
-                           params = c("z", "w"),
+                           params = c("z", "w", "ystar"),
                            max_K = 5) {
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
@@ -130,18 +133,107 @@ runMCMCForABox2 <- function(box,
                                                       n.iter=n.iter, thin=thin,
                                                       n.burn=n.burn),
                                   mc.cores=mc.cores)
-    return(c(list(samps_K1), samps_2))
+    samps_list <- c(list(samps_K1), samps_2)
+    names(samps_list) <- paste0("K", 1:max_K)
+    return(samps_list)
   } else {
+    names(samps_K1) <- "K1"
     return(samps_K1)
   }
   
 }
+
+formatChains <- function(samps) {
+  temp_z <- get.parameter.chain("z", ggmcmc::ggs(samps)) %>%
+    mutate(Parameter = as.character(Parameter))
+  temp_w <- get.parameter.chain("w", ggmcmc::ggs(samps)) %>%
+    mutate(Parameter = as.character(Parameter))
+  temp_ystar <- get.parameter.chain("ystar", ggmcmc::ggs(samps)) %>%
+    mutate(Parameter = as.character(Parameter))
+  samps_list_formatted <- list(w_chain = temp_w,
+                               z_chain = temp_z,
+                               ystar_chain = temp_ystar)
+  return(samps_list_formatted)
+}
+
+runMutSetMCMC <- function(temp_box, 
+                          n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
+                          inits = list(".RNG.name" = "base::Wichmann-Hill",
+                                       ".RNG.seed" = 123),
+                          temp_max_K = 5,
+                          model_type = "spike_and_slab",
+                          params = c("z", "w", "ystar")) {
+  
+  # Run MCMC
+  if (temp_max_K == 1) {
+    temp_samps_list <- runMCMCForABox(temp_box,
+                                      n.iter = n.iter, n.burn = n.burn, 
+                                      thin = thin, mc.cores = mc.cores,
+                                      inits = inits,
+                                      params = params,
+                                      max_K = temp_max_K)
+  } else {
+    
+    if (model_type == "spike_and_slab") {
+      temp_samps_list <- runMCMCForABox(temp_box,
+                                        n.iter = n.iter, n.burn = n.burn, 
+                                        thin = thin, mc.cores = mc.cores,
+                                        inits = inits,
+                                        params = params,
+                                        max_K = temp_max_K)
+      
+    } else if (model_type == "simple") {
+      temp_samps_list <- runMCMCForABox2(temp_box,
+                                         n.iter = n.iter, n.burn = n.burn, 
+                                         thin = thin, mc.cores = mc.cores,
+                                         inits = inits,
+                                         params = params,
+                                         max_K = temp_max_K)
+    } else stop("provide model_type either 'spike_and_slab' or 'simple'")
+  }
+  
+  # Format chains
+  samps_list <- parallel::mclapply(temp_samps_list, formatChains,
+                                   mc.cores = mc.cores)
+  
+  # Calculate BIC
+  K_tested <- seq_len(temp_max_K)
+  if (temp_max_K > 1) {
+    box_indata <- getBoxInputData(temp_box)
+    bic_vec <- unname(unlist(parallel::mclapply(samps_list, 
+                                         function(chains) calcChainBIC(chains, box_indata),
+                                         mc.cores = mc.cores)))
+    bic_tb <- tibble(K_tested = K_tested,
+                     BIC = bic_vec)
+    best_chains <- samps_list[[which.min(bic_vec)]]
+    res_list <- list(all_chains = samps_list,
+                     BIC = bic_tb,
+                     best_chains = best_chains,
+                     best_K = which.min(bic_vec))
+  } else {
+    # only 1 variant, so must be 1 cluster and don't need to check BIC
+    res_list <- list(all_chains = samps_list,
+                     BIC = NA,
+                     best_chains = samps_list[[1]],
+                     best_K = 1)
+  }
+  
+  return(res_list)
+}
+
+
+
 
 #' Run MCMC to cluster mutations and estimate CCFs
 #' 
 #' @export
 #' @importFrom ggmcmc ggs
 #' @param input_data list of input data objects; 
+#' @param n.iter number of iterations to run MCMC
+#' @param n.burn number of iterations for burn in 
+#' @param thin thinning parameter
+#' @param mc.cores number of cores for parallelization
+#' @param max_K maximum number of clusters to assess for each mutation set
 #' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
@@ -152,148 +244,70 @@ clusterSep <- function(input_data,
   # 1. separate mutations by sample presence
   sep_list <- separateMutationsBySamplePresence(input_data)
   
-  # 2. For each presence set, run clustering MCMC and choose K 
+  # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
+  all_set_results <- vector("list", length(sep_list))
+  names(all_set_results) <- names(sep_list)
   params = c("z", "w", "ystar")
-  best_K_vals <- c()
-  sep_samps_list <- list()
+
   for (i in seq_len(length(sep_list))) {
     temp_box <- sep_list[[i]]
     # Max number of clusters cannot be more than number of mutations
     temp_max_K <- min(max_K, length(temp_box$mutation_indices))
-    if (temp_max_K == 1) {
-      temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, 
-                                        thin = thin, mc.cores = mc.cores,
-                                        inits = inits,
-                                        params = params,
-                                        max_K = temp_max_K)
-      temp_z <- get.parameter.chain("z", ggs(temp_samps_list)) %>%
-        mutate(Parameter = as.character(Parameter))
-      temp_w <- get.parameter.chain("w", ggs(temp_samps_list)) %>%
-        mutate(Parameter = as.character(Parameter))
-      temp_ystar <- get.parameter.chain("ystar", ggmcmc::ggs(temp_samps_list)) %>%
-        mutate(Parameter = as.character(Parameter))
-      sep_samps_list[[i]] <- list(w_chain = temp_w,
-                                  z_chain = temp_z,
-                                  ystar_chain = temp_ystar)
-      best_K_vals[i] <- 1
-    } else {
-      
-      if (model_type == "spike_and_slab") {
-        temp_samps_list <- runMCMCForABox(temp_box,
-                                          n.iter = n.iter, n.burn = n.burn, 
-                                          thin = thin, mc.cores = mc.cores,
-                                          inits = inits,
-                                          params = params,
-                                          max_K = temp_max_K)
-      } else if (model_type == "simple") {
-        temp_samps_list <- runMCMCForABox2(temp_box,
-                                           n.iter = n.iter, n.burn = n.burn, 
-                                           thin = thin, mc.cores = mc.cores,
-                                           inits = inits,
-                                           params = params,
-                                           max_K = temp_max_K)
-      } else stop("provide model_type either 'spike_and_slab' or 'simple'")
-
-
-      # calc BIC for each K
-      temp_BIC <- mapply(function(samps, k)
-        calcBIC(temp_box$I*temp_box$S, k, 
-                calcChainLogLik(samps, getBoxInputData(temp_box), k)),
-        samps = temp_samps_list, k = 1:temp_max_K)
-
-      # choose optimum K
-     # if (opt_K == "elbow1" & temp_max_K >= 5) {
-     #   temp_min_BIC_K <- findElbow1(temp_BIC)
-      #} else {
-        temp_min_BIC_K <- which.min(temp_BIC)
-      #}
-     
-      
-      
-      # clean up empty clusters by map_z -----------------------------------------
-      best_samps_list <- temp_samps_list[[temp_min_BIC_K]]
-      temp_z_old <- get.parameter.chain("z", ggs(best_samps_list)) %>%
-        mutate(Parameter = as.character(Parameter))
-      temp_w_old <- get.parameter.chain("w", ggs(best_samps_list)) %>%
-        mutate(Parameter = as.character(Parameter))
-      map_z_old <- estimateClusterAssignments(temp_z_old)
-      # don't need to modify ystar
-      ystar_to_store <- get.parameter.chain("ystar", ggmcmc::ggs(best_samps_list)) %>%
-        mutate(Parameter = as.character(Parameter))
-      
-      
-      # if there are empty clusters, remove empty ones and relabel clusters 
-      if (length(unique(map_z_old$value)) < temp_min_BIC_K) {
-        
-        # new_labs <- 1:length(unique(map_z$value))
-        old_labs <- unique(map_z_old$value)
-        
-        # remove clusters that are empty in map_z
-        temp_z_remove_empty <- temp_z_old %>%
-          filter(value %in% old_labs)
-        # relabel z chain
-        z_relabeled <- temp_z_remove_empty %>%
-          mutate(new_value = match(value, old_labs)) %>%
-          select(Iteration, Chain, Parameter, new_value) %>%
-          rename(value = new_value)
-        # order by variant
-        z_relabeled <- z_relabeled %>%
-          mutate(Variant = as.numeric(gsub("z\\[", "", 
-                                         gsub("\\]", "", 
-                                              Parameter)))) %>%
-          arrange(Variant, Iteration) %>%
-          mutate(Parameter = factor(Parameter, levels = unique(z_relabeled$Parameter))) 
-        z_relabeled$Variant <- NULL
-          
-        
-        # relabel w chain
-        # remove clusters that are empty in map_z
-        temp_w_remove_empty <- temp_w_old %>%
-          mutate(k = as.numeric(gsub("w\\[", "", 
-                                     sapply(Parameter, 
-                                            function(x) strsplit(as.character(x), ",")[[1]][1])))) %>%
-          mutate(s = as.numeric(gsub("\\]", "", 
-                                     sapply(Parameter, 
-                                            function(x) strsplit(as.character(x), ",")[[1]][2])))) %>%
-          filter(k %in% old_labs) 
-        # relabel w chain 
-        w_relabeled <- temp_w_remove_empty %>%
-          mutate(new_k = match(k, old_labs)) %>%
-          mutate(Parameter = paste0("w[", new_k, ",", s, "]")) %>%
-          arrange(new_k, s) %>%
-          select(Iteration, Chain, Parameter, value)
-        
-        w_to_store <- w_relabeled
-        z_to_store <- z_relabeled
-      } else {
-        w_to_store <- temp_w_old
-        z_to_store <- temp_z_old
-      }
-      
-      # store chain and best K
-      sep_samps_list[[i]] <- list(w_chain = w_to_store,
-                                  z_chain = z_to_store,
-                                  ystar_chain = ystar_to_store)
-      best_K_vals[i] <- length(unique(map_z_old$value))
-    }
+    
+    temp_samps_list <- runMutSetMCMC(temp_box, 
+                                     n.iter = n.iter, n.burn = n.burn, thin = thin, 
+                                     mc.cores = mc.cores,
+                                     inits = inits,
+                                     temp_max_K = temp_max_K,
+                                     model_type = model_type,
+                                     params = params)
+    all_set_results[[i]] <- temp_samps_list
   }
   
-  # 3. Relabel chains for all sets and merge 
-  # first set doesn't need to change cluster labels
-  w_chain <- sep_samps_list[[1]]$w_chain
-  temp_z_chain <- sep_samps_list[[1]]$z_chain
-  temp_ystar_chain <- sep_samps_list[[1]]$ystar_chain
+  return(all_set_results)
+}
+
+#' Collect chains for best K of each mutation set 
+#' 
+#' @export
+#' @param all_set_results List of MCMC results for each mutation set; returned by \code{clusterSep}
+#' @param chosen_K (Optional) Vector of K to choose for each mutation set, in the same order as all_set_chains. If left blank, function will select best K automatically selected by \code{clusterSep}
+collectBestKChains <- function(all_set_results, chosen_K = NULL) {
+  if (is.null(chosen_K)) {
+    best_set_chains <- lapply(all_set_results, function(x) x$best_chains)
+  } else {
+    best_set_chains <- mapply(function(set_res, choose_K) set_res$all_chains[[choose_K]],
+                              set_res = all_set_results,
+                              chosen_K,
+                              SIMPLIFY = FALSE)
+  }
+  return(best_set_chains)
+}
+
+#' Relabel chains for all sets and merge 
+#' 
+#' @export
+#' @import dplyr
+#' @param best_set_chains List of lists of MCMC chains (w_chain, z_chain, ystar_chain) for each mutation set
+#' @param indata List of input data objects (same as provided to clusterSep)
+mergeSetChains <- function(best_set_chains, indata) {
+  best_K_vals <- unname(sapply(best_set_chains, function(x) max(x$z_chain$value)))
+  sep_list <- separateMutationsBySamplePresence(indata)
   
-  if (length(sep_list) > 1) {
+  # first set doesn't need to change cluster labels
+  w_chain <- best_set_chains[[1]]$w_chain
+  temp_z_chain <- best_set_chains[[1]]$z_chain
+  temp_ystar_chain <- best_set_chains[[1]]$ystar_chain
+  
+  if (length(best_set_chains) > 1) {
     # still need to change mutation indices if more than 1 box
     z_chain <- relabel_z_chain_mut_only(temp_z_chain, sep_list[[1]]$mutation_indices)
     ystar_chain <- relabel_ystar_chain(temp_ystar_chain,
                                        sep_list[[1]]$mutation_indices)
-    for (i in 2:length(sep_samps_list)) {
-      temp_w_chain <- sep_samps_list[[i]]$w_chain
-      temp_z_chain <- sep_samps_list[[i]]$z_chain
-      temp_ystar_chain <- sep_samps_list[[i]]$ystar_chain
+    for (i in 2:length(best_set_chains)) {
+      temp_w_chain <- best_set_chains[[i]]$w_chain
+      temp_z_chain <- best_set_chains[[i]]$z_chain
+      temp_ystar_chain <- best_set_chains[[i]]$ystar_chain
       new_cluster_labels <- seq_len(best_K_vals[i]) + sum(best_K_vals[1:(i-1)])
       
       temp_relabeled_w_chain <- relabel_w_chain(temp_w_chain, new_cluster_labels)
@@ -345,7 +359,6 @@ clusterSep <- function(input_data,
   chains <- list(w_chain = w_chain,
                  z_chain = z_chain,
                  ystar_chain = ystar_chain)
-  
   return(chains)
 }
 

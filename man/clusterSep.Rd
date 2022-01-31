@@ -18,6 +18,16 @@ clusterSep(
 \arguments{
 \item{input_data}{list of input data objects;}
 
+\item{n.iter}{number of iterations to run MCMC}
+
+\item{n.burn}{number of iterations for burn in}
+
+\item{thin}{thinning parameter}
+
+\item{mc.cores}{number of cores for parallelization}
+
+\item{max_K}{maximum number of clusters to assess for each mutation set}
+
 \item{model_type}{hierarchical model type for ("spike_and_slab" or "simple)}
 }
 \description{

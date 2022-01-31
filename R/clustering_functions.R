@@ -54,10 +54,22 @@ getParamChain <- function(samps, param) {
   chain
 }
 
-reshapeW <- function(w, S, K) {
-  w.mat <- matrix(w, nrow = K)
+#' @importFrom stringr str_replace_all
+reshapeW <- function(w.chain.iter) {
+  w.mat <- w.chain.iter %>%
+    mutate(sample=stringr::str_replace_all(Parameter, "w\\[[:digit:]+,", ""),
+           sample=as.numeric(stringr::str_replace_all(sample, "\\]", "")),
+           cluster=stringr::str_replace_all(Parameter, "w\\[", ""),
+           cluster=as.numeric(stringr::str_replace_all(cluster, ",[:digit:]\\]", ""))) %>%
+    select(cluster, sample, value) 
+  S <- max(w.mat$sample)
+  w.mat <- w.mat %>%
+    pivot_wider(names_from = sample, 
+                values_from = value)
+  w.mat$cluster <- NULL
+  w.mat <- as.matrix(w.mat)
   colnames(w.mat) <- paste0("sample", 1:S)
-  w.mat
+  return(w.mat)
 }
 
 calcLogLik <- function(z.iter, w.iter, input.data) {
@@ -74,19 +86,34 @@ calcLogLik <- function(z.iter, w.iter, input.data) {
   sum(dbinom(as.matrix(input.data$y), as.matrix(input.data$n), as.matrix(theta), log=T))
 }
 
-calcChainLogLik <- function(samps, input.data, K) {
-  z.chain <- getParamChain(samps, "z\\[")
-  w.chain <- getParamChain(samps, "w\\[")
+calcChainLogLik <- function(chains, input.data, est_K) {
+  num_iter <- max(chains$z_chain$Iteration)
+  
   lik <- c()
-  for(iter in 1:nrow(z.chain)) {
-    z.iter <- z.chain[iter, ]
-    w.iter <- reshapeW(w.chain[iter, ], input.data$S, K)
+  for(iter in 1:num_iter) {
+    z.iter <- chains$z_chain %>%
+      filter(Iteration == iter) %>%
+      pull(value)
+    w.iter <- filter(chains$w_chain, Iteration == iter) %>% 
+      reshapeW()
     lik <- c(lik, calcLogLik(z.iter, w.iter, input.data))
   }
-  mean(lik)
+  return(mean(lik))
 }
 
+
 calcBIC <- function(n, k, ll) log(n)*k - 2*ll
+
+#' @import magrittr
+calcChainBIC <- function(chains, input.data) {
+  n <- input.data$I * input.data$S
+  est_K <- estimateCCFs(chains$w_chain) %>%
+    nrow(.)
+  ll <- calcChainLogLik(chains, input.data, est_K)
+  
+  BIC <- calcBIC(n, est_K, ll)
+  return(BIC)
+}
 
 calcBICForRangeK <- function(samps.list, kToTest, input.data) {
   mapply(function(samps, k)
