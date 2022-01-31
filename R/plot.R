@@ -100,6 +100,7 @@ plotClusterAssignmentProbVertical <- function(z_chain,
   
   # Variant sample presence 
   var_sample_pres <- map_z %>%
+    ungroup() %>%
     mutate(cluster_num = value,
            Variant = 1:I,
            Mut_ID = mut_labels,
@@ -134,7 +135,7 @@ plotClusterAssignmentProbVertical <- function(z_chain,
   z.plot <- ggplot(mcmc_z, aes(x = value, y = Mut_ID, color = probability)) +
     theme_light() +
     scale_y_discrete(drop = T, name = "Variant") +
-    scale_x_discrete(breaks = 1:K, name = "Cluster") +
+    scale_x_continuous(breaks = 1:K, name = "Cluster", labels = 1:K) +
     geom_segment(data = z.seg.tb, 
                  aes(y=Mut_ID, yend=Mut_ID,
                      x=z1, xend=z2),
