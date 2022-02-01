@@ -150,6 +150,78 @@ plotClusterAssignmentProbVertical <- function(z_chain,
   return(z.plot)
 }
 
+grabBIC <- function(all_set_results) {
+  bic_list <- lapply(all_set_results, function(x) x$BIC) 
+  bic_tb <- bic_list %>%
+    bind_rows(.id = 'Set') %>%
+    mutate(Set = factor(Set, levels = names(all_set_results)))
+  return(bic_tb)
+}
+
+grabBestK <- function(all_set_results) {
+  best_k <- lapply(all_set_results, function(x) x$best_K) %>%
+    stack() %>%
+    rename(Set = ind,
+           Best_K = values) %>%
+    as_tibble()
+  return(best_k)
+}
+
+#' Plot BIC for all mutation sets 
+#' 
+#' @export
+#' @import dplyr
+#' @import ggplot2
+#' @param all_set_results List of MCMC results for each mutation set; returned by \code{clusterSep}
+#' @param SampleID (Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID)
+plotBIC <- function(all_set_results, Sample_ID = NULL) {
+  bic_tb <- grabBIC(all_set_results) 
+  min_BIC <- grabBestK(all_set_results) %>%
+    rename(K_tested = Best_K) %>%
+    left_join(., bic_tb,
+              by = c("Set", "K_tested"))
+  
+  # rename sets
+  if (is.null(Sample_ID)) {
+    S <- all_set_results[[1]]$best_chains$w_chain %>% 
+      estimateCCFs %>% 
+      ncol
+    Sample_ID <- paste0("Sample ", 1:S)
+  }
+  
+  binary_set_names <- unique(bic_tb$Set)
+  set_names <- sapply(binary_set_names, function(x) getSetName(x, Sample_ID))
+  
+  bic_tb <- bic_tb %>%
+    mutate(Set_name = factor(set_names[Set], levels = set_names))
+  min_BIC <- min_BIC %>%
+    mutate(Set_name = factor(set_names[Set], levels = set_names))
+  
+  # plot
+  bic_plot <- ggplot(bic_tb, aes(x = K_tested, y = BIC)) +
+    theme_light() +
+    facet_wrap(~Set_name, scales = "free") +
+    geom_line() +
+    geom_point(data = min_BIC, color = "#56B1F7", size = 2) +
+    theme(strip.background=element_blank(),
+          strip.text = element_text(colour = 'black'),
+          panel.grid.minor = element_blank()) +
+    xlab("K")
+  
+  return(bic_plot)
+}
+
+#' Convert binary set names to long form with Sample_ID
+getSetName <- function(binary_name, Sample_ID) {
+  split_bin <- strsplit(as.character(binary_name), "") %>%
+    .[[1]] %>%
+    as.numeric() %>%
+    as.logical()
+  samples_present <- Sample_ID[split_bin]
+  set_name <- paste0(samples_present, collapse = ", \n")
+  return(set_name)
+}
+
 #' Plot cluster CCF posterior distributions
 #' 
 #' @export
@@ -262,7 +334,7 @@ plotViolin <- function(vdat) {
           legend.pos="bottom") +
     facet_wrap(~cluster, nrow=1) +
     ylab("Posterior CCF") + xlab("") +ylim(c(0, 1)) +
-    guides(fill=guide_legend("Sample-presence set")) +
+    guides(fill=guide_legend("Sample-presence")) +
     theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
   return(vplot)
 }
@@ -330,8 +402,8 @@ plotChainsCCF <- function(w_chain) {
 #' @import tidyr
 #' @param ystar_chain MCMC chain of ystar values, which is the third item in the list returned by \code{clusterSep}
 #' @param indata List of input data items 
-#' @param Sample_names Vector of sample names. If not provided, function will use the Sample_names in indata
-#' @param Mutation_ID Vector of mutation IDs. If not provided, function will use the MutID in indata
+#' @param SampleID (Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID). If not provided, function will use the Sample_ID in indata
+#' @param Mutation_ID (Optional) Vector of mutation IDs. If not provided, function will use the MutID in indata
 plotPPD <- function(ystar_chain, indata, 
                     Sample_ID = NULL,
                     Mutation_ID = NULL) {
