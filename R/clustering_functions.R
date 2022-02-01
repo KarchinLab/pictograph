@@ -238,7 +238,9 @@ estimateClusterAssignments <- function(z_chain) {
   
   # choose first cluster if equal probability
   map_z_count <- map_z %>% 
-    summarize(map_count = n())
+    group_by(Parameter) %>%
+    summarize(map_count = n()) %>%
+    ungroup()
   if (any(map_z_count$map_count > 1)) {
     mut_ind <- which(map_z_count$map_count > 1)
     for (i in mut_ind) {

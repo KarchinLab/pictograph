@@ -145,7 +145,8 @@ plotClusterAssignmentProbVertical <- function(z_chain,
           strip.background=element_blank(),
           strip.text = element_text(colour = 'black'),
           strip.text.y = element_text(angle = 0)) +
-    facet_grid(Sample_presence~., scales = "free", space = "free")
+    facet_grid(Sample_presence~., scales = "free", space = "free") +
+    scale_color_gradient(limits = c(0,1))
   return(z.plot)
 }
 
@@ -293,7 +294,7 @@ plotEnsembleTree <- function(trees) {
 #' @import tibble
 #' @import dplyr
 #' @import tidyr
-#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
+#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{mergeSetChains}
 plotChainsCCF <- function(w_chain) {
   cluster <- strsplit(as.character(w_chain$Parameter), ",") %>%
     sapply(., function(x) gsub("w\\[", "", x[1])) %>%
