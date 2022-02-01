@@ -271,7 +271,7 @@ clusterSep <- function(input_data,
 #' 
 #' @export
 #' @param all_set_results List of MCMC results for each mutation set; returned by \code{clusterSep}
-#' @param chosen_K (Optional) Vector of K to choose for each mutation set, in the same order as all_set_chains. If left blank, function will select best K automatically selected by \code{clusterSep}
+#' @param chosen_K (Optional) Vector of K to choose for each mutation set, in the same order as all_set_results. If left blank, function will select best K automatically selected by \code{clusterSep}
 collectBestKChains <- function(all_set_results, chosen_K = NULL) {
   if (is.null(chosen_K)) {
     best_set_chains <- lapply(all_set_results, function(x) x$best_chains)

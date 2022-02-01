@@ -11,9 +11,9 @@ plotPPD(ystar_chain, indata, Sample_ID = NULL, Mutation_ID = NULL)
 
 \item{indata}{List of input data items}
 
-\item{Mutation_ID}{Vector of mutation IDs. If not provided, function will use the MutID in indata}
+\item{Mutation_ID}{(Optional) Vector of mutation IDs. If not provided, function will use the MutID in indata}
 
-\item{Sample_names}{Vector of sample names. If not provided, function will use the Sample_names in indata}
+\item{SampleID}{(Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID). If not provided, function will use the Sample_ID in indata}
 }
 \description{
 Plot posterior predictive distribution for number of variant reads

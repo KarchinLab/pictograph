@@ -4,7 +4,7 @@
 \alias{writeClusterCCFsTable}
 \title{Determine the most probable cluster CCF values by taking the mode of the posterior distributions}
 \usage{
-writeClusterCCFsTable(w_chain, Sample_ID)
+writeClusterCCFsTable(w_chain, Sample_ID = NULL)
 }
 \arguments{
 \item{w_chain}{MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}}

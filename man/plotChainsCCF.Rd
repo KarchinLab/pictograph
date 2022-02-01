@@ -7,7 +7,7 @@
 plotChainsCCF(w_chain)
 }
 \arguments{
-\item{w_chain}{MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}}
+\item{w_chain}{MCMC chain of CCF values, which is the first item in the list returned by \code{mergeSetChains}}
 }
 \description{
 Plot CCF chain trace
