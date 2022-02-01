@@ -258,8 +258,12 @@ estimateClusterAssignments <- function(z_chain) {
 #' @param z_chain MCMC chain of mutation cluster assignment values, which is the second item in the list returned by \code{clusterSep}
 #' @param Mut_ID Vector of mutation IDs, same order as provided as input data (e.g. indata$Mut_ID)
 #' @return A tibble listing mutation IDs and their cluster assignments
-writeClusterAssignmentsTable <- function(z_chain, Mut_ID) {
-  map_z <- estimateClusterAssignments(z_chain) %>%
+writeClusterAssignmentsTable <- function(z_chain, Mut_ID = NULL) {
+  map_z <- estimateClusterAssignments(z_chain) 
+  if (is.null(Mut_ID)) {
+    Mut_ID <- paste0("Mut", 1:nrow(map_z))
+  }
+  map_z <- map_z %>%
     mutate(Mut_ID = Mut_ID, Cluster = value) %>%
     select(Mut_ID, Cluster) %>%
     arrange(Cluster)
@@ -299,8 +303,12 @@ estimateCCFs <- function(w_chain) {
 #' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
 #' @param Sample_ID Vector of sample IDs, same order as provided as input data (e.g. indata$Sample_ID)
 #' @return A tibble of estimated cluster CCFs in each sample 
-writeClusterCCFsTable <- function(w_chain, Sample_ID) {
+writeClusterCCFsTable <- function(w_chain, Sample_ID = NULL) {
   map_w <- as.data.frame(estimateCCFs(chains$w_chain))
+  
+  if (is.null(Sample_ID)) {
+    Sample_ID <- paste0("Sample ", 1:ncol(map_w))
+  }
   colnames(map_w) <- Sample_ID
   map_w <- map_w %>%
     as_tibble() %>%
