@@ -218,19 +218,25 @@ violinProcessData <- function(w_chain, indata) {
   w_mat <- estimateCCFs(w_chain)
   est_K <- nrow(w_mat)
   
+  if (is.null(indata$Sample_ID)) {
+    sample_names <- paste0("Sample ", 1:indata$S)
+  } else {
+    sample_names <- indata$Sample_ID
+  }
+  
   vdat <- w_chain %>%
     mutate(sample=stringr::str_replace_all(Parameter, "w\\[[:digit:]+,", ""),
            sample=stringr::str_replace_all(sample, "\\]", ""),
            cluster=stringr::str_replace_all(Parameter, "w\\[", ""),
            cluster=stringr::str_replace_all(cluster, ",[:digit:]\\]", "")) %>%
     mutate(sample=as.numeric(sample),
-           sample=indata$Sample_ID[sample],
-           sample=factor(sample, indata$Sample_ID),
+           sample=sample_names[sample],
+           sample=factor(sample, sample_names),
            cluster=as.numeric(cluster),
            cluster=paste0("Cluster ", cluster),
            cluster=factor(cluster, level=paste("Cluster", 1:est_K)))
   
-  tiers <- generateTiers(w_mat, indata$Sample_ID)
+  tiers <- generateTiers(w_mat, sample_names)
   
   vdat <- vdat %>%
     mutate(cluster=as.character(cluster)) %>%
