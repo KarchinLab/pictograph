@@ -43,9 +43,9 @@ input_data <- list(y = sim_data_1$y,
 
 The first step of evolutionary analysis is clustering mutations and estimating their CCFs. This is comprised of three steps: 
 
-a. splitting the mutation data into sets by sample-presence and approximating the joint posterior by Markov chain Monte Carlo (MCMC) across a range of possible values for the number of clusters, $K$
-b. selecting the best $K$ for each mutation set
-c. merging the best chains of each mutation set. 
+a. Splitting the mutation data into sets by sample-presence and approximating the joint posterior by Markov chain Monte Carlo (MCMC) across a range of possible values for the number of clusters, $K$
+b. Selecting the best $K$ for each mutation set
+c. Merging the best chains of each mutation set
 
 ### 3a. Run clustering and CCF estimation separately for each mutation set 
 
@@ -151,10 +151,10 @@ all_spanning_trees
 We then calculate a fitness score for all the trees that have passed our filtering and identify the highest scoring tree. 
 ```{r tree-scoring}
 # calculate SCHISM fitness score for all trees
-scores <- calcTreeScores(chains$w_chain, filtered_trees)
+scores <- calcTreeScores(chains$w_chain, all_spanning_trees)
 scores
 # highest scoring tree
-best_tree <- filtered_trees[[which.max(scores)]]
+best_tree <- all_spanning_trees[[which.max(scores)]]
 # plot tree
 plotTree(best_tree)
 ```
