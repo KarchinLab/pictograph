@@ -304,7 +304,7 @@ estimateCCFs <- function(w_chain) {
 #' @param Sample_ID Vector of sample IDs, same order as provided as input data (e.g. indata$Sample_ID)
 #' @return A tibble of estimated cluster CCFs in each sample 
 writeClusterCCFsTable <- function(w_chain, Sample_ID = NULL) {
-  map_w <- as.data.frame(estimateCCFs(chains$w_chain))
+  map_w <- as.data.frame(estimateCCFs(w_chain))
   
   if (is.null(Sample_ID)) {
     Sample_ID <- paste0("Sample ", 1:ncol(map_w))
