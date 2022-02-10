@@ -80,7 +80,7 @@ str(best_set_chains, give.attr = F, max.level = 2)
 
 BIC values for all $K$ assessed in each mutation set can be visualized using `plotBIC`. 
 
-```{r plot_bic, height = 5, width = 8}
+```{r plot_bic, height = 5, width = 6}
 plotBIC(all_set_results)
 ```
 
