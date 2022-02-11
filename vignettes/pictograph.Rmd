@@ -165,3 +165,7 @@ In this toy example, there is only one tree with the maximum score. In some case
 plotEnsembleTree(all_spanning_trees)
 ```
 
+```{r subclone-props}
+subclone_props <- calcSubcloneProportions(w_mat, best_tree)
+plotSubclonePie(subclone_props)
+```
