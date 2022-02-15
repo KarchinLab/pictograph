@@ -69,6 +69,8 @@ runMCMCForABox <- function(box,
                       inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
   if(box$I == 1) {
     colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "z")] <- "z[1]"
+    # fix ystar column names 
+    colnames(samps_K1[[1]])[startsWith(colnames(samps_K1[[1]]), "ystar")] <- paste0("ystar[1,", 1:box$S, "]")
   }
   
   # Max number of clusters cannot be more than number of mutations
