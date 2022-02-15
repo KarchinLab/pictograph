@@ -179,7 +179,7 @@ plotBIC <- function(all_set_results, Sample_ID = NULL) {
   bic_tb <- grabBIC(all_set_results) 
   min_BIC <- grabBestK(all_set_results) %>%
     rename(K_tested = Best_K) %>%
-    left_join(., bic_tb,
+    right_join(., bic_tb,
               by = c("Set", "K_tested"))
   
   # rename sets
