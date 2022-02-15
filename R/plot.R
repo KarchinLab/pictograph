@@ -152,7 +152,8 @@ plotClusterAssignmentProbVertical <- function(z_chain,
 
 grabBIC <- function(all_set_results) {
   bic_list <- lapply(all_set_results, function(x) x$BIC) 
-  bic_tb <- bic_list %>%
+  bic_list_filt <- bic_list[sapply(bic_list, function(x) typeof(x) != "logical")]
+  bic_tb <- bic_list_filt %>%
     bind_rows(.id = 'Set') %>%
     mutate(Set = factor(Set, levels = names(all_set_results)))
   return(bic_tb)
