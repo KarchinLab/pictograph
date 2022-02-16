@@ -168,6 +168,86 @@ grabBestK <- function(all_set_results) {
   return(best_k)
 }
 
+#' Plot probabilities of mutation cluster assignments (vertical) for tested K across all mutation sets
+#' 
+#' @export
+#' @import ggplot2
+#' @import dplyr
+#' @param all_set_results List of MCMC results for each mutation set; returned by \code{clusterSep}
+#' @param filter_thresh Lowest posterior probability to include cluster assignment. Default value is 0.05 (inclusive)
+#' @param SampleID (Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID)
+plotAllZProb <- function(all_set_results, outdir, SampleID = NULL, filter_thresh = 0.05) {
+  if (is.null(SampleID)) {
+    sample_names <- paste0("Sample ", 1:S)
+  } else {
+    sample_names <- SampleID
+  }
+  
+  num_sets <- length(all_set_results)
+  set_names_bin <- names(all_set_results)
+  
+  for (set in set_names_bin) {
+    set_name_full <- sample_names[as.logical(as.numeric(strsplit(set, "")[[1]]))] %>%
+      paste0(., collapse = ",\n")
+    
+    all_set_chains <- all_set_results[[set]]$all_chains
+    k_tested <- as.numeric(gsub("K", "", names(all_set_chains)))
+    S <- all_set_chains[[1]]$w_chain %>%
+      estimateCCFs %>%
+      ncol
+    I <- all_set_chains[[1]]$z_chain %>%
+      estimateClusterAssignments %>%
+      nrow
+    num_iter <- all_set_chains[[1]]$z_chain %>%
+      pull(Iteration) %>%
+      max
+    
+    for (k in k_tested) {
+      z_plot_file <- file.path(zoutdir, paste0(set, "_", names(all_set_chains)[k], "_z_plot.pdf"))
+      plot_title <- paste0(set_name_full, ": ", names(all_set_chains)[k])
+      temp_chains <- all_set_chains[[k]]
+      
+      mcmc_z <- summarizeZPost(temp_chains$z_chain) %>%
+        filter(probability >= filter_thresh) %>%
+        mutate(Variant = as.numeric(gsub("z\\[|]", "", Parameter)))
+      
+      # order varints by highest probability cluster assignment
+      var_order <-  mcmc_z %>%
+        group_by(Variant) %>%
+        summarize(map_z = value[which.max(probability)]) %>%
+        arrange(-map_z) %>%
+        pull(Variant)
+      
+      mcmc_z <- mcmc_z %>%
+        mutate(Variant = factor(Variant, levels = var_order))
+      
+      # segments connecting multiple assignments for each variant
+      z.seg.tb <- mcmc_z %>%
+        group_by(Variant) %>%
+        summarize(z1 = min(value), z2 = max(value)) %>%
+        ungroup() 
+      
+      z.plot <- ggplot(mcmc_z, aes(x = value, y = Variant, color = probability)) +
+        theme_light() +
+        scale_y_discrete(drop = T, name = "Variant", labels = NULL) +
+        scale_x_continuous(breaks = 1:k, name = "Cluster", labels = 1:k) +
+        geom_segment(data = z.seg.tb, 
+                     aes(y=Variant, yend=Variant,
+                         x=z1, xend=z2),
+                     color="black", linetype=2) +
+        geom_point() +
+        theme(panel.grid.minor = element_blank(),
+              strip.background=element_blank(),
+              strip.text = element_text(colour = 'black'),
+              strip.text.y = element_text(angle = 0)) +
+        scale_color_gradient(limits = c(0,1)) +
+        ggtitle(plot_title)
+      plot_height <- max(3, I/15) + S/2
+      ggsave(z_plot_file, plot = z.plot, height = plot_height, width = max(3, k))
+    }
+  }
+}
+
 #' Plot BIC for all mutation sets 
 #' 
 #' @export
