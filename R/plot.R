@@ -270,14 +270,11 @@ plotBIC <- function(all_set_results, Sample_ID = NULL) {
       ncol
     Sample_ID <- paste0("Sample ", 1:S)
   }
-  
-  binary_set_names <- unique(bic_tb$Set)
-  set_names <- sapply(binary_set_names, function(x) getSetName(x, Sample_ID))
-  
+   
   bic_tb <- bic_tb %>%
-    mutate(Set_name = factor(set_names[Set], levels = set_names))
+    mutate(Set_name = sapply(bic_tb$Set, function(x) getSetName(x, Sample_ID)))
   min_BIC <- min_BIC %>%
-    mutate(Set_name = factor(set_names[Set], levels = set_names))
+    mutate(Set_name = sapply(min_BIC$Set, function(x) getSetName(x, Sample_ID)))
   
   # plot
   bic_plot <- ggplot(bic_tb, aes(x = K_tested, y = BIC)) +
