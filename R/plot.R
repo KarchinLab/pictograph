@@ -291,13 +291,13 @@ plotBIC <- function(all_set_results, Sample_ID = NULL) {
 }
 
 #' Convert binary set names to long form with Sample_ID
-getSetName <- function(binary_name, Sample_ID) {
+getSetName <- function(binary_name, Sample_ID, collapse_string = ", \n") {
   split_bin <- strsplit(as.character(binary_name), "") %>%
     .[[1]] %>%
     as.numeric() %>%
     as.logical()
   samples_present <- Sample_ID[split_bin]
-  set_name <- paste0(samples_present, collapse = ", \n")
+  set_name <- paste0(samples_present, collapse = collapse_string)
   return(set_name)
 }
 

@@ -4,7 +4,7 @@
 \alias{getSetName}
 \title{Convert binary set names to long form with Sample_ID}
 \usage{
-getSetName(binary_name, Sample_ID)
+getSetName(binary_name, Sample_ID, collapse_string = ", \\n")
 }
 \description{
 Convert binary set names to long form with Sample_ID

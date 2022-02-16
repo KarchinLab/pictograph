@@ -494,3 +494,20 @@ relabel.w.z.chains <- function(true.z, chains) {
        z.chain=z.chain.relabeled)
 }
 
+#' Make table listing chosen K (by minimum BIC) for each mutation set
+#' @export
+#' @import dplyr
+#' @param all_set_results List of MCMC results for each mutation set; returned by \code{clusterSep}
+#' @param sample_names (Optional) Vector of sample IDs, same order as provided as input data (e.g. indata$Sample_ID)
+writeSetKTable <- function(all_set_results, sample_names = NULL) {
+  min_bic_k <- sapply(all_set_results, function(x) x$best_K)
+  min_bic_k_tb <- tibble(set_name_bin = names(all_set_results),
+                         chosen_K = min_bic_k)
+  
+  if (!is.null(sample_names)) {
+    min_bic_k_tb <- min_bic_k_tb %>%
+      mutate(set_name_full = sapply(min_bic_k_tb$set_name_bin, 
+                                    function(x) getSetName(x, sample_names)))
+  }
+  return(min_bic_k_tb)
+}
