@@ -507,7 +507,7 @@ writeSetKTable <- function(all_set_results, sample_names = NULL) {
   if (!is.null(sample_names)) {
     min_bic_k_tb <- min_bic_k_tb %>%
       mutate(set_name_full = sapply(min_bic_k_tb$set_name_bin, 
-                                    function(x) getSetName(x, sample_names)))
+                                    function(x) getSetName(x, sample_names, collapse_string = ",")))
   }
   return(min_bic_k_tb)
 }
