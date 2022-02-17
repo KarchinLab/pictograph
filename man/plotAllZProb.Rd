@@ -4,14 +4,24 @@
 \alias{plotAllZProb}
 \title{Plot probabilities of mutation cluster assignments (vertical) for tested K across all mutation sets}
 \usage{
-plotAllZProb(all_set_results, outdir, SampleID = NULL, filter_thresh = 0.05)
+plotAllZProb(
+  all_set_results,
+  outdir,
+  SampleID = NULL,
+  filter_thresh = 0.05,
+  compare_min_elbow_bic = FALSE
+)
 }
 \arguments{
 \item{all_set_results}{List of MCMC results for each mutation set; returned by \code{clusterSep}}
 
+\item{outdir}{Path to directory for output of plots}
+
 \item{SampleID}{(Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID)}
 
 \item{filter_thresh}{Lowest posterior probability to include cluster assignment. Default value is 0.05 (inclusive)}
+
+\item{compare_min_elbow_bic}{Option to only plot cluster probabilities for K chosen by minimum BIC and elbow of plot when different (default FALSE plots all K tested)}
 }
 \description{
 Plot probabilities of mutation cluster assignments (vertical) for tested K across all mutation sets

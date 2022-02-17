@@ -494,20 +494,29 @@ relabel.w.z.chains <- function(true.z, chains) {
        z.chain=z.chain.relabeled)
 }
 
-#' Make table listing chosen K (by minimum BIC) for each mutation set
+#' Make table listing possible choices of K (minimum BIC and elbow of BIC plot) for each mutation set
+#' 
 #' @export
 #' @import dplyr
 #' @param all_set_results List of MCMC results for each mutation set; returned by \code{clusterSep}
 #' @param sample_names (Optional) Vector of sample IDs, same order as provided as input data (e.g. indata$Sample_ID)
 writeSetKTable <- function(all_set_results, sample_names = NULL) {
   min_bic_k <- sapply(all_set_results, function(x) x$best_K)
+  elbow_k <- sapply(all_set_results, function(x) ifelse(is.logical(x$BIC), 1, findElbow1(x$BIC$BIC)))
   min_bic_k_tb <- tibble(set_name_bin = names(all_set_results),
-                         chosen_K = min_bic_k)
+                         min_BIC = min_bic_k,
+                         elbow = elbow_k)
   
   if (!is.null(sample_names)) {
     min_bic_k_tb <- min_bic_k_tb %>%
       mutate(set_name_full = sapply(min_bic_k_tb$set_name_bin, 
-                                    function(x) getSetName(x, sample_names, collapse_string = ",")))
+                                    function(x) getSetName(x, sample_names, collapse_string = ","))) %>%
+      select(set_name_bin, set_name_full, min_BIC, elbow)
   }
+  
+  # write chosen K if elbow and minimum BIC agree 
+  min_bic_k_tb <- min_bic_k_tb %>%
+    mutate(chosen_K = ifelse(min_BIC == elbow, min_BIC, NA))
+  
   return(min_bic_k_tb)
 }

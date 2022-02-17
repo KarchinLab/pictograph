@@ -408,16 +408,14 @@ relabel_z_chain <- function(z_chain, new_cluster_labels, mutation_indices) {
 
 relabel_ystar_chain <- function(ystar_chain, mutation_indices) {
   # mutation_indices = numeric vector of original mutation indices prior to separating by sample presence
-  
+  i_s <- gsub("ystar\\[|]", "", ystar_chain$Parameter)
+  i <- sapply(i_s, function(x) strsplit(x, ",")[[1]][1]) %>%
+    as.numeric
+  s <- sapply(i_s, function(x) strsplit(x, ",")[[1]][2]) %>%
+    as.numeric
   new_ystar <- ystar_chain %>%
-    mutate(i = as.numeric(gsub("\\]", "",
-                               gsub("ystar\\[", "",
-                                    sapply(ystar_chain$Parameter,
-                                           function(x) strsplit(as.character(x), ",")[[1]][1])))),
-           s = as.numeric(gsub("\\]", "",
-                               gsub("ystar\\[", "",
-                                    sapply(ystar_chain$Parameter,
-                                           function(x) strsplit(as.character(x), ",")[[1]][2])))))
+    mutate(i = i,
+           s = s)
   new_ystar <- new_ystar %>%
     mutate(new_i = mutation_indices[i]) %>%
     mutate(Parameter = paste0("ystar[", new_i, ",", s, "]")) %>%

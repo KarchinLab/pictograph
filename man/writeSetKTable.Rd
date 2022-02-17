@@ -2,7 +2,7 @@
 % Please edit documentation in R/clustering_functions.R
 \name{writeSetKTable}
 \alias{writeSetKTable}
-\title{Make table listing chosen K (by minimum BIC) for each mutation set}
+\title{Make table listing possible choices of K (minimum BIC and elbow of BIC plot) for each mutation set}
 \usage{
 writeSetKTable(all_set_results, sample_names = NULL)
 }
@@ -12,5 +12,5 @@ writeSetKTable(all_set_results, sample_names = NULL)
 \item{sample_names}{(Optional) Vector of sample IDs, same order as provided as input data (e.g. indata$Sample_ID)}
 }
 \description{
-Make table listing chosen K (by minimum BIC) for each mutation set
+Make table listing possible choices of K (minimum BIC and elbow of BIC plot) for each mutation set
 }
