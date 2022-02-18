@@ -92,7 +92,7 @@ writeSetKTable <- function(all_set_results, sample_names = NULL) {
     min_bic_k_tb <- min_bic_k_tb %>%
       mutate(set_name_full = sapply(min_bic_k_tb$set_name_bin, 
                                     function(x) getSetName(x, sample_names, collapse_string = ","))) %>%
-      select(set_name_bin, set_name_full, min_BIC, elbow)
+      select(set_name_bin, set_name_full, min_BIC, elbow, knee)
   }
   
   # write chosen K if elbow, knee, and minimum BIC all agree 
