@@ -218,8 +218,8 @@ plotAllZProb <- function(all_set_results, outdir, SampleID = NULL, filter_thresh
       elbow_k <- k_tb %>%
         filter(set_name_bin == set) %>%
         pull(elbow)
-      k_to_plot <- c(min_bic_k, elbow_k)
-      
+      k_to_plot <- unique(c(min_bic_k, elbow_k))
+      k_to_plot <- k_to_plot[-which(is.na(k_to_plot))]
     } else {
       k_to_plot <- k_tested
     }
