@@ -279,11 +279,28 @@ plotAllZProb <- function(all_set_results, outdir, SampleID = NULL, filter_thresh
 #' @param SampleID (Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID)
 plotBIC <- function(all_set_results, Sample_ID = NULL) {
   bic_tb <- grabBIC(all_set_results) 
+  k_tb <- writeSetKTable(all_set_results)
   min_BIC <- grabBestK(all_set_results) %>%
     rename(K_tested = Best_K) %>%
     left_join(., bic_tb,
-              by = c("Set", "K_tested"))
+              by = c("Set", "K_tested")) %>%
+    mutate(Choice = "Minimum")
+  elbow <- k_tb %>%
+    select(K_tested = elbow, Set = set_name_bin) %>%
+    mutate(Set = factor(Set, levels(bic_tb$Set))) %>%
+    left_join(., bic_tb,
+              by = c("Set", "K_tested")) %>%
+    mutate(Choice = "Elbow")
+  knee <- k_tb %>%
+    select(K_tested = knee, Set = set_name_bin) %>%
+    mutate(Set = factor(Set, levels(bic_tb$Set))) %>%
+    left_join(., bic_tb,
+              by = c("Set", "K_tested")) %>%
+    mutate(Choice = "Knee")
+  
   if (any(is.na(min_BIC$BIC))) min_BIC <- min_BIC[-which(is.na(min_BIC$BIC)), ]
+  if (any(is.na(elbow$BIC))) elbow <- elbow[-which(is.na(elbow$BIC)), ]
+  if (any(is.na(knee$BIC))) knee <- knee[-which(is.na(knee$BIC)), ]
   
   # rename sets
   if (is.null(Sample_ID)) {
@@ -292,18 +309,29 @@ plotBIC <- function(all_set_results, Sample_ID = NULL) {
       ncol
     Sample_ID <- paste0("Sample ", 1:S)
   }
+  
+  set_name_tb <- tibble(set_bin = unique(bic_tb$Set),
+                        set_name = sapply(unique(bic_tb$Set), function(x) getSetName(x, Sample_ID))) %>%
+    mutate(set_name = factor(set_name, set_name))
    
   bic_tb <- bic_tb %>%
-    mutate(Set_name = sapply(bic_tb$Set, function(x) getSetName(x, Sample_ID)))
-  min_BIC <- min_BIC %>%
-    mutate(Set_name = sapply(min_BIC$Set, function(x) getSetName(x, Sample_ID)))
+    mutate(Set_name = sapply(bic_tb$Set, function(x) getSetName(x, Sample_ID))) %>%
+    mutate(Set_name = factor(Set_name, set_name_tb$set_name))
+  k_choices <- bind_rows(min_BIC, elbow, knee) %>%
+    mutate(Set_name = sapply(Set, function(x) getSetName(x, Sample_ID))) %>%
+    mutate(Set_name = factor(Set_name, set_name_tb$set_name)) %>%
+    mutate(Choice = factor(Choice, c("Minimum", "Elbow", "Knee")))
   
   # plot
   bic_plot <- ggplot(bic_tb, aes(x = K_tested, y = BIC)) +
     theme_light() +
     facet_wrap(~Set_name, scales = "free") +
     geom_line() +
-    geom_point(data = min_BIC, color = "#56B1F7", size = 2) +
+    geom_point(data = k_choices, aes(color = Choice, size = Choice, shape = Choice), stroke = 1) +
+    scale_shape_manual(values=c(19, 1, 1))+
+    scale_color_manual(values=c('#999999',"#56B1F7", "#E69F00")) +
+    scale_size_manual(values=c(1, 3, 5)) +
+    #geom_point(data = elbow, color = , size = 4, shape = 1)
     theme(strip.background=element_blank(),
           strip.text = element_text(colour = 'black'),
           panel.grid.minor = element_blank()) +
