@@ -9,7 +9,7 @@ plotAllZProb(
   outdir,
   SampleID = NULL,
   filter_thresh = 0.05,
-  compare_min_elbow_bic = FALSE
+  compare = FALSE
 )
 }
 \arguments{
@@ -21,7 +21,7 @@ plotAllZProb(
 
 \item{filter_thresh}{Lowest posterior probability to include cluster assignment. Default value is 0.05 (inclusive)}
 
-\item{compare_min_elbow_bic}{Option to only plot cluster probabilities for K chosen by minimum BIC and elbow of plot when different (default FALSE plots all K tested)}
+\item{compare}{Option to only plot cluster probabilities for K chosen by minimum BIC, elbow or knee of plot when different (default FALSE plots all K tested)}
 }
 \description{
 Plot probabilities of mutation cluster assignments (vertical) for tested K across all mutation sets

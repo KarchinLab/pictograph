@@ -177,8 +177,8 @@ grabBestK <- function(all_set_results) {
 #' @param outdir Path to directory for output of plots 
 #' @param SampleID (Optional) Vector of sample IDs for labeling purposes. Same order as supplied as input data (e.g. indata$Sample_ID)
 #' @param filter_thresh Lowest posterior probability to include cluster assignment. Default value is 0.05 (inclusive)
-#' @param compare_min_elbow_bic Option to only plot cluster probabilities for K chosen by minimum BIC and elbow of plot when different (default FALSE plots all K tested)
-plotAllZProb <- function(all_set_results, outdir, SampleID = NULL, filter_thresh = 0.05, compare_min_elbow_bic = FALSE) {
+#' @param compare Option to only plot cluster probabilities for K chosen by minimum BIC, elbow or knee of plot when different (default FALSE plots all K tested)
+plotAllZProb <- function(all_set_results, outdir, SampleID = NULL, filter_thresh = 0.05, compare = FALSE) {
   if (is.null(SampleID)) {
     S <- estimateCCFs(all_set_results[[1]]$all_chains[[1]]$w_chain) %>% 
       ncol
@@ -190,7 +190,7 @@ plotAllZProb <- function(all_set_results, outdir, SampleID = NULL, filter_thresh
   num_sets <- length(all_set_results)
   set_names_bin <- names(all_set_results)
   
-  if (compare_min_elbow_bic) k_tb <- writeSetKTable(all_set_results)
+  if (compare) k_tb <- writeSetKTable(all_set_results)
   
   for (set in set_names_bin) {
     set_name_full <- sample_names[as.logical(as.numeric(strsplit(set, "")[[1]]))] %>%
@@ -210,16 +210,16 @@ plotAllZProb <- function(all_set_results, outdir, SampleID = NULL, filter_thresh
     
     if (I == 1) next # plot is trivial if only one mutation in set; skip plotting
     
-    if (compare_min_elbow_bic) {
+    if (compare) {
       # only plot for K = minimum BIC and K = elbow
-      min_bic_k <- k_tb %>%
-        filter(set_name_bin == set) %>%
-        pull(min_BIC)
-      elbow_k <- k_tb %>%
-        filter(set_name_bin == set) %>%
-        pull(elbow)
-      k_to_plot <- unique(c(min_bic_k, elbow_k))
-      k_to_plot <- k_to_plot[-which(is.na(k_to_plot))]
+      k_to_plot <- k_tb %>% 
+        filter(set_name_bin == set) %>% 
+        select(min_BIC, elbow, knee) %>% 
+        unlist %>% 
+        unname %>% 
+        unique
+      if (any(is.na(k_to_plot)))  k_to_plot <- k_to_plot[-which(is.na(k_to_plot))]
+     
     } else {
       k_to_plot <- k_tested
     }

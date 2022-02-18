@@ -424,14 +424,6 @@ relabel_ystar_chain <- function(ystar_chain, mutation_indices) {
   return(new_ystar)
 }
 
-# find elbow of bic plot
-findElbow1 <- function(BIC) {
-  delta1 <- diff(BIC)
-  delta2 <- diff(delta1)
-  elbow_ind <- which.min(delta2) + 2
-  return(elbow_ind)
-}
-
 relabel_z_chain_mut_only <- function(z_chain, mutation_indices) {
   # mutation_indices = numeric vector of original mutation indices prior to separating by sample presence
   # cluster labels are left unchanged 
