@@ -102,8 +102,8 @@ plotClusterAssignmentProbVertical <- function(z_chain,
   var_sample_pres <- map_z %>%
     ungroup() %>%
     mutate(cluster_num = value,
-           Variant = 1:I,
-           Mut_ID = mut_labels,
+           Variant = as.numeric(gsub("z\\[|]", "", Parameter)),
+           Mut_ID = mut_labels[Variant],
            Sample_presence = tiers$samples[value])
   # sample presence order 
   sample_pres_order <- tiers %>% 
@@ -114,7 +114,7 @@ plotClusterAssignmentProbVertical <- function(z_chain,
   # variant order 
   var_order <- map_z %>%
     arrange(-value) %>%
-    mutate(Variant = as.numeric(Parameter),
+    mutate(Variant = as.numeric(gsub("z\\[|]", "", Parameter)),
            Mut_ID = mut_labels[Variant]) %>%
     pull(Mut_ID)
   
@@ -122,12 +122,12 @@ plotClusterAssignmentProbVertical <- function(z_chain,
     group_by(Parameter) %>%
     summarize(z1 = min(value), z2 = max(value)) %>%
     ungroup() %>%
-    mutate(Variant = 1:I,
-           Mut_ID = factor(mut_labels, var_order),
+    mutate(Variant = as.numeric(gsub("z\\[|]", "", Parameter)),
+           Mut_ID = factor(mut_labels[Variant], var_order),
            Sample_presence = factor(var_sample_pres$Sample_presence, sample_pres_order))
   
   mcmc_z <- mcmc_z %>%
-    mutate(Variant = as.numeric(Parameter),
+    mutate(Variant = as.numeric(gsub("z\\[|]", "", Parameter)),
            Mut_ID = factor(mut_labels[Variant], var_order),
            Sample_presence = factor(var_sample_pres$Sample_presence[Variant],
                                     sample_pres_order))
