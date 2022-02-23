@@ -1,7 +1,8 @@
 #' @import rjags
 runMCMC <- function(data, K, jags.file, inits, params,
                     n.iter=10000, thin=10, n.chains=1,
-                    n.adapt=1000, n.burn=1000) {
+                    n.adapt=1000, n.burn=1000,
+                    beta.prior=FALSE) {
     if (K > 1) data$K <- K
     jags.m <- jags.model(jags.file,
                          data,
@@ -10,35 +11,69 @@ runMCMC <- function(data, K, jags.file, inits, params,
                          n.adapt = n.adapt)
     if (n.burn > 0) update(jags.m, n.burn)
     samps <- coda.samples(jags.m, params, n.iter=n.iter, thin=thin)
-    samps
+    
+    if (beta.prior & K > 1) {
+      # use initial MCMC to estimate beta priors for identified clusters
+      initial_chains <- formatChains(samps)
+      est_ccfs <- initial_chains$w_chain %>%
+        estimateCCFs %>%
+        as.data.frame %>%
+        magrittr::set_colnames(1:ncol(.)) %>%
+        tibble %>%
+        mutate(cluster = 1:nrow(.)) %>%
+        pivot_longer(cols = colnames(.)[colnames(.) != "cluster"], 
+                     names_to = "sample", 
+                     values_to = "ccf") %>%
+        mutate(sample = as.numeric(sample))
+      
+      est_ccfs$ccf[which(est_ccfs$ccf == 0)] <- 0.001
+      
+      beta_shapes <- lapply(est_ccfs$ccf, 
+                            function(x) 
+                              suppressWarnings(
+                                epiR::epi.betabuster(x, 
+                                                     conf = 0.5, 
+                                                     greaterthan = TRUE,
+                                                     x, 
+                                                     conf.level = 0.8,
+                                                     max.shape1 = 10)))
+      cluster_beta_params <- est_ccfs %>%
+        mutate(shape1 = sapply(beta_shapes, function(x) x$shape1),
+               shape2 = sapply(beta_shapes, function(x) x$shape2))
+      
+      cluster_shape1 <- cluster_beta_params %>%
+        select(cluster, shape1, sample) %>%
+        pivot_wider(names_from = sample,
+                    values_from = shape1) %>%
+        select(-c(cluster)) %>%
+        as.matrix
+      cluster_shape2 <- cluster_beta_params %>%
+        select(cluster, shape2, sample) %>%
+        pivot_wider(names_from = sample,
+                    values_from = shape2) %>%
+        select(-c(cluster)) %>%
+        as.matrix
+      
+      # run second MCMC with specified beta priors
+      data$cluster_shape1 <- cluster_shape1
+      data$cluster_shape2 <- cluster_shape2
+
+      extdir <- system.file("extdata", package="pictograph")
+      jags.file.beta <- file.path(extdir, "model-simple-set-beta.jags")
+      
+      jags.m.beta <- rjags::jags.model(jags.file.beta,
+                                  data,
+                                  n.chains = n.chains,
+                                  inits = inits,
+                                  n.adapt = n.adapt)
+      if (n.burn > 0) update(jags.m.beta, n.burn)
+      samps.beta <- rjags::coda.samples(jags.m.beta, params, n.iter=n.iter, thin=thin)
+      return(samps.beta)
+    }
+
+    return(samps)
 }
 
-runClusteringForRangeK <- function(data, kToTest, 
-                                   inits = list(".RNG.name" = "base::Wichmann-Hill", ".RNG.seed" = 123), 
-                                   params = c("z", "w"), n.iter=10000, thin=10, n.chains=1,
-                                   n.adapt=1000, n.burn=1000,
-                                   mc.cores=8) {
-  # jags files stored in clone.tools
-  extdir <- system.file("extdata", package="pictograph")
-  jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
-  jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
-  
-  # use proper jags model for K=1
-  if (kToTest[1] == 1) {
-    samps.K1 <- runMCMC(data, 1, jags.file.K1, inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
-    samps.list <- parallel::mclapply(kToTest[-1],
-                           function(k) runMCMC(data, k, jags.file, inits, params,
-                                               n.iter=n.iter, thin=thin, n.burn=n.burn),
-                           mc.cores=mc.cores)
-    samps.list <- c(list(samps.K1), samps.list)
-  } else {
-    samps.list <- parallel::mclapply(kToTest,
-                           function(k) runMCMC(data, k, jags.file, inits, params,
-                                               n.iter=n.iter, thin=thin, n.burn=n.burn),
-                           mc.cores=mc.cores)
-  }
-  return(samps.list)
-}
 
 getParamChain <- function(samps, param) {
   chains <- do.call(rbind, samps)
@@ -169,7 +204,8 @@ estimateClusterAssignments <- function(z_chain) {
   if (any(map_z_count$map_count > 1)) {
     mut_ind <- which(map_z_count$map_count > 1)
     for (i in mut_ind) {
-      map_z_dups <- which(as.numeric(map_z$Parameter) == i)
+      dup_var <- as.numeric(gsub("z\\[|]", "", map_z_count$Parameter[i]))
+      map_z_dups <- which(gsub("z\\[|]", "", map_z$Parameter) == dup_var)
       dup_ind <- map_z_dups[-1]
       map_z <- map_z[-dup_ind, ]
     }

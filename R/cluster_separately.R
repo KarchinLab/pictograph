@@ -1,3 +1,49 @@
+#' Run MCMC to cluster mutations and estimate CCFs
+#' 
+#' @export
+#' @importFrom ggmcmc ggs
+#' @param input_data list of input data objects; 
+#' @param n.iter number of iterations to run MCMC
+#' @param n.burn number of iterations for burn in 
+#' @param thin thinning parameter
+#' @param mc.cores number of cores for parallelization
+#' @param max_K maximum number of clusters to assess for each mutation set
+#' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
+#' @param beta.prior option to run an initial MCMC chain and use results to specify beta priors for a second MCMC chain 
+clusterSep <- function(input_data,
+                       n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
+                       inits = list(".RNG.name" = "base::Wichmann-Hill",
+                                    ".RNG.seed" = 123),
+                       max_K = 5,
+                       model_type = "spike_and_slab",
+                       beta.prior = FALSE) {
+  # 1. separate mutations by sample presence
+  sep_list <- separateMutationsBySamplePresence(input_data)
+  
+  # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
+  all_set_results <- vector("list", length(sep_list))
+  names(all_set_results) <- names(sep_list)
+  params = c("z", "w", "ystar")
+  
+  for (i in seq_len(length(sep_list))) {
+    temp_box <- sep_list[[i]]
+    # Max number of clusters cannot be more than number of mutations
+    temp_max_K <- min(max_K, length(temp_box$mutation_indices))
+    
+    temp_samps_list <- runMutSetMCMC(temp_box, 
+                                     n.iter = n.iter, n.burn = n.burn, thin = thin, 
+                                     mc.cores = mc.cores,
+                                     inits = inits,
+                                     temp_max_K = temp_max_K,
+                                     model_type = model_type,
+                                     params = params,
+                                     beta.prior = beta.prior)
+    all_set_results[[i]] <- temp_samps_list
+  }
+  
+  return(all_set_results)
+}
+
 separateMutationsBySamplePresence <- function(input_data) {
   # returns list of lists -- 
   # each item of list contains input data for a mutation sample presence set 
@@ -43,7 +89,8 @@ runMCMCForABox <- function(box,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
                                         ".RNG.seed" = 123),
                            params = c("z", "w", "ystar"),
-                           max_K = 5) {
+                           max_K = 5, model_type = "simple",
+                           beta.prior = FALSE) {
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
   
@@ -55,62 +102,12 @@ runMCMCForABox <- function(box,
     jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
   }
   
-  #jags.file <- file.path(extdir, "spike_and_slab_purity_2.jags")
-  jags.file <- file.path(extdir, "spike_and_slab_purity_ident.jags") # fixing order of CCFs in one sample
-  # choose sample in which mutations are present
-  if (box$I > 1) {
-    sample_to_sort <- which(colSums(box$y) > 0)[1] 
-  } else {
-    sample_to_sort <- which(box$y > 0)[1]
-  }
+  if (model_type == "simple") {
+    jags.file <- file.path(extdir, "model-test.jags") # fixes order of CCFs in one sample, not spike and slab 
+  } else if (model_type == "spike_and_slab") {
+    jags.file <- file.path(extdir, "spike_and_slab_purity_ident.jags") # fixing order of CCFs in one sample
+  } else stop("provide model_type either 'spike_and_slab' or 'simple'")
   
-  
-  samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
-                      inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
-  if(box$I == 1) {
-    colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "z")] <- "z[1]"
-    # fix ystar column names 
-    colnames(samps_K1[[1]])[startsWith(colnames(samps_K1[[1]]), "ystar")] <- paste0("ystar[1,", 1:box$S, "]")
-  }
-  
-  # Max number of clusters cannot be more than number of mutations
-  max_K <- min(max_K, length(box$mutation_indices)) 
-  if (max_K > 1) {
-    box_input_data$sample_to_sort <- sample_to_sort
-    samps_2 <- parallel::mclapply(2:max_K,
-                                  function(k) runMCMC(box_input_data, k,
-                                                      jags.file, inits, params,
-                                                      n.iter=n.iter, thin=thin,
-                                                      n.burn=n.burn),
-                                  mc.cores=mc.cores)
-    samps_list <- c(list(samps_K1), samps_2)
-    names(samps_list) <- paste0("K", 1:max_K)
-    return(samps_list)
-  } else {
-    names(samps_K1) <- "K1"
-    return(samps_K1)
-  }
-}
-
-runMCMCForABox2 <- function(box, 
-                           n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
-                           inits = list(".RNG.name" = "base::Wichmann-Hill",
-                                        ".RNG.seed" = 123),
-                           params = c("z", "w", "ystar"),
-                           max_K = 5) {
-  # returns samps_list 
-  box_input_data <- getBoxInputData(box)
-  
-  extdir <- system.file("extdata", package="pictograph")
-  if (box$I == 1) {
-    jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1_I1.jags")
-    box_input_data$I <- NULL
-  } else {
-    jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
-  }
-  
-  jags.file <- file.path(extdir, "model-test.jags") # fixes order of CCFs in one sample, not spike and slab 
-  #jags.file <- file.path(extdir, "spike_and_slab_purity_ident.jags") # fixing order of CCFs in one sample
   # choose sample in which mutations are present
   if (box$I > 1) {
     sample_to_sort <- which(colSums(box$y) > 0)[1] 
@@ -128,16 +125,21 @@ runMCMCForABox2 <- function(box,
   # Max number of clusters cannot be more than number of mutations
   max_K <- min(max_K, length(box$mutation_indices)) 
   if (max_K > 1) {
+  
     box_input_data$sample_to_sort <- sample_to_sort
+    
     samps_2 <- parallel::mclapply(2:max_K,
                                   function(k) runMCMC(box_input_data, k,
                                                       jags.file, inits, params,
                                                       n.iter=n.iter, thin=thin,
-                                                      n.burn=n.burn),
+                                                      n.burn=n.burn,
+                                                      beta.prior=beta.prior),
                                   mc.cores=mc.cores)
+    
     samps_list <- c(list(samps_K1), samps_2)
     names(samps_list) <- paste0("K", 1:max_K)
     return(samps_list)
+    
   } else {
     names(samps_K1) <- "K1"
     return(samps_K1)
@@ -164,10 +166,12 @@ runMutSetMCMC <- function(temp_box,
                                        ".RNG.seed" = 123),
                           temp_max_K = 5,
                           model_type = "spike_and_slab",
-                          params = c("z", "w", "ystar")) {
+                          params = c("z", "w", "ystar"),
+                          beta.prior = FALSE) {
   
   # Run MCMC
   if (temp_max_K == 1) {
+    # only 1 possible cluster
     temp_samps_list <- runMCMCForABox(temp_box,
                                       n.iter = n.iter, n.burn = n.burn, 
                                       thin = thin, mc.cores = mc.cores,
@@ -175,23 +179,15 @@ runMutSetMCMC <- function(temp_box,
                                       params = params,
                                       max_K = temp_max_K)
   } else {
-    
-    if (model_type == "spike_and_slab") {
-      temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, 
-                                        thin = thin, mc.cores = mc.cores,
-                                        inits = inits,
-                                        params = params,
-                                        max_K = temp_max_K)
-      
-    } else if (model_type == "simple") {
-      temp_samps_list <- runMCMCForABox2(temp_box,
-                                         n.iter = n.iter, n.burn = n.burn, 
-                                         thin = thin, mc.cores = mc.cores,
-                                         inits = inits,
-                                         params = params,
-                                         max_K = temp_max_K)
-    } else stop("provide model_type either 'spike_and_slab' or 'simple'")
+    # assess range of K: [1, temp_max_K]
+    temp_samps_list <- runMCMCForABox(temp_box,
+                                      n.iter = n.iter, n.burn = n.burn, 
+                                      thin = thin, mc.cores = mc.cores,
+                                      inits = inits,
+                                      params = params,
+                                      max_K = temp_max_K,
+                                      model = model_type,
+                                      beta.prior = beta.prior)
   }
   
   # Format chains
@@ -226,48 +222,7 @@ runMutSetMCMC <- function(temp_box,
 
 
 
-#' Run MCMC to cluster mutations and estimate CCFs
-#' 
-#' @export
-#' @importFrom ggmcmc ggs
-#' @param input_data list of input data objects; 
-#' @param n.iter number of iterations to run MCMC
-#' @param n.burn number of iterations for burn in 
-#' @param thin thinning parameter
-#' @param mc.cores number of cores for parallelization
-#' @param max_K maximum number of clusters to assess for each mutation set
-#' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
-clusterSep <- function(input_data,
-                       n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
-                       inits = list(".RNG.name" = "base::Wichmann-Hill",
-                                    ".RNG.seed" = 123),
-                       max_K = 5,
-                       model_type = "spike_and_slab") {
-  # 1. separate mutations by sample presence
-  sep_list <- separateMutationsBySamplePresence(input_data)
-  
-  # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
-  all_set_results <- vector("list", length(sep_list))
-  names(all_set_results) <- names(sep_list)
-  params = c("z", "w", "ystar")
 
-  for (i in seq_len(length(sep_list))) {
-    temp_box <- sep_list[[i]]
-    # Max number of clusters cannot be more than number of mutations
-    temp_max_K <- min(max_K, length(temp_box$mutation_indices))
-    
-    temp_samps_list <- runMutSetMCMC(temp_box, 
-                                     n.iter = n.iter, n.burn = n.burn, thin = thin, 
-                                     mc.cores = mc.cores,
-                                     inits = inits,
-                                     temp_max_K = temp_max_K,
-                                     model_type = model_type,
-                                     params = params)
-    all_set_results[[i]] <- temp_samps_list
-  }
-  
-  return(all_set_results)
-}
 
 #' Collect chains for best K of each mutation set 
 #' 
