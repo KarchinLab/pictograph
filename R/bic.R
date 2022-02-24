@@ -81,7 +81,7 @@ calcTheta2 <- function(m, tcn, w, p) {
 #' @param sample_names (Optional) Vector of sample IDs, same order as provided as input data (e.g. indata$Sample_ID)
 writeSetKTable <- function(all_set_results, sample_names = NULL) {
   min_bic_k <- sapply(all_set_results, function(x) x$best_K)
-  elbow_k <- sapply(all_set_results, function(x) ifelse(is.logical(x$BIC), 1, findElbow1(x$BIC$BIC)))
+  elbow_k <- sapply(all_set_results, function(x) ifelse(is.logical(x$BIC), 1, findElbow2(x$BIC$BIC)))
   knee_k <- sapply(all_set_results, function(x) ifelse(is.logical(x$BIC), 1, findKnee(x$BIC$BIC)))
   min_bic_k_tb <- tibble(set_name_bin = names(all_set_results),
                          min_BIC = min_bic_k,
@@ -120,6 +120,34 @@ findElbow1 <- function(BIC) {
   delta2 <- diff(delta1)
   elbow_ind <- which.min(delta2) + 2
   return(elbow_ind)
+}
+
+findElbow2 <- function(BIC) {
+  
+  # return first ind if all increasing 
+  if(all (BIC >= BIC[1])) return(1)
+  
+  K_vec <- seq_len(length(BIC))
+  # line defined by two end-points of BIC plot P1 = (x1, y1) and P2 = (x2, y2)
+  x1 <- K_vec[1]
+  y1 <- BIC[1]
+  x2 <- length(BIC)
+  y2 <- BIC[length(BIC)]
+  
+  # calculate distance of each point (x0, y0) to line
+  perp_dist <- sapply(K_vec, function(i) calcDistFromPointToLine(K_vec[i], BIC[i],
+                                                    x1, y1, 
+                                                    x2, y2))
+  return(which.max(perp_dist))
+}
+
+calcDistFromPointToLine <- function (x0, y0,
+                                     x1, y1,
+                                     x2, y2) {
+  numerator <- abs( (x2-x1)*(y1-y0) - (x1-x0)*(y2-y1) )
+  denominator <- sqrt( (x2-x1)^2 + (y2-y1)^2 )
+  distance <- numerator / denominator
+  return(distance)
 }
 
 # angle-based method for knee point detection of BIC 
