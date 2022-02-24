@@ -1,4 +1,5 @@
 #' @import rjags
+#' @importFrom epiR epi.betabuster
 runMCMC <- function(data, K, jags.file, inits, params,
                     n.iter=10000, thin=10, n.chains=1,
                     n.adapt=1000, n.burn=1000,
@@ -26,20 +27,11 @@ runMCMC <- function(data, K, jags.file, inits, params,
                      values_to = "ccf") %>%
         mutate(sample = as.numeric(sample))
       
-      est_ccfs$ccf[which(est_ccfs$ccf == 0)] <- 0.001
       
-      beta_shapes <- lapply(est_ccfs$ccf, 
-                            function(x) 
-                              suppressWarnings(
-                                epiR::epi.betabuster(x, 
-                                                     conf = 0.5, 
-                                                     greaterthan = TRUE,
-                                                     x, 
-                                                     conf.level = 0.8,
-                                                     max.shape1 = 10)))
+      beta_shapes <- lapply(est_ccfs$ccf, estimateBetaPriors)
       cluster_beta_params <- est_ccfs %>%
-        mutate(shape1 = sapply(beta_shapes, function(x) x$shape1),
-               shape2 = sapply(beta_shapes, function(x) x$shape2))
+        mutate(shape1 = sapply(beta_shapes, function(x) x[1]),
+               shape2 = sapply(beta_shapes, function(x) x[2]))
       
       cluster_shape1 <- cluster_beta_params %>%
         select(cluster, shape1, sample) %>%
@@ -72,6 +64,31 @@ runMCMC <- function(data, K, jags.file, inits, params,
     }
 
     return(samps)
+}
+
+#' @importFrom epiR epi.betabuster
+estimateBetaPriors <- function(ccf) {
+  if (ccf == 0) ccf <- 0.001
+  suppressWarnings(
+    param_list <- epiR::epi.betabuster(ccf, 
+                         conf = 0.5, 
+                         greaterthan = TRUE,
+                         ccf, 
+                         conf.level = 0.8,
+                         max.shape1 = 10)
+  )
+  
+  if (length(param_list$shape1) > 1) {
+    shape1 <- mean(param_list$shape1)
+  } else {
+    shape1 <- param_list$shape1
+  }
+  if (length(param_list$shape2) > 1) {
+    shape2 <- mean(param_list$shape2)
+  } else {
+    shape2 <- param_list$shape2
+  }
+  return(c(shape1, shape2))
 }
 
 
