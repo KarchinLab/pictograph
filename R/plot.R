@@ -74,6 +74,40 @@ plotClusterAssignmentProbVertical <- function(z_chain,
                                               MutID = NULL,
                                               SampleID = NULL) {
   
+  mcmc_z <- generateZPostSummary(z_chain, w_chain, filter_thresh, MutID, SampleID)
+  K <- max(mcmc_z$value)
+  z.seg.tb <- mcmc_z %>%
+    group_by(Parameter) %>%
+    summarize(z1 = min(value), z2 = max(value)) %>%
+    ungroup() %>%
+    mutate(Variant = as.numeric(gsub("z\\[|]", "", Parameter)),
+           Mut_ID =  mcmc_z$Mut_ID[match(Variant, mcmc_z$Variant)],
+           Sample_presence =  mcmc_z$Sample_presence[match(Variant, mcmc_z$Variant)])
+  
+  z.plot <- ggplot(mcmc_z, aes(x = value, y = Mut_ID, color = probability)) +
+    theme_light() +
+    scale_y_discrete(drop = T, name = "Variant") +
+    scale_x_continuous(breaks = 1:K, name = "Cluster", labels = 1:K) +
+    geom_segment(data = z.seg.tb, 
+                 aes(y=Mut_ID, yend=Mut_ID,
+                     x=z1, xend=z2),
+                 color="black", linetype=2) +
+    geom_point() +
+    theme(panel.grid.minor = element_blank(),
+          strip.background=element_blank(),
+          strip.text = element_text(colour = 'black'),
+          strip.text.y = element_text(angle = 0)) +
+    facet_grid(Sample_presence~., scales = "free", space = "free") +
+    scale_color_gradient(limits = c(0,1))
+  return(z.plot)
+}
+
+generateZPostSummary <- function(z_chain, 
+                                 w_chain,
+                                 filter_thresh = 0.05,
+                                 MutID = NULL,
+                                 SampleID = NULL) {
+  
   map_z <- estimateClusterAssignments(z_chain)
   map_w <- estimateCCFs(w_chain)
   
@@ -92,6 +126,8 @@ plotClusterAssignmentProbVertical <- function(z_chain,
   } else {
     sample_labels <- SampleID
   }
+  
+
   
   tiers <- generateTiers(map_w, sample_labels)
   
@@ -118,36 +154,12 @@ plotClusterAssignmentProbVertical <- function(z_chain,
            Mut_ID = mut_labels[Variant]) %>%
     pull(Mut_ID)
   
-  z.seg.tb <- mcmc_z %>%
-    group_by(Parameter) %>%
-    summarize(z1 = min(value), z2 = max(value)) %>%
-    ungroup() %>%
-    mutate(Variant = as.numeric(gsub("z\\[|]", "", Parameter)),
-           Mut_ID = factor(mut_labels[Variant], var_order),
-           Sample_presence = factor(var_sample_pres$Sample_presence, sample_pres_order))
-  
   mcmc_z <- mcmc_z %>%
     mutate(Variant = as.numeric(gsub("z\\[|]", "", Parameter)),
            Mut_ID = factor(mut_labels[Variant], var_order),
            Sample_presence = factor(var_sample_pres$Sample_presence[Variant],
                                     sample_pres_order))
-  
-  z.plot <- ggplot(mcmc_z, aes(x = value, y = Mut_ID, color = probability)) +
-    theme_light() +
-    scale_y_discrete(drop = T, name = "Variant") +
-    scale_x_continuous(breaks = 1:K, name = "Cluster", labels = 1:K) +
-    geom_segment(data = z.seg.tb, 
-                 aes(y=Mut_ID, yend=Mut_ID,
-                     x=z1, xend=z2),
-                 color="black", linetype=2) +
-    geom_point() +
-    theme(panel.grid.minor = element_blank(),
-          strip.background=element_blank(),
-          strip.text = element_text(colour = 'black'),
-          strip.text.y = element_text(angle = 0)) +
-    facet_grid(Sample_presence~., scales = "free", space = "free") +
-    scale_color_gradient(limits = c(0,1))
-  return(z.plot)
+  return(mcmc_z)
 }
 
 grabBIC <- function(all_set_results) {
@@ -392,11 +404,26 @@ plotDensityCCF <- function(w_chain) {
 #' @import dplyr
 #' @import tidyr
 #' @importFrom stringr str_replace_all
-#' @param w_chain MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}
+#' @param w_chain MCMC chain of CCF values
+#' @param z_chain (Optional) MCMC chain of mutation cluster assignment values. If provided, cluster names will show the number of mutations assigned in brackets
 #' @param indata (Optional) List of input data items 
-plotCCFViolin <- function(w_chain, indata = NULL) {
+plotCCFViolin <- function(w_chain, z_chain = NULL, indata = NULL) {
   # process data
   vdat <- violinProcessData(w_chain, indata)
+  
+  if (!is.null(z_chain)) {
+    num_muts_in_clusters <- estimateClusterAssignments(z_chain) %>%
+      group_by(value) %>%
+      summarize(num_muts = n()) %>%
+      ungroup() %>%
+      rename(cluster = value)
+    num_muts <- num_muts_in_clusters$num_muts[match(vdat$cluster_num, num_muts_in_clusters$cluster)]
+    new_cluster_labels <- paste0("Cluster ", 
+                                 vdat$cluster_num, 
+                                 " [", num_muts,"]")
+    vdat <- vdat %>%
+      mutate(cluster = factor(new_cluster_labels, unique(new_cluster_labels)))
+  }
 
   # plot violins
   vplot <- plotViolin(vdat)
@@ -456,9 +483,9 @@ plotViolin <- function(vdat) {
                 color="white") +
     geom_violin(fill="transparent", color="black",
                 scale="width", draw_quantiles=0.5) +
-    theme_bw(base_size=20) +
+    theme_bw(base_size=12) +
     theme(strip.background=element_blank(),
-          axis.text.x=element_text(size=14),
+          axis.text.x=element_text(size=12),
           panel.grid=element_blank(),
           legend.pos="bottom") +
     facet_wrap(~cluster, nrow=1) +

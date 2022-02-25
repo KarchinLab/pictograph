@@ -4,10 +4,12 @@
 \alias{plotCCFViolin}
 \title{Plot cluster CCF posterior distributions as violin plots}
 \usage{
-plotCCFViolin(w_chain, indata = NULL)
+plotCCFViolin(w_chain, z_chain = NULL, indata = NULL)
 }
 \arguments{
-\item{w_chain}{MCMC chain of CCF values, which is the first item in the list returned by \code{clusterSep}}
+\item{w_chain}{MCMC chain of CCF values}
+
+\item{z_chain}{(Optional) MCMC chain of mutation cluster assignment values. If provided, cluster names will show the number of mutations assigned in brackets}
 
 \item{indata}{(Optional) List of input data items}
 }

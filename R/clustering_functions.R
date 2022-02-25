@@ -132,12 +132,14 @@ relabelZ <- function(z.chain, I, K){
       ##filter(value==sim_cluster)
 }
 
+get_mode <- function(v) {
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
 orderW <- function(w, map_z){
     mcmc_cluster_numbering  <- matrix(map_z$value, nrow = 10)
-    get_mode <- function(v) {
-        uniqv <- unique(v)
-        uniqv[which.max(tabulate(match(v, uniqv)))]
-    }
+    
     mcmc_cluster_numbering <- apply(mcmc_cluster_numbering, 2, get_mode)
     true_to_mcmc_w_ordering <- match(1:K, mcmc_cluster_numbering)
     w_ordered <- w[true_to_mcmc_w_ordering, ]

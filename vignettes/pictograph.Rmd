@@ -39,6 +39,10 @@ input_data <- list(y = sim_data_1$y,
                    S = sim_data_1$S)
 ```
 
+```{r load_results, include = F}
+data("example_results")
+```
+
 ## 3. Clustering mutations and estimating CCFs
 
 The first step of evolutionary analysis is clustering mutations and estimating their CCFs. This is comprised of three steps: 
@@ -51,7 +55,7 @@ c. Merging the best chains of each mutation set
 
 In toy example, we run a short MCMC chain with only 1000 iterations (`n.iter`), burn-in of 100 (`n.burn`), and no thinning (`thin`). In practice, we recommend running the MCMC for longer e.g. 10,000 iterations, burn-in of 1000, and thinning by 10. PICTograph separates mutations into sets by sample-presence patterns, and clusters mutations separately within each set. We can set the maximum number of clusters to evaluate with `max_K`.
 
-```{r cluster, results = FALSE}
+```{r cluster, eval = FALSE}
 all_set_results <- clusterSep(input_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
                               max_K = 5)
@@ -78,7 +82,7 @@ best_set_chains <- collectBestKChains(all_set_results)
 str(best_set_chains, give.attr = F, max.level = 2)
 ```
 
-BIC values for all $K$ assessed in each mutation set can be visualized using `plotBIC`. 
+BIC values for all $K$ assessed in each mutation set can be visualized using `plotBIC`. The minimum, elbow, and knee points are marked. 
 
 ```{r plot_bic, height = 5, width = 6}
 plotBIC(all_set_results)
@@ -86,9 +90,9 @@ plotBIC(all_set_results)
 
 ### 3c. Merge results for all mutation sets
 
-Finally, we can merge `best_set_chains` to obtain chains with the final mutation cluster numbering and correct mutation indices (original order provided in input data). 
+Finally, we can merge `best_set_chains` to obtain chains with the final mutation cluster numbering and correct mutation indices (original order provided in input data).
 
-```{r merge}
+```{r merge, eval = FALSE}
 chains <- mergeSetChains(best_set_chains, input_data)
 ```
 
@@ -100,10 +104,10 @@ Traces for CCF chains can be visualized to check for convergence.
 plotChainsCCF(chains$w_chain)
 ```
 
-The posterior distribtuion of cluster CCFs can be visualized as violin plots
+The posterior distribtuion of cluster CCFs can be visualized as violin plots. The number of mutations assigned to each cluster is listed in brackets after the cluster name. 
 
 ```{r ccf_violin, fig.height = 4, fig.width = 6} 
-plotCCFViolin(chains$w_chain, input_data)
+plotCCFViolin(chains$w_chain, chains$z_chain, indata = input_data)
 ```
 
 
