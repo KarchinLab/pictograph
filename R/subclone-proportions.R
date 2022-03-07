@@ -144,3 +144,72 @@ plotSubclonePie <- function(subclone_props, sample_names = NULL) {
     facet_wrap(~Sample)
   
 }
+
+#' Force CCFs to comply with lineage precedence and sum condition
+#'
+#' @param w_mat Matrix of CCF estimates (from \code{estimateCCFs})
+#' @param tree_edges Tibble of tree edges with columns edge, parent, and child 
+#' @export
+#' @import dplyr
+forceCCFs <- function(w_mat, tree_edges) {
+  
+  K <- nrow(w_mat)
+  S <- ncol(w_mat)
+  fixed_w_mat <- matrix(NA, nrow = K, ncol = S)
+  
+  curr_edges <- tree_edges %>%
+    filter(parent == "root")
+  
+  while (nrow(curr_edges) > 0) {
+    next_edges <- tibble()
+    for (p in unique(curr_edges$parent)) {
+      # grab parent node CCF
+      if (p == "root") {
+        parent_ccfs <- rep(1, S)
+      } else {
+        parent_ccfs <- fixed_w_mat[as.numeric(p), ]
+      }
+      
+      temp_curr_edges <- curr_edges %>%
+        filter(parent == p)
+      
+      if (isBranchPoint(p, tree_edges)) {
+        child_ccfs <- w_mat[as.numeric(temp_curr_edges$child), ]
+        sample_sums <- colSums(child_ccfs)
+        for (s in 1:S) {
+          if (sample_sums[s] > parent_ccfs[s]) {
+            for (i in seq_len(length(temp_curr_edges$child))) {
+              child_num <- as.numeric(temp_curr_edges$child)[i]
+              fixed_w_mat[i, s] <- max(round(child_ccfs[i, s] / sample_sums[s] * parent_ccfs[s], 2),
+                                      0.01)
+            }
+          } else {
+            for (child in as.numeric(temp_curr_edges$child)) {
+              child_ccfs <- w_mat[child, ]
+              fixed_ccfs <- mapply(function(child_ccf, parent_ccf) ifelse(child_ccf > parent_ccf, parent_ccf, child_ccf),
+                                   child_ccf = child_ccfs,
+                                   parent_ccf = parent_ccfs)
+              fixed_w_mat[child, ] <- fixed_ccfs
+            }
+          }
+        }
+      } else {
+        for (child in as.numeric(temp_curr_edges$child)) {
+          child_ccfs <- w_mat[child, ]
+          fixed_ccfs <- mapply(function(child_ccf, parent_ccf) ifelse(child_ccf > parent_ccf, parent_ccf, child_ccf),
+                               child_ccf = child_ccfs,
+                               parent_ccf = parent_ccfs)
+          fixed_w_mat[child, ] <- fixed_ccfs
+        }
+      }
+      
+      
+      child_next_edges <- edges_left %>% 
+        filter(parent %in% temp_curr_edges$child)
+      next_edges <- bind_rows(next_edges,
+                              child_next_edges)
+    }
+    curr_edges <- next_edges
+  }
+  return(fixed_w_mat)
+}
