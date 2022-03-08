@@ -2,7 +2,7 @@
 % Please edit documentation in R/subclone-proportions.R
 \name{calcSubcloneProportions}
 \alias{calcSubcloneProportions}
-\title{Calculate proportions of subclones in each sample}
+\title{Calculate proportions of subclones in each sample (assumes CCFs comply with lineage precedence and sum condition)}
 \usage{
 calcSubcloneProportions(w_mat, tree_edges)
 }
@@ -12,5 +12,5 @@ calcSubcloneProportions(w_mat, tree_edges)
 \item{tree_edges}{Tibble of tree edges with columns edge, parent, and child}
 }
 \description{
-Calculate proportions of subclones in each sample
+Calculate proportions of subclones in each sample (assumes CCFs comply with lineage precedence and sum condition)
 }

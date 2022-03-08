@@ -2,9 +2,8 @@
 #'
 #' @param w_mat Matrix of CCF estimates (from \code{estimateCCFs})
 #' @param tree_edges Tibble of tree edges with columns edge, parent, and child 
-#' @export
 #' @import dplyr
-calcSubcloneProportions <- function(w_mat, tree_edges) {
+calcSubcloneProportions2 <- function(w_mat, tree_edges) {
   K <- nrow(w_mat)
   S <- ncol(w_mat)
   subclone_props <- matrix(NA, nrow = K, ncol = S)
@@ -204,7 +203,7 @@ forceCCFs <- function(w_mat, tree_edges) {
       }
       
       
-      child_next_edges <- edges_left %>% 
+      child_next_edges <- tree_edges %>% 
         filter(parent %in% temp_curr_edges$child)
       next_edges <- bind_rows(next_edges,
                               child_next_edges)
@@ -212,4 +211,35 @@ forceCCFs <- function(w_mat, tree_edges) {
     curr_edges <- next_edges
   }
   return(fixed_w_mat)
+}
+
+#' Calculate proportions of subclones in each sample (assumes CCFs comply with lineage precedence and sum condition)
+#'
+#' @param w_mat Matrix of CCF estimates (from \code{estimateCCFs})
+#' @param tree_edges Tibble of tree edges with columns edge, parent, and child 
+#' @export
+#' @import dplyr
+calcSubcloneProportions <- function(w_mat, tree_edges) {
+  K <- nrow(w_mat)
+  S <- ncol(w_mat)
+  subclone_props <- matrix(NA, nrow = K, ncol = S)
+  
+  for (i in seq_len(nrow(w_mat))) {
+    children <- tree_edges %>% 
+      filter(parent == as.character(i)) %>%
+      pull(child) %>%
+      as.numeric()
+      
+    if (length(children) == 1) {
+      children_ccfs <- w_mat[children, ]
+    } else if (length(children) > 1) {
+      children_ccfs <- w_mat[children, ] %>%
+        colSums
+    } else {
+      children_ccfs <- rep(0, ncol(w_mat))
+    }
+    
+    subclone_props[i, ] <- w_mat[i, ] - children_ccfs
+  }
+  return(subclone_props)
 }
