@@ -173,22 +173,21 @@ forceCCFs <- function(w_mat, tree_edges) {
         filter(parent == p)
       
       if (isBranchPoint(p, tree_edges)) {
+        # if branch point, check sum condition
         child_ccfs <- w_mat[as.numeric(temp_curr_edges$child), ]
         sample_sums <- colSums(child_ccfs)
         for (s in 1:S) {
+          # if sum condition is violated, normalize children CCFs to parent CCF
           if (sample_sums[s] > parent_ccfs[s]) {
             for (i in seq_len(length(temp_curr_edges$child))) {
               child_num <- as.numeric(temp_curr_edges$child)[i]
-              fixed_w_mat[i, s] <- max(round(child_ccfs[i, s] / sample_sums[s] * parent_ccfs[s], 2),
-                                      0.01)
+              fixed_w_mat[child_num, s] <- round(child_ccfs[i, s] / sample_sums[s] * parent_ccfs[s], 2)
             }
           } else {
+            # else sum condition is not violated, children CCFs are fine as is 
+            # not violating sum condition guarantees compliance with lineage precedence
             for (child in as.numeric(temp_curr_edges$child)) {
-              child_ccfs <- w_mat[child, ]
-              fixed_ccfs <- mapply(function(child_ccf, parent_ccf) ifelse(child_ccf > parent_ccf, parent_ccf, child_ccf),
-                                   child_ccf = child_ccfs,
-                                   parent_ccf = parent_ccfs)
-              fixed_w_mat[child, ] <- fixed_ccfs
+              fixed_w_mat[child, s] <- w_mat[child, s]
             }
           }
         }
