@@ -242,3 +242,53 @@ calcSubcloneProportions <- function(w_mat, tree_edges) {
   }
   return(subclone_props)
 }
+
+#' Plot subclone proportions in each sample as stacked bar chart
+#'
+#' @param subclone_props matrix of subclone proportions (returned from \code{calcSubcloneProportions})
+#' @param sample_names (Optional) Vector of sample names. Should be in the order of columns of subclone_props
+#' @param label_cluster (Default FALSE) Whether to add cluster label to text on stacked bar
+#' @export
+#' @import ggplot2
+#' @importFrom magrittr set_colnames
+#' @importFrom viridis viridis
+plotSubcloneBar <- function(subclone_props, sample_names = NULL, label_cluster = FALSE) {
+  if (is.null(sample_names)) {
+    sample_names <- paste0("Sample ", 1:ncol(subclone_props))
+  }
+  
+  clone_colors <- viridis::viridis(nrow(subclone_props))
+  color_half <- nrow(subclone_props) / 2
+  color_half_vec <- factor(ifelse(1:nrow(subclone_props) < color_half, "white", "black"),
+                           c("white", "black"))
+  
+  props_tb <- subclone_props %>%
+    magrittr::set_colnames(sample_names) %>%
+    as_tibble %>% 
+    mutate(Clone = as.factor(1:nrow(.)),
+           text_color = color_half_vec) %>%
+    pivot_longer(cols = all_of(sample_names),
+                 names_to = "Sample", 
+                 values_to = "Proportion of Sample")
+  if (label_cluster) {
+    text_label <- paste0("Clone ", props_tb$Clone, ": ", props_tb$`Proportion of Sample`)
+    props_tb <- props_tb %>%
+      mutate(text_label = text_label)
+  } else {
+    props_tb <- props_tb %>%
+      mutate(text_label = `Proportion of Sample`)
+  }
+  
+  
+  stacked_bar <- ggplot(props_tb, aes(x = Sample, y = `Proportion of Sample`, fill = Clone)) +
+    theme_light() +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = clone_colors) +
+    geom_text(data = subset(props_tb, `Proportion of Sample` != 0), 
+              aes(label = text_label, colour = text_color), 
+              size = 3, position = position_stack(vjust = 0.5)) +
+    scale_color_manual(values = c("white", "black"), guide = "none") +
+    ylim(0,1)
+  
+  return(stacked_bar)
+}
