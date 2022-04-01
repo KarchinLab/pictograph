@@ -269,22 +269,22 @@ plotSubcloneBar <- function(subclone_props, sample_names = NULL, label_cluster =
            text_color = color_half_vec) %>%
     pivot_longer(cols = all_of(sample_names),
                  names_to = "Sample", 
-                 values_to = "Proportion of Sample")
+                 values_to = "Proportion of Tumor")
   if (label_cluster) {
-    text_label <- paste0("Clone ", props_tb$Clone, ": ", props_tb$`Proportion of Sample`)
+    text_label <- paste0("Clone ", props_tb$Clone, ": ", props_tb$`Proportion of Tumor`)
     props_tb <- props_tb %>%
       mutate(text_label = text_label)
   } else {
     props_tb <- props_tb %>%
-      mutate(text_label = `Proportion of Sample`)
+      mutate(text_label = `Proportion of Tumor`)
   }
   
   
-  stacked_bar <- ggplot(props_tb, aes(x = Sample, y = `Proportion of Sample`, fill = Clone)) +
+  stacked_bar <- ggplot(props_tb, aes(x = Sample, y = `Proportion of Tumor`, fill = Clone)) +
     theme_light() +
     geom_bar(stat = "identity") +
     scale_fill_manual(values = clone_colors) +
-    geom_text(data = subset(props_tb, `Proportion of Sample` != 0), 
+    geom_text(data = subset(props_tb, `Proportion of Tumor` != 0), 
               aes(label = text_label, colour = text_color), 
               size = 3, position = position_stack(vjust = 0.5)) +
     scale_color_manual(values = c("white", "black"), guide = "none") +

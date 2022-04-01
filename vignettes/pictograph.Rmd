@@ -16,6 +16,7 @@ knitr::opts_chunk$set(
 
 ```{r setup, include = FALSE}
 library(pictograph)
+library(dplyr)
 ```
 
 ## 1. Introduction
@@ -75,18 +76,26 @@ str(all_set_results, give.attr = F, max.level = 4)
 
 ### 3b. Select the best number of clusters, $K$, for each mutation set
 
-From `all_set_results`, we can extract the MCMC chains for the best $K$ of each mutation set using `collectBestKChains`. As default, PICTograph chooses the $K$ with the lowest BIC, and these chains will be automatically extracted. Users also have the option to specify the $K$ to choose for each mutation set by supplying a vector of integers to the parameter `chosen_K` in the same order as the listed sets in `all_set_results`. 
+From `all_set_results`, BIC values for all $K$ assessed in each mutation set can be visualized using `plotBIC`. The minimum, elbow, and knee points are marked. 
+
+```{r plot_bic, fig.height = 3, fig.width = 7}
+plotBIC(all_set_results)
+```
+
+Use `writeSetKTable` to generate a table with the K at minimum, elbow, and knee points of the BIC plot for each mutation set. 
+
+```{r set_choices}
+set_k_choices <- writeSetKTable(all_set_results)
+set_k_choices
+```
+
+We can extract the MCMC chains for the best $K$ of each mutation set using `collectBestKChains`. As default, PICTograph chooses the $K$ with the lowest BIC, and these chains will be automatically extracted. Users also have the option to specify the $K$ to choose for each mutation set by supplying a vector of integers to the parameter `chosen_K` in the same order as the listed sets in `all_set_results`. 
 
 ```{r collect_best_chains}
-best_set_chains <- collectBestKChains(all_set_results)
+best_set_chains <- collectBestKChains(all_set_results, chosen_K = set_k_choices$chosen_K)
 str(best_set_chains, give.attr = F, max.level = 2)
 ```
 
-BIC values for all $K$ assessed in each mutation set can be visualized using `plotBIC`. The minimum, elbow, and knee points are marked. 
-
-```{r plot_bic, height = 5, width = 6}
-plotBIC(all_set_results)
-```
 
 ### 3c. Merge results for all mutation sets
 
@@ -110,13 +119,6 @@ The posterior distribtuion of cluster CCFs can be visualized as violin plots. Th
 plotCCFViolin(chains$w_chain, chains$z_chain, indata = input_data)
 ```
 
-
-
-<!-- PICTograph samples the posterior distribution of cluster CCFs. We can visualize the posterior distributions and use the mode as an estimate. The plot facets are organized with samples as columns and clusters as rows.  -->
-
-<!-- ```{r CCF-estimates} -->
-<!-- plotDensityCCF(chains$w_chain) -->
-<!-- ``` -->
 
 We can also visualize the posterior probabilities of mutation cluster assignments and determine the most probable cluster assignments. In this toy example, there is high concordance of the cluster assignments of mutations across the MCMC chain.  
 
@@ -169,7 +171,41 @@ In this toy example, there is only one tree with the maximum score. In some case
 plotEnsembleTree(all_spanning_trees)
 ```
 
+## Subclone proportions
+
+The proportion of each subclone in each sample can be calculated using `calcSubcloneProportions`. This is calculated using the estimated CCFs and a single tree. Two available options for visualizing subclone proportions are pie charts using `plotSubclonePie` and stacked bar graphs using `plotSubcloneBar`. 
+
 ```{r subclone-props}
 subclone_props <- calcSubcloneProportions(w_mat, best_tree)
 plotSubclonePie(subclone_props)
+plotSubcloneBar(subclone_props)
 ```
+
+We can force the cluster CCF estimates to comply with the Sum Condition for a given tree using `forceCCFs`. 
+
+```{r force_ccfs}
+fixed_w_mat <- forceCCFs(w_mat, best_tree)
+fixed_subclone_props <- calcSubcloneProportions(fixed_w_mat, best_tree)
+plotSubcloneBar(fixed_subclone_props)
+```
+
+Subclone proportions can also be calculated for the edges of an ensemble tree that are shared by all summarized trees (backbone). For this example ensemble tree, the "backbone" is made up of the root node and nodes 1, 2, 3, and 5, which are connected by thick black edges. 
+
+```{r backbone}
+selected_trees <- all_spanning_trees
+plotEnsembleTree(selected_trees)
+
+backbone <- bind_rows(selected_trees) %>%
+  group_by(edge) %>%
+  mutate(count = n()) %>%
+  ungroup() %>%
+  filter(count == length(selected_trees)) %>%
+  distinct() %>%
+  select(edge, parent, child)
+
+fixed_w_mat_backbone <- forceCCFs(w_mat, backbone)
+backbone_subclone_props <- calcSubcloneProportions(fixed_w_mat_backbone, backbone)
+plotSubcloneBar(backbone_subclone_props)
+```
+
+
