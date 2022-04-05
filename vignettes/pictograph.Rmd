@@ -139,7 +139,7 @@ We can then use the mutation cluster CCF estimates for tree inference. We first 
 
 ```{r possible-edges}
 w_mat <- estimateCCFs(chains$w_chain)
-graph_G_pre <- prepareGraphForGabowMyers(w_mat, zero.thresh = 0.01)
+graph_G_pre <- prepareGraphForGabowMyers(w_mat, chains, input_data)
 graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
 ```
 

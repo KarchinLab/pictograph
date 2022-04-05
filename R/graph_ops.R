@@ -1,4 +1,4 @@
-constrainedEdgesMatrix <- function(wmat, zero.thresh=0.01) {
+constrainedEdgesMatrix <- function(wmat, chains, input_data) {
   ##
   ## Rules:
   ##  - cluster (node) cannot connect to itself
@@ -8,7 +8,8 @@ constrainedEdgesMatrix <- function(wmat, zero.thresh=0.01) {
   ##         - X < Y implies ...
   ##
   ##cluster.sample.presence <- apply(w, 1, function(x) which( x>= zero.thresh))
-  cluster.sample.presence <- apply(wmat, 1, function(x) which(x>=zero.thresh))
+  samp_pres <- matchSamplePresence(wmat, chains, input_data)
+  cluster.sample.presence <- apply(samp_pres, 1, function(x) which(x==1))
   K <- nrow(wmat)
   S <- ncol(wmat)
   admat <- matrix(T, K, K)
@@ -39,10 +40,22 @@ constrainedEdgesMatrix <- function(wmat, zero.thresh=0.01) {
   return(am2)
 }
 
+matchSamplePresence <- function(w_mat, chains, input_data) {
+  map_z <- estimateClusterAssignments(chains$z_chain) 
+  
+  # pull one variant for each cluster
+  single_var_clust <- map_z[match(unique(map_z$value), map_z$value), ] %>%
+    mutate(mut_ind = as.numeric(gsub("z\\[|]", "", Parameter))) %>%
+    arrange(value)
+  
+  samp_pres <- ifelse(input_data$y[single_var_clust$mut_ind, ] >=1, 1, 0)
+  return(samp_pres)
+}
+
 
 ## refactored base.admat
-constrainedEdges <- function(wmat, zero.thresh=0.01) {
-    am2 <- constrainedEdgesMatrix(wmat, zero.thresh)
+constrainedEdges <- function(wmat, chains, input_data) {
+    am2 <- constrainedEdgesMatrix(wmat, chains, input_data)
     am2.long <- as_tibble(am2) %>%
         mutate(parent=rownames(am2)) %>%
         pivot_longer(-parent,

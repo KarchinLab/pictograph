@@ -192,10 +192,11 @@ growModified <- function(tree_T, all_vertices, w, sum_thresh=0.2) {
 #' @import tidyr
 #' @importFrom tidyr pivot_longer unite
 #' @param w matrix of CCF values (rows = clusters, columns = samples)
-#' @param zero.thresh lower CCF threshold for consider a mutation to be present
+#' @param chains list of MCMC chains (must contain w_chain and z_chain)
+#' @param input_data list of input data; same as supplied for clustering
 #' @return graph_G tibble of possible edges with columns edge, parent, child
-prepareGraphForGabowMyers <- function(w, zero.thresh=0.01) {
-  graph_G <- constrainedEdges(w, zero.thresh=zero.thresh) %>%
+prepareGraphForGabowMyers <- function(w, chains, input_data) {
+  graph_G <- constrainedEdges(w, chains, input_data) %>%
     filter(possible_edge == TRUE) %>%
     mutate(parent = as.character(parent)) %>%
     select(edge, parent, child)
