@@ -84,6 +84,24 @@ getBoxInputData <- function(box) {
        tcn = box$tcn)
 }
 
+
+#' Title
+#'
+#' @param box 
+#' @param n.iter 
+#' @param n.burn 
+#' @param thin 
+#' @param mc.cores 
+#' @param inits 
+#' @param params 
+#' @param max_K 
+#' @param model_type 
+#' @param beta.prior 
+#'
+#' @return
+#' @export
+#'
+#' @examples
 runMCMCForABox <- function(box, 
                            n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
@@ -110,9 +128,19 @@ runMCMCForABox <- function(box,
   
   # choose sample in which mutations are present
   if (box$I > 1) {
-    sample_to_sort <- which(colSums(box$y) > 0)[1] 
+    if (sum(box$y) == 0){
+      sample_to_sort <- 1
+    }else{
+      sample_to_sort <- which(colSums(box$y) > 0)[1]
+    }
+     
   } else {
-    sample_to_sort <- which(box$y > 0)[1]
+    if (sum(box$y) == 0){
+      sample_to_sort <- 1
+    }else{
+      sample_to_sort <- which(box$y > 0)[1]
+    }
+    
   }
   
   

@@ -258,7 +258,7 @@ writeClusterAssignmentsTable <- function(z_chain, Mut_ID = NULL) {
 estimateCCFs <- function(w_chain) {
   S <- numberSamples(w_chain)
   K <- numberClusters(w_chain)
-  # density plot 
+  # density plot
   w.dens <- ggplot(w_chain, aes(x = value)) +
     geom_density() +
     facet_wrap(~Parameter, ncol = S, scales = "free_y") +
@@ -268,10 +268,18 @@ estimateCCFs <- function(w_chain) {
   w.map <- w.dens.p %>%
     as_tibble() %>%
     group_by(PANEL) %>%
-    summarize(value = x[max(y) == y])
-  w.map <- w.map %>%
+    arrange(y)%>%
+    slice(1)%>%
+    ## need ungroup()
+    ungroup()%>%
     mutate(Parameter = unique(w_chain$Parameter),
-           value_rounded = round(value, 2))
+           value_rounded = round(x, 2))%>%
+    select(PANEL, x,Parameter, value_rounded)
+  ########there is no max when everythign is zero############
+  #   summarize(value = x[max(y) == y])
+  # w.map <- w.map %>%
+  #   mutate(Parameter = unique(w_chain$Parameter),
+  #          value_rounded = round(value, 2))
   # return w matrix
   w.map.matrix <- matrix(w.map$value_rounded, K, S, byrow=TRUE)
   return(w.map.matrix)
