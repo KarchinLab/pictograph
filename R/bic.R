@@ -87,6 +87,11 @@ writeSetKTable <- function(all_set_results, sample_names = NULL) {
                          min_BIC = min_bic_k,
                          elbow = elbow_k,
                          knee = knee_k)
+  getmode <- function(v) {
+    uniqv <- unique(v)
+    uniqv[which.max(tabulate(match(v, uniqv)))]
+  }
+  mode = apply(min_bic_k_tb[,-1], 1, function(x) getmode(x))
   
   if (!is.null(sample_names)) {
     min_bic_k_tb <- min_bic_k_tb %>%
@@ -96,16 +101,15 @@ writeSetKTable <- function(all_set_results, sample_names = NULL) {
   }
   
   # write chosen K if elbow, knee, and minimum BIC all agree 
-  chosen_K <- rep(NA, length(all_set_results))
-  for (i in seq_len(length(all_set_results))) {
-    chosen_K[i] <- ifelse(min_bic_k_tb$min_BIC[i] == min_bic_k_tb$elbow[i] & 
-                            min_bic_k_tb$min_BIC[i] == min_bic_k_tb$knee[i],
-                          min_bic_k_tb$min_BIC[i],
-                          NA)
-  }
+  # chosen_K <- rep(NA, length(all_set_results))
+  # for (i in seq_len(length(all_set_results))) {
+  #   chosen_K[i] <- ifelse(min_bic_k_tb$min_BIC[i] == min_bic_k_tb$elbow[i] & 
+  #                           min_bic_k_tb$min_BIC[i] == min_bic_k_tb$knee[i],
+  #                         min_bic_k_tb$min_BIC[i],
+  #                         NA)
+  # }
   
-  min_bic_k_tb <- min_bic_k_tb %>%
-    mutate(chosen_K = chosen_K)
+  min_bic_k_tb$chosen_K <- mode
   
   return(min_bic_k_tb)
 }
