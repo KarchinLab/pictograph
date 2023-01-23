@@ -242,12 +242,14 @@ writeClusterAssignmentsTable <- function(z_chain, Mut_ID = NULL) {
   map_z <- estimateClusterAssignments(z_chain)
   if (is.null(Mut_ID)) {
     map_z <- map_z %>%
-      mutate(Mut_ID = paste0("Mut",gsub("z\\[(.*)\\]","\\1",Parameter))) %>%
-      rename("Cluster" = "value") %>%
-      select(Mut_ID, Cluster) %>%
+      ungroup()%>%
+      mutate(Mut_ID = paste0("Mut",gsub("z\\[(.*)\\]","\\1",Parameter)))%>%
+      rename("Cluster" = "value")%>%
+      select(Mut_ID, Cluster)%>%
       arrange(Cluster)
   }else{
     map_z <- map_z %>%
+      ungroup()%>%
       mutate(Mut_ID = Mut_ID, Cluster = value)%>%
       select(Mut_ID, Cluster) %>%
       arrange(Cluster)
