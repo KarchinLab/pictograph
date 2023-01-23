@@ -239,9 +239,13 @@ estimateClusterAssignments <- function(z_chain) {
 #' @param Mut_ID Vector of mutation IDs, same order as provided as input data (e.g. indata$Mut_ID)
 #' @return A tibble listing mutation IDs and their cluster assignments
 writeClusterAssignmentsTable <- function(z_chain, Mut_ID = NULL) {
-  map_z <- estimateClusterAssignments(z_chain) 
+  map_z <- estimateClusterAssignments(z_chain)
   if (is.null(Mut_ID)) {
-    Mut_ID <- paste0("Mut", 1:nrow(map_z))
+    map_z <- map_z %>%
+      mutate(Mut_ID = paste0("Mut",gsub("z\\[(.*)\\]","\\1",Parameter))) %>%
+      rename("Cluster" = "value") %>%
+      select(Mut_ID, Cluster) %>%
+      arrange(Cluster)
   }
   map_z <- map_z %>%
     mutate(Mut_ID = Mut_ID, Cluster = value) %>%
