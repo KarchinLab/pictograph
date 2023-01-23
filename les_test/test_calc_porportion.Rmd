@@ -1,0 +1,102 @@
+---
+title: "Untitled"
+author: "Lester"
+date: "2022-10-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(pictograph)
+```
+
+## R Markdown
+```{r pressure, echo=FALSE}
+w_mat <- estimateCCFs(chains$w_chain)
+
+  K <- nrow(w_mat)
+  S <- ncol(w_mat)
+  subclone_props <- matrix(NA, nrow = K, ncol = S)
+  
+  leaves <- seq_len(K)[sapply(as.character(seq_len(K)), function(x) isLeaf(x, best_tree))]
+  
+  # subclone proportions of leaves is just CCFs
+  for (leaf in leaves) {
+    subclone_props[leaf, ] <- w_mat[leaf, ]
+  }
+  
+  nodes_left <- as.character(seq_len(K))[sapply(as.character(seq_len(K)), function(x) !isLeaf(x, best_tree))]
+  new_children <- leaves
+  
+  # calculate proportions of other subclones (bottom up)
+  while(length(nodes_left) > 0) {
+    temp_nodes <- best_tree %>% 
+      filter(child %in% new_children, parent != "root") %>% 
+      pull(parent) %>%
+      unique()
+    
+    # check if nodes are branch points 
+    for (node in temp_nodes) {
+      if (isBranchPoint(node, best_tree)) {
+        
+        branch_children <- best_tree %>%
+          filter(parent == node) %>%
+          pull(child)
+        
+        # only add ccf if all children have been added
+        if (any(branch_children %in% as.character(nodes_left))) {
+          temp_nodes <- temp_nodes[-which(temp_nodes == node)]
+          next
+        }
+        
+        node_ccf <- w_mat[as.numeric(node), ]
+        ######sum_child_ccfs <- colSums(w_mat[as.numeric(branch_children), ])
+        # sum up proportions for all children (all generations)
+        temp_child_prop <- lapply(branch_children, 
+                                  function(x) calcDescendantProps(x, tree_edges, subclone_props) +
+                                    subclone_props[as.numeric(x), ]) %>%
+          unlist() %>% 
+          matrix(., nrow = length(branch_children), byrow = T) %>%
+          colSums()
+        
+        subclone_props[as.numeric(node), ] <- sapply(node_ccf - temp_child_prop, function(x) max(x, 0))
+        nodes_left <- nodes_left[-which(nodes_left == node)]
+        
+      } else {
+        # add ccf like normal 
+        
+        # sum up proportions for all children (all generations)
+        temp_child_prop <- calcDescendantProps(node, tree_edges, subclone_props)
+        
+        # proportion is node ccf - sum(all children proportions)
+        subclone_props[as.numeric(node), ] <- sapply(w_mat[as.numeric(node), ] - temp_child_prop, function(x) max(x, 0))
+        nodes_left <- nodes_left[-which(nodes_left == node)]
+      }
+    }
+    new_children <- temp_nodes
+
+```
+```{r}
+sub <- w_mat
+temp_w <- best_tree %>%
+  filter(!parent == "root")
+while (length(temp_w$child) > 0 ){
+  
+  c <- as.numeric(setdiff(unique(temp_w$child),unique(temp_w$parent)))
+  p <- temp_w %>%
+    filter(child %in% c)%>%
+    pull(parent)%>%
+    as.numeric()
+  for (i in 1:length(c)){
+    prop <- ifelse(sub[p[i],]-w_mat[c[i],] < 0, 0, sub[p[i],]-w_mat[c[i],])
+    sub[p[i],] = prop
+  }
+  
+  temp_w <- temp_w %>% filter(!child %in% c)
+}
+sub <- sapply(1:ncol(sub), function(x) sub[,x]/sum(sub[,x]))
+```
+
+```{r}
+node <- diag(length(w_mat[,1]))
+
+```

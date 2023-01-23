@@ -1,0 +1,81 @@
+---
+title: "Test canopy"
+author: "Lester"
+date: "2022-11-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(Canopy)
+library()
+```
+
+## R Markdown
+C: cpoy # alteration -- 
+R: mutant allele read depth -- y
+X: total depth -- n
+WM: major copy number -- tcn
+Wm: minor copy number
+epsilonM: sd of WM
+epsilonm: sd of Wm
+Y: SNA affected by CNA
+no purity
+m = (y/n)()
+```{r cars}
+data("MDA231")
+R=MDA231$R
+X=MDA231$X
+num_cluster=
+num_run=10 # How many EM runs per clustering step for each mutation cluster wave
+canopy.cluster=canopy.cluster(R = R,X = X,
+                              num_cluster = num_cluster,
+                              num_run = num_run)
+bic_output=canopy.cluster$bic_output # BIC for model selection (# of clusters)
+Mu=canopy.cluster$Mu # VAF centroid for each cluster
+Tau=canopy.cluster$Tau # Prior for mutation cluster, with a K+1 component
+sna_cluster=canopy.cluster$sna_cluster # cluster identity for each mutation
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+projectname = MDA231$projectname
+K = 3:6 # number of subclones
+numchain = 20 # number of chains with random initiations
+input <- MDA231
+sampchain = canopy.sample(R = input$R, X = input$X, 
+                          WM = input$WM, Wm = input$Wm,
+                          epsilonM = input$epsilonM,
+                          epsilonm = input$epsilonm, 
+                          C = input$C, Y = input$Y, K = K, 
+                          numchain = numchain,
+                          max.simrun = 50000, 
+                          min.simrun = 10000,
+                          writeskip = 200,
+                          projectname = projectname,
+                          cell.line = TRUE,
+                          plot.likelihood = TRUE)
+burnin = 100
+ thin = 5 # If there is error in the bic and canopy.post step below, make sure # burnin and thinning parameters are wisely selected so that there are
+# posterior trees left.
+ bic = canopy.BIC(sampchain = sampchain, projectname = projectname, K = K,
++ numchain = numchain, burnin = burnin, thin = thin, pdf = FALSE)
+optK = K[which.max(bic)]
+
+ post = canopy.post(sampchain = sampchain, projectname = projectname, K = K,
++ numchain = numchain, burnin = burnin, thin = thin, optK = optK,
++ C = C, post.config.cutoff = 0.05)
+ samptreethin = post[[1]]
+ samptreethin.lik = post[[2]] 
+  config = post[[3]]
+config.summary = post[[4]]
+```
+
+```{r}
+data('MDA231_tree')
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

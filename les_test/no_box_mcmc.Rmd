@@ -1,0 +1,106 @@
+---
+title: "Untitled"
+author: "Lester"
+date: "2022-12-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(rjags)
+library(ggplot2)
+library(stringr)
+#library(pictograph)
+source("C:/Users/Leste/Documents/GitHub/pictograph/R/bic.R")
+source("C:/Users/Leste/Documents/GitHub/pictograph/R/cluster_separately.R")
+source("C:/Users/Leste/Documents/GitHub/pictograph/R/clustering_functions.R")
+get.parameter.chain <- function(param, chains) {
+  chains[grep(paste0(param, "\\["), chains$Parameter), ]
+}
+
+```
+
+## R Markdown
+```{r cars}
+clusterSep <- function(input_data,
+                       n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
+                       inits = list(".RNG.name" = "base::Wichmann-Hill",
+                                    ".RNG.seed" = 123),
+                       max_K = 10,
+                       model_type = "spike_and_slab",
+                       beta.prior = FALSE) {
+  # 1. separate mutations by sample presence
+  #sep_list <- separateMutationsBySamplePresence(input_data)
+  
+  
+  # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
+  #all_set_results <- vector("list", length(sep_list))
+  #names(all_set_results) <- names(sep_list)
+  params = c("z", "w", "ystar")
+  
+  ####### very important to run mcmc #######
+  input_data$mutation_indices <- 1:input_data$I
+  
+  #for (i in seq_len(length(sep_list))) {
+    #temp_box <- sep_list[[4]]
+    temp_box <- input_data
+    # Max number of clusters cannot be more than number of mutations
+    temp_max_K <- min(max_K, temp_box$I)
+    
+    temp_samps_list <- runMutSetMCMC(temp_box, 
+                                     n.iter = n.iter, n.burn = n.burn, thin = thin, 
+                                     mc.cores = mc.cores,
+                                     inits = inits,
+                                     temp_max_K = temp_max_K,
+                                     model_type = model_type,
+                                     params = params,
+                                     beta.prior = beta.prior)
+    #all_set_results[[i]] <- temp_samps_list
+  #}
+  
+  return(temp_samps_list)
+}
+```
+
+# Check AIC to select best K
+
+## Including Plots
+```{r pressure, echo=FALSE}
+input_data <- readRDS("C:/Users/Leste/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
+
+tt <- as.data.frame(input_data$y)%>%
+  cbind(as.data.frame(input_data$n))
+
+all_set_results <- clusterSep(input_data,
+                              n.iter = 1000, n.burn = 100, thin = 1,
+                              max_K = 10)
+chains <- all_set_results$best_chains
+plotChainsCCF(chains$w_chain)
+
+sets <- writeClusterAssignmentsTable(chains$z_chain)%>%
+  mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
+  arrange(Mut_ID)
+mut <- input_data$Mut_ID%>%
+  cbind(sets)%>%
+  rename("Mut" = ".")
+  filter(grepl('KRAS|GNAS',Mut, ignore.case = TRUE))
+```
+
+
+
+```{r}
+w_mat <- estimateCCFs(chains$w_chain)
+graph_G_pre <- prepareGraphForGabowMyers(w_mat, chains, input_data)
+graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.98)
+enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=1)
+scores <- calcTreeScores(chains$w_chain, all_spanning_trees)
+best_tree <- all_spanning_trees[[which.max(scores)]]
+plotTree(best_tree)
+plotEnsembleTree(all_spanning_trees)
+subclone_props <- calcSubcloneProportions(w_mat, best_tree)
+subclone_props[subclone_props<0]=0
+subclone_props_n <- sapply(c(1,2,3), function(x) round(subclone_props[,x]/sum(subclone_props[,x]),digits = 5))
+plotSubclonePie(subclone_props_n)
+plotSubcloneBar(subclone_props_n)
+```

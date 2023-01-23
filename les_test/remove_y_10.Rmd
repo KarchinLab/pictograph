@@ -1,0 +1,205 @@
+---
+title: "Untitled"
+author: "Lester"
+date: "2022-12-16"
+output: html_document
+---
+```{r}
+library(pictograph)
+library(tidyverse)
+library(rjags)
+# source("C:/Users/Leste/OneDrive - Johns Hopkins/Documents/GitHub/pictograph/R/bic.R")
+# source("C:/Users/Leste/OneDrive - Johns Hopkins/Documents/GitHub/pictograph/R/cluster_separately.R")
+# source("C:/Users/Leste/OneDrive - Johns Hopkins/Documents/GitHub/pictograph/R/clustering_functions.R")
+# source("C:/Users/Leste/OneDrive - Johns Hopkins/Documents/GitHub/pictograph/R/plot.R")
+# source("C:/Users/Leste/OneDrive - Johns Hopkins/Documents/GitHub/pictograph/R/gabowmyers.R")
+# source("C:/Users/Leste/OneDrive - Johns Hopkins/Documents/GitHub/pictograph/R/graph_ops.R")
+# source("C:/Users/Leste/OneDrive - Johns Hopkins/Documents/GitHub/pictograph/R/metrics.R")
+get.parameter.chain <- function(param, chains) {
+  chains[grep(paste0(param, "\\["), chains$Parameter), ]
+}
+```
+
+#replace y<10 with 0
+```{r}
+input_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
+ny <- input_data$y
+ny[ny<10] = 0
+mut_in <- as.data.frame(ny)%>%
+  mutate(sum= rowSums(.))
+#input_data$y = ny
+
+input_data <- list(y = input_data$y[mut_in$sum!=0,],
+              n = input_data$n[mut_in$sum!=0,],
+              tcn = input_data$tcn[mut_in$sum!=0,],
+              m = input_data$m[mut_in$sum!=0,],
+              I = sum(mut_in$sum!=0),
+              S = input_data$S,
+              purity = input_data$purity,
+              Sample_names = input_data$Sample_names,
+              Mut_ID = input_data$Mut_ID[mut_in$sum!=0])
+
+# all_set_results <- clusterSep(input_data,
+#                              n.iter = 1000, n.burn = 100, thin = 1,
+#                              max_K = 5)
+# saveRDS(all_set_results,"C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/remove_less10/IP24_input_data_bt10.rds")
+all_set_results <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/remove_less10/IP22_input_data_bt10.rds")
+
+set_k_choices <- writeSetKTable(all_set_results)
+set_k_choices$chosen_K[5] = 2
+
+
+best_set_chains <- collectBestKChains(all_set_results, chosen_K = set_k_choices$chosen_K)
+chains <- mergeSetChains(best_set_chains, input_data)
+plotChainsCCF(chains$w_chain)
+
+
+sets <- writeClusterAssignmentsTable(chains$z_chain)%>%
+  mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
+  arrange(Mut_ID)
+mut <- input_data$Mut_ID%>%
+  cbind(sets)%>%
+  rename("Mut" = ".")%>%
+  filter(grepl('KRAS|GNAS',Mut, ignore.case = TRUE))
+
+
+
+w_mat <- estimateCCFs(chains$w_chain)
+graph_G_pre <- prepareGraphForGabowMyers(w_mat, chains, input_data)
+graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
+enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=0.59)
+scores <- calcTreeScores(chains$w_chain, all_spanning_trees)
+best_tree <- all_spanning_trees[[which.max(scores)]]
+plotTree(best_tree)
+plotEnsembleTree(all_spanning_trees)
+subclone_props <- calcSubcloneProportions(w_mat, best_tree)
+subclone_props[subclone_props<0]=0
+subclone_props_n <- sapply(c(1,2,3), function(x) round(subclone_props[,x]/sum(subclone_props[,x]),digits = 5))
+plotSubclonePie(subclone_props_n)
+plotSubcloneBar(subclone_props_n)
+```
+
+# hist for y/n
+# ```{r setup, include=FALSE}
+# input_data <- readRDS("C:/Users/Leste/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
+# y <- input_data$y
+# n <- input_data$n
+# # check the distribution of y/n
+# #y[y < 10] = NA
+# per <- y/n
+# his_in <- c(per)
+# hist(his_in)
+# ```
+
+
+# get liklihood for the model
+# y is predicted from a binomial distritbuion with parameter VAF and n (from model output), vaf can be calc using w chain. 
+# then find the liklihood of observed data form the expected distribution
+```{r}
+input_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP24_input_data.rds")
+all_set_results <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/IP24_processed.rds")
+all_types <- names(all_set_results)
+AAIC <- list()
+for (i in 1:length(all_types)){
+  all_k <- names(all_set_results[[i]]$all_chains)
+  AIC <- matrix(NA, nrow = 2, ncol = length(all_k))
+  col = 1
+  for (j in 1:length(all_k)){
+    chains <- all_set_results[[i]]$all_chains[[j]]
+    w <- chains$w_chain %>%
+      mutate(Cluster = as.numeric(gsub("w\\[(.*),.*","\\1",Parameter)),
+             sample = gsub(".*,(.*)\\]","\\1", Parameter),
+             value = round(value,1))%>%
+      group_by(Cluster, sample)%>%
+      summarize(w = mean(value))%>%
+      ungroup()%>%
+      spread(key = sample, value = w)%>%
+      arrange(Cluster)
+    
+    ww <- writeClusterAssignmentsTable(chains$z_chain)
+      mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
+      arrange(Mut_ID)%>%
+      left_join(w)%>%
+      select(-c("Mut_ID","Cluster"))%>%
+      as.matrix()
+    
+    pres <- input_data$y %>%
+      as.data.frame()%>%
+      mutate(across(everything(), ~ifelse(.x >0, 1, 0)))%>%
+      unite("type", colnames(.), sep= "", remove = FALSE)
+    
+    rows <- pres$type == all_types[i]
+    
+    y <- input_data$y[rows,]
+    n <- input_data$n[rows,]
+    m <- input_data$m[rows,]
+    p <- input_data$purity
+    pp <- diag(p,length(p),length(p))
+    c <- input_data$tcn[rows,]
+    
+    vaf <- m*ww%*%pp/sweep(c%*%pp, 2, -2*(1-p))
+    
+    # vaf is the probability
+    # trails is n
+    #assume predicted n is from the input
+    lik <- prod(dbinom(y,n,vaf))
+    # 5 parameters? 
+    aic_score = 2*-2*log(lik)
+    
+    AIC[1,col] = all_k[j]
+    AIC[2,col] = aic_score
+    
+    col=col+1
+  }
+  AAIC[[all_types[i]]] <- AIC
+}
+
+aic_k <- gsub("K","",sapply(1:length(AAIC), function(x) AAIC[[x]][1,which.min(AAIC[[x]][2,])]))
+
+
+## AIC = 2K – 2ln(L)
+
+```
+
+
+# cluster.sample.presence[[j]] : subscript out of bounds: means some cluster doesn't exist, reduce chosen k
+
+```{r}
+set_k_choices <- writeSetKTable(all_set_results)%>%
+  mutate(chosen_K = as.numeric(aic_k))
+set_k_choices$chosen_K[4] = 1
+
+best_set_chains <- collectBestKChains(all_set_results, chosen_K = set_k_choices$chosen_K)
+chains <- mergeSetChains(best_set_chains, input_data)
+plotChainsCCF(chains$w_chain)
+
+
+## check mutation location on the tree ##
+sets <- writeClusterAssignmentsTable(chains$z_chain)%>%
+  mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
+  arrange(Mut_ID)
+mut <- input_data$Mut_ID%>%
+  cbind(sets)%>%
+  rename("Mut" = ".")%>%
+  filter(grepl('KRAS|GNAS',Mut, ignore.case = TRUE))
+
+```
+
+
+#tree
+```{r}
+w_mat <- estimateCCFs(chains$w_chain)
+graph_G_pre <- prepareGraphForGabowMyers(w_mat, chains, input_data)
+graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
+enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=0.5)
+scores <- calcTreeScores(chains$w_chain, all_spanning_trees)
+best_tree <- all_spanning_trees[[which.max(scores)]]
+best_tree <- all_spanning_trees[[10]]
+plotTree(best_tree)
+plotEnsembleTree(all_spanning_trees)
+subclone_props <- calcSubcloneProportions(w_mat, best_tree)
+subclone_props[subclone_props<0]=0
+subclone_props_n <- sapply(c(1,2,3), function(x) round(subclone_props[,x]/sum(subclone_props[,x]),digits = 5))
+plotSubclonePie(subclone_props_n)
+plotSubcloneBar(subclone_props_n)
+```
