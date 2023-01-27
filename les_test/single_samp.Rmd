@@ -1,0 +1,123 @@
+---
+title: "single sample test"
+author: "Lester"
+date: "2023-01-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+#library(pictograph)
+library(tidyverse)
+library(rjags)
+setwd("~/GitHub/pictograph/les_test")
+source("../R/bic.R")
+source("../R/cluster_separately.R")
+source("../R/clustering_functions.R")
+source("../R/plot.R")
+source("../R/gabowmyers.R")
+source("../R/graph_ops.R")
+source("../R/metrics.R")
+source("../R/tree_scoring.R")
+source("../R/tree.R")
+source("../R/subclone-proportions.R")
+source("single_samp_func.R")
+```
+
+# prepare single sample data
+```{r}
+## change to input path
+ori_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
+
+## split original data into single sample input
+samp_comb <- combn(1:ori_data$S,1)
+subset <- function(input_data, samp_comb, x){
+  out <- list(y = input_data$y[,samp_comb[,x]],
+              n = input_data$n[,samp_comb[,x]],
+              tcn = input_data$tcn[,samp_comb[,x]],
+              m = input_data$m[,samp_comb[,x]],
+              I = input_data$I,
+              S = 1,
+              purity = input_data$purity[samp_comb[,x]],
+              Sample_names = input_data$Sample_names[samp_comb[,x]],
+              mutation_indices = seq_len(input_data$I),
+              Mut_ID = input_data$Mut_ID)
+}
+subset_list <- lapply(1:ncol(samp_comb), function(x) subset(ori_data, samp_comb,x))
+
+## pick one sample from list by changing the number in bracket
+input_data <- subset_list[[1]]
+```
+
+
+
+
+# process the data
+```{r pressure, echo=FALSE}
+# run MCMC
+all_set_results <- clusterSep(input_data,
+                              n.iter = 1000, n.burn = 100, thin = 1,
+                              max_K = 5)
+
+## plot ccf
+chains <- all_set_results$best_chains
+chains$w_chain%>%
+  mutate(Cluster = gsub("w\\[(,*)\\]","\\1",Parameter))%>%
+  ggplot(aes(x = Iteration, y = value))+
+  geom_line() +
+    theme_light() +
+    facet_wrap("Cluster") +
+    ylab("Cancer Cell Fraction")
+
+```
+
+```{r}
+sets <- writeClusterAssignmentsTable(chains$z_chain)%>%
+  mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
+  arrange(Mut_ID)
+mut <- input_data$Mut_ID%>%
+  cbind(sets)%>%
+  rename("Mut" = ".")%>%
+  filter(grepl('KRAS|GNAS',Mut, ignore.case = TRUE))
+
+```
+
+
+```{r}
+w_mat <- estimateCCFs(chains$w_chain)%>%
+  cbind(matrix(rep(0, nrow(.)),nrow = nrow(.), ncol = 1))
+
+# create all possible edges and then filter based on lineage precedence
+graph_G <- expand.grid(parent = c(seq.int(1,nrow(w_mat),1),"root"),
+                           child = c(seq.int(1,nrow(w_mat),1),"root"))%>%
+  filter(parent != child,
+         child != "root")%>%
+  mutate(parent = ifelse(parent == "root", as.character(parent), as.numeric(parent)),
+         child = as.numeric(child),
+         edge = paste0(as.character(parent), "->", as.character(child)),
+         parent.ccf = ifelse(parent == "root",1,w_mat[.$parent]),
+         child.ccf = w_mat[.$child],
+         topo_cost = child.ccf - parent.ccf)%>%
+  filter(topo_cost < 0.1)
+
+enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=0.5)
+
+## no topology cost bc there was a filter before, all bad edges are removed
+get_score <- function(tree){
+top <- tree %>%
+  pull(topo_cost)%>%
+  sum()
+mas <- tree%>%
+  group_by(parent)%>%
+  mutate(sum_child = sum(child.ccf),
+         mass_cost = sum_child - parent.ccf)%>%
+  distinct(parent, .keep_all = TRUE)%>%
+  pull(mass_cost)%>%
+  sum()
+return(abs(top+mas))
+}
+scores <- sapply(all_spanning_trees, function(x) get_score(x))
+best_tree <- all_spanning_trees[[which.max(scores)]]
+best_tree <- all_spanning_trees[[40]]
+plotTree(best_tree)
+plotEnsembleTree(all_spanning_trees)
+```

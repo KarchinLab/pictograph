@@ -1,0 +1,21 @@
+model {
+	for (i in 1:I) { ## for each variant
+			theta.temp[i] <- m[i] * w[z[i]] * purity /
+                       (tcn[i] * purity + 2 * (1 - purity))
+			theta[i] <- ifelse(theta.temp[i] > 1, 1, theta.temp[i])
+			y[i] ~ dbin(theta[i], n[i])
+			## posterior predictive distribution
+			ystar[i] ~ dbin(theta[i], n[i])
+			z[i] ~ dcat(pi[1:K])
+	}
+alpha <- rep(1, K)
+pi[1:K] ~ ddirch(alpha[1:K])
+
+	for (k in 1:K) {
+			p[k] ~ dbeta(5,2)
+			z.p[k] ~ dcat(c(p[k], 1-p[k]))
+
+			w1[k] ~ dbeta(1,1)T(0.005, )
+			w[k] <- ifelse(z.p[k] == 1, w1[k], 0)
+	}
+}
