@@ -7,11 +7,9 @@ output: html_document
 
 ```{r setup, include=FALSE}
 library(pictograph)
+library(tidyverse)
 #devtools::load_all("~/GitHub/pictograph")
 ```
-
-#try aci and get rid of single digit in y to run again
-# calculate liklihood for each observation, then product to get total liklihood
 
 ## Get the cluster info
 ```{r pressure, echo=FALSE}
@@ -23,10 +21,10 @@ input_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin L
 
 all_set_results <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/IP22_processed.rds")
 
-getmode <- function(v) {
-   uniqv <- unique(v)
-   uniqv[which.max(tabulate(match(v, uniqv)))]
-}
+# getmode <- function(v) {
+#    uniqv <- unique(v)
+#    uniqv[which.max(tabulate(match(v, uniqv)))]
+# }
 
 set_k_choices <- writeSetKTable(all_set_results)
 set_k_choices$chosen_K[6]= 2
@@ -45,160 +43,6 @@ mut <- input_data$Mut_ID%>%
   
 ```
 
-## seperating to subsets
-```{r}
-samp_comb <- combn(1:input_data$S,2)
-subset <- function(input_data, samp_comb, x){
-  out <- list(y = input_data$y[,samp_comb[,x]],
-              n = input_data$n[,samp_comb[,x]],
-              tcn = input_data$tcn[,samp_comb[,x]],
-              m = input_data$m[,samp_comb[,x]],
-              I = input_data$I,
-              S = length(samp_comb[,x]),
-              purity = input_data$purity[samp_comb[,x]],
-              Sample_names = input_data$Sample_names[samp_comb[,x]],
-              Mut_ID = input_data$Mut_ID)
-}
-subset_list <- lapply(1:ncol(samp_comb), function(x) subset(input_data, samp_comb,x))
-```
-
-
-```{r}
-mcmc <- function(data,jags.file,
-                 n.iter = 10000, n.burn = 1000, thin = 10,n.chains=1,n.adapt=1000,
-                 mc.cores = 1,params = c("w", "ystar"),beta.prior = FALSE,
-                 inits = list(".RNG.name" = "base::Wichmann-Hill",".RNG.seed" = 123)){
-  
-  jags.m <- jags.model(jags.file,
-                         data,
-                         n.chains = n.chains,
-                         inits = inits,
-                         n.adapt = n.adapt)
-    if (n.burn > 0) update(jags.m, n.burn)
-    samps <- coda.samples(jags.m, params, n.iter=n.iter, thin=thin)
-    
-    return(samps)
-}
-
-temp <- input_data$y %>%
-  as.data.frame()%>%
-  mutate_if(is.numeric, ~1 * (. != 0))%>%
-  unite("type", colnames(.), remove = FALSE)%>%
-  mutate(num = rownames(.),
-         type = gsub("_","",type))
-boxes <- lapply(unique(temp$type), function(x) as.numeric(filter(temp, type == x)$num))
-out <- list()
-extdir <- system.file("extdata", package="pictograph")
-jags.file.test <- file.path(extdir, "sub_test.jags")
-
-
-for (i in 1:length(boxes)){
-  type <- unique(temp$type)[i]
-  K <- filter(set_k_choices, set_name_bin==type)$chosen_K
-  z <- sets[boxes[[i]],]$Cluster - min(sets[boxes[[i]],]$Cluster)+1
-  box <- list(y = subset_list[[1]]$y[boxes[[i]],],
-              n = subset_list[[1]]$n[boxes[[i]],],
-              tcn = subset_list[[1]]$tcn[boxes[[i]],],
-              m = subset_list[[1]]$m[boxes[[i]],],
-              I = length(boxes[[i]]),
-              S = subset_list[[1]]$S,
-              purity = subset_list[[1]]$purity,
-              #Sample_names = subset_list[[1]]$Sample_names,
-              #Mut_ID = subset_list[[1]]$Mut_ID[boxes[[i]]],
-              z = z,
-              K = K)
-  if (box$I > 1) {
-    if (sum(box$y) == 0){
-      sample_to_sort <- 1
-    }else{
-      sample_to_sort <- which(colSums(box$y) > 0)[1]
-    }
-     
-  } else {
-    if (sum(box$y) == 0){
-      sample_to_sort <- 1
-    }else{
-      sample_to_sort <- which(box$y > 0)[1]
-    }
-    
-  }
-  box$sample_to_sort <- sample_to_sort
-  
-  # run mcmc chain
-  out_chain <- mcmc(box,jags.file.test)[[1]]
-  
-  # convert to original clustering number
-  col <- colnames(out_chain)[grep("w",colnames(out_chain))]%>%
-    as.data.frame()%>%
-    rename("w_para" = ".")%>%
-    mutate(old_z = gsub("w\\[(.*),.*","\\1",w_para),
-           other = gsub("w\\[(.*)(,.*)","\\2",w_para),
-           z = as.numeric(old_z) + min(sets[boxes[[i]],]$Cluster)-1,
-           new_w = paste0("w[",z,other))
-  colnames(out_chain)[grep("w",colnames(out_chain))] <- col$new_w 
-  
-  # convert w chain to data frame to build w matrix
-  out_w <- out_chain[,grep("w",colnames(out_chain))]%>%
-    as.data.frame()%>%
-    gather(key = "Parameter",value = "value")
-  out[[type]] <- out_w
-}
-w_chain <- do.call(rbind.data.frame, out)%>%
-  mutate()
-w_mat <- estimateCCFs(w_chain)
-```
-
-## cluster subset based on earlier cluster assignment
-```{r}
-test <- input_data
-
-m = test$m
-  # mutate(Mut_ID = rownames(.)) %>%
-  # left_join(sets)%>%
-  # group_by(Cluster)%>%
-  # summarise(across(where(is.numeric), sum))%>%
-  # select(-Cluster)%>%
-  # as.matrix()
-
-p = diag(test$purity,length(test$purity),length(test$purity))
-
-pdot = test$purity
-
-c = test$tcn
-  # mutate(Mut_ID = rownames(.)) %>%
-  # left_join(sets)%>%
-  # group_by(Cluster)%>%
-  # summarise(across(where(is.numeric), sum))%>%
-  # select(-Cluster)%>%
-  # as.matrix()
-
-y = test$y
-  # mutate(Mut_ID = rownames(.)) %>%
-  # left_join(sets)%>%
-  # group_by(Cluster)%>%
-  # summarise(across(where(is.numeric), sum))%>%
-  # select(-Cluster)%>%
-  # as.matrix()
-
-n = test$n
-  # mutate(Mut_ID = rownames(.)) %>%
-  # left_join(sets)%>%
-  # group_by(Cluster)%>%
-  # summarise(across(where(is.numeric), sum))%>%
-  # select(-Cluster)%>%
-  # as.matrix()
-
-v = y/n
-
-  
-CCF <- as.data.frame(v*sweep(c%*%p, 2, -2*(1-pdot))/(m%*%p))%>%
-  mutate(Mut_ID = rownames(.))%>%
-  left_join(sets)%>%
-  group_by(Cluster)%>%
-  summarise(across(where(is.numeric), mean))%>%
-  ungroup()
-
-```
 
 #tree
 ```{r}
@@ -218,6 +62,7 @@ plotSubclonePie(subclone_props_n)
 plotSubcloneBar(subclone_props_n)
 ```
 
+# proportion bar plot
 ```{r}
 subclone_props%>%
   as.data.frame()%>%
@@ -232,7 +77,7 @@ subclone_props%>%
   geom_bar(stat = "identity")
 ```
 
-#matchSamplePresence in graphop.R
+# create sample_pres for matrix calculation
 ```{r}
 matchSamplePresence <- function(w_mat, chains, input_data) {
   map_z <- estimateClusterAssignments(chains$z_chain) 
@@ -276,7 +121,6 @@ estimateClusterAssignments <- function(z_chain) {
   return(map_z)
 }
 
-## why only choose one from each cluster? sampling check? why we need this step
 samp_pres <- matchSamplePresence(w_mat, chains, input_data)
 ```
 
@@ -285,12 +129,16 @@ samp_pres <- matchSamplePresence(w_mat, chains, input_data)
 ```{r}
 #First filter connection by checking if going from more sample presence to less (graph_G_pre)
 find_graph_G <- function(samp_pres,w_mat, thresh = 0.1){
+  
   K <- nrow(w_mat)
+  # check sample presence hierarchy
   x <- rowSums(samp_pres)
+  # create constrain matrix (higher sample pres goes to lower pres, not the other way)
   xx <- x%*%t(x)
-  #consider change T/F to 1/0 for future calculation
   constrainmatrix <- xx <= x^2
+  # set diagnal to be false since cluster can't connect to itself
   diag(constrainmatrix) <- F
+  # extra row to represent root
   constrainmatrix <- rbind(T, constrainmatrix)
   dimnames(constrainmatrix) <- list(c("root", 1:K), 1:K)
   constrainmatrix <- ifelse(constrainmatrix == T, 1,0)
@@ -314,7 +162,6 @@ loc <- which(cmat == 1)
 cmat[loc] = loc
 cmat[-loc] = NA
 test <- as.data.frame(cmat)
-aa <- unique(test[,c('1','2')])
 
 ########################trying trees################
 
@@ -387,111 +234,4 @@ mass_cost <- function(mat,w_mat){
 score <- sapply(1:length(select_mat), 
                 function(ind) topology_cost(select_mat[[ind]], w_mat)+mass_cost(select_mat[[ind]], w_mat))
 our_tree <- select_mat[[which.min(score)]]
-```
-
-#find subclone proportion
-```{r}
-runMCMCForABox <- function(box, 
-                           n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
-                           inits = list(".RNG.name" = "base::Wichmann-Hill",
-                                        ".RNG.seed" = 123),
-                           params = c("z", "w", "ystar"),
-                           max_K = 5, model_type = "simple",
-                           beta.prior = FALSE) {
-  # returns samps_list 
-  box_input_data <- getBoxInputData(box)
-  
-  extdir <- system.file("extdata", package="pictograph")
-  if (box$I == 1) {
-    jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1_I1.jags")
-    box_input_data$I <- NULL
-  } else {
-    jags.file.K1 <- file.path(extdir, "spike_and_slab_purity_2_K1.jags")
-  }
-  
-  if (model_type == "simple") {
-    jags.file <- file.path(extdir, "model-test.jags") # fixes order of CCFs in one sample, not spike and slab 
-  } else if (model_type == "spike_and_slab") {
-    jags.file <- file.path(extdir, "spike_and_slab_purity_ident.jags") # fixing order of CCFs in one sample
-  } else stop("provide model_type either 'spike_and_slab' or 'simple'")
-  
-  # choose sample in which mutations are present
-  if (box$I > 1) {
-    if (sum(box$y) == 0){
-      sample_to_sort <- 1
-    }else{
-      sample_to_sort <- which(colSums(box$y) > 0)[1]
-    }
-     
-  } else {
-    if (sum(box$y) == 0){
-      sample_to_sort <- 1
-    }else{
-      sample_to_sort <- which(box$y > 0)[1]
-    }
-    
-  }
-  
-  
-  samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
-                      inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
-  if(box$I == 1) {
-    colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "z")] <- "z[1]"
-  }
-  
-  # Max number of clusters cannot be more than number of mutations
-  max_K <- min(max_K, length(box$mutation_indices)) 
-  if (max_K > 1) {
-  
-    box_input_data$sample_to_sort <- sample_to_sort
-    
-    samps_2 <- parallel::mclapply(2:max_K,
-                                  function(k) runMCMC(box_input_data, k,
-                                                      jags.file, inits, params,
-                                                      n.iter=n.iter, thin=thin,
-                                                      n.burn=n.burn,
-                                                      beta.prior=beta.prior),
-                                  mc.cores=mc.cores)
-    
-    samps_list <- c(list(samps_K1), samps_2)
-    names(samps_list) <- paste0("K", 1:max_K)
-    return(samps_list)
-    
-  } else {
-    names(samps_K1) <- "K1"
-    return(samps_K1)
-  }
-  
-}
-
-
-estimateCCFs <- function(w_chain) {
-  S <- numberSamples(w_chain)
-  K <- numberClusters(w_chain)
-  # density plot
-  w.dens <- ggplot(w_chain, aes(x = value)) +
-    geom_density() +
-    facet_wrap(~Parameter, ncol = S, scales = "free_y") +
-    theme_light()
-  # find peak for MAP w
-  w.dens.p <- ggplot_build(w.dens)$data[[1]]
-  w.map <- w.dens.p %>%
-    as_tibble() %>%
-    group_by(PANEL) %>%
-    arrange(y)%>%
-    slice(1)%>%
-    ## need ungroup()
-    ungroup()%>%
-    mutate(Parameter = unique(w_chain$Parameter),
-           value_rounded = round(x, 2))%>%
-    select(PANEL, x,Parameter, value_rounded)
-  ########there is no max when everythign is zero############
-  #   summarize(value = x[max(y) == y])
-  # w.map <- w.map %>%
-  #   mutate(Parameter = unique(w_chain$Parameter),
-  #          value_rounded = round(value, 2))
-  # return w matrix
-  w.map.matrix <- matrix(w.map$value_rounded, K, S, byrow=TRUE)
-  return(w.map.matrix)
-}
 ```

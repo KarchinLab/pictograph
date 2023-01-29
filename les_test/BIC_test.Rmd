@@ -1,0 +1,170 @@
+---
+title: "BIC test"
+author: "Lester"
+date: "2023-01-28"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(rjags)
+setwd("~/GitHub/pictograph/les_test")
+source("../R/bic.R")
+source("../R/cluster_separately.R")
+source("../R/clustering_functions.R")
+source("../R/plot.R")
+source("../R/gabowmyers.R")
+source("../R/graph_ops.R")
+source("../R/metrics.R")
+source("../R/tree_scoring.R")
+source("../R/tree.R")
+source("../R/subclone-proportions.R")
+source("single_samp_func.R")
+
+```
+
+
+
+# get input data
+```{r}
+## change to input path
+ori_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
+
+## split original data into single sample input
+samp_comb <- combn(1:ori_data$S,1)
+subset <- function(input_data, samp_comb, x){
+  out <- list(y = input_data$y[,samp_comb[,x]],
+              n = input_data$n[,samp_comb[,x]],
+              tcn = input_data$tcn[,samp_comb[,x]],
+              m = input_data$m[,samp_comb[,x]],
+              I = input_data$I,
+              S = 1,
+              purity = input_data$purity[samp_comb[,x]],
+              Sample_names = input_data$Sample_names[samp_comb[,x]],
+              mutation_indices = seq_len(input_data$I),
+              Mut_ID = input_data$Mut_ID)
+}
+subset_list <- lapply(1:ncol(samp_comb), function(x) subset(ori_data, samp_comb,x))
+
+## pick one sample from list by changing the number in bracket
+temp_box <- subset_list[[1]]
+
+
+n.iter = 10000
+n.burn = 1000
+thin = 10
+mc.cores = 1
+inits = list(".RNG.name" = "base::Wichmann-Hill",
+             ".RNG.seed" = 123)
+temp_max_K = 5
+model_type = "spike_and_slab"
+params = c("z", "w", "ystar")
+beta.prior = FALSE
+
+
+temp_samps_list <- runMCMCForABox(temp_box,
+                                  n.iter = n.iter, n.burn = n.burn, 
+                                  thin = thin, mc.cores = mc.cores,
+                                  inits = inits,
+                                  params = params,
+                                  max_K = temp_max_K,
+                                  model = model_type,
+                                  beta.prior = beta.prior)
+
+temp <- temp_samps_list 
+# Format chains
+format_chain <- function(temp_samps_list, k){
+  
+  w <- temp_samps_list[[k]][[1]]%>%
+    as.data.frame()%>%
+    select(contains("w"))%>%
+    mutate(Iteration = seq.int(1,nrow(.),1),
+           Chain = rep(1, nrow(.)))%>%
+    gather(key = Parameter, value = value, 1:(ncol(.)-2))%>%
+    mutate(Parameter= ifelse(Parameter == "w","w[1]",Parameter))
+  y <- temp_samps_list[[k]][[1]]%>%
+    as.data.frame()%>%
+    select(contains("y"))%>%
+    mutate(Iteration = seq.int(1,nrow(.),1),
+           Chain = rep(1, nrow(.)))%>%
+    gather(key = Parameter, value = value, 1:(ncol(.)-2))
+  z <- temp_samps_list[[k]][[1]]%>%
+    as.data.frame()%>%
+    select(contains("z"))%>%
+    mutate(Iteration = seq.int(1,nrow(.),1),
+           Chain = rep(1, nrow(.)))%>%
+    gather(key = Parameter, value = value, 1:(ncol(.)-2))
+  
+  temp[[k]] <- list(w_chain = w,
+                    z_chain = z,
+                    ystar_chain = y)
+  
+}
+
+samp_list <- lapply(names(temp_samps_list), function(k) format_chain(temp_samps_list,k))
+names(samp_list) <- names(temp)
+
+```
+
+# original
+```{r}
+k = 5
+box_indata <- getBoxInputData(temp_box)
+n <- box_indata$I * box_indata$S
+ll <- calcChainLogLik(samp_list[[k]], box_indata, k)
+```
+
+# New
+```{r}
+j = k
+#get one chain from a box and its K
+chains <- samp_list[[j]]
+# get w matrix
+w <- chains$w_chain
+  mutate(value = round(value,5),
+         Cluster = as.numeric(gsub("w\\[(.*)\\]","\\1", Parameter)))%>%
+  group_by(Cluster)%>%
+  summarize(w = mean(value))%>%
+  ungroup()
+  
+  samp_list[[3]]$w_chain%>%
+  mutate(Cluster = gsub("w\\[(,*)\\]","\\1",Parameter))%>%
+  ggplot(aes(x = Iteration, y = value))+
+  geom_line() +
+    theme_light() +
+    facet_wrap("Cluster") +
+    ylab("Cancer Cell Fraction")
+# get mutation assignment
+ww <- writeClusterAssignmentsTable(chains$z_chain)%>%
+  mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
+  arrange(Mut_ID)%>%
+  left_join(w)%>%
+  select(-c("Mut_ID","Cluster"))%>%
+  as.matrix()
+
+y <- temp_box$y
+n <- temp_box$n
+m <- temp_box$m
+p <- temp_box$purity
+pp <- diag(p,length(p),length(p))
+c <- temp_box$tcn
+
+vaf <- m*ww%*%pp/sweep(c%*%pp, 2, -2*(1-p))
+
+# vaf is the probability
+# trails is n
+#assume predicted n is from the input
+
+############################################################# do the log first then sum()
+lik <- sum(dbinom(y,n,vaf,log = T))
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

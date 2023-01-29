@@ -1,0 +1,121 @@
+---
+title: "Subset_test"
+author: "Lester"
+date: "2023-01-29"
+output: html_document
+---
+
+## seperating to subsets
+```{r}
+input_data <- readRDS("C:/Users/Leste/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
+samp_comb <- combn(1:input_data$S,2)
+subset <- function(input_data, samp_comb, x){
+  out <- list(y = input_data$y[,samp_comb[,x]],
+              n = input_data$n[,samp_comb[,x]],
+              tcn = input_data$tcn[,samp_comb[,x]],
+              m = input_data$m[,samp_comb[,x]],
+              I = input_data$I,
+              S = length(samp_comb[,x]),
+              purity = input_data$purity[samp_comb[,x]],
+              Sample_names = input_data$Sample_names[samp_comb[,x]],
+              Mut_ID = input_data$Mut_ID)
+}
+subset_list <- lapply(1:ncol(samp_comb), function(x) subset(input_data, samp_comb,x))
+all_set_results <- clusterSep(subset_list[[1]],
+                               n.iter = 1000, n.burn = 100, thin = 1,
+                               max_K = 5)
+
+set_k_choices <- writeSetKTable(all_set_results)
+set_k_choices$chosen_K[5] = 2
+
+
+best_set_chains <- collectBestKChains(all_set_results, chosen_K = set_k_choices$chosen_K)
+chains <- mergeSetChains(best_set_chains, input_data)
+plotChainsCCF(chains$w_chain)
+```
+
+## run mcmc for subset
+```{r}
+mcmc <- function(data,jags.file,
+                 n.iter = 10000, n.burn = 1000, thin = 10,n.chains=1,n.adapt=1000,
+                 mc.cores = 1,params = c("w", "ystar"),beta.prior = FALSE,
+                 inits = list(".RNG.name" = "base::Wichmann-Hill",".RNG.seed" = 123)){
+  
+  jags.m <- jags.model(jags.file,
+                         data,
+                         n.chains = n.chains,
+                         inits = inits,
+                         n.adapt = n.adapt)
+    if (n.burn > 0) update(jags.m, n.burn)
+    samps <- coda.samples(jags.m, params, n.iter=n.iter, thin=thin)
+    
+    return(samps)
+}
+
+temp <- input_data$y %>%
+  as.data.frame()%>%
+  mutate_if(is.numeric, ~1 * (. != 0))%>%
+  unite("type", colnames(.), remove = FALSE)%>%
+  mutate(num = rownames(.),
+         type = gsub("_","",type))
+boxes <- lapply(unique(temp$type), function(x) as.numeric(filter(temp, type == x)$num))
+out <- list()
+extdir <- system.file("extdata", package="pictograph")
+jags.file.test <- file.path(extdir, "sub_test.jags")
+
+
+for (i in 1:length(boxes)){
+  type <- unique(temp$type)[i]
+  K <- filter(set_k_choices, set_name_bin==type)$chosen_K
+  z <- sets[boxes[[i]],]$Cluster - min(sets[boxes[[i]],]$Cluster)+1
+  box <- list(y = subset_list[[1]]$y[boxes[[i]],],
+              n = subset_list[[1]]$n[boxes[[i]],],
+              tcn = subset_list[[1]]$tcn[boxes[[i]],],
+              m = subset_list[[1]]$m[boxes[[i]],],
+              I = length(boxes[[i]]),
+              S = subset_list[[1]]$S,
+              purity = subset_list[[1]]$purity,
+              #Sample_names = subset_list[[1]]$Sample_names,
+              #Mut_ID = subset_list[[1]]$Mut_ID[boxes[[i]]],
+              z = z,
+              K = K)
+  if (box$I > 1) {
+    if (sum(box$y) == 0){
+      sample_to_sort <- 1
+    }else{
+      sample_to_sort <- which(colSums(box$y) > 0)[1]
+    }
+     
+  } else {
+    if (sum(box$y) == 0){
+      sample_to_sort <- 1
+    }else{
+      sample_to_sort <- which(box$y > 0)[1]
+    }
+    
+  }
+  box$sample_to_sort <- sample_to_sort
+  
+  # run mcmc chain
+  out_chain <- mcmc(box,jags.file.test)[[1]]
+  
+  # convert to original clustering number
+  col <- colnames(out_chain)[grep("w",colnames(out_chain))]%>%
+    as.data.frame()%>%
+    rename("w_para" = ".")%>%
+    mutate(old_z = gsub("w\\[(.*),.*","\\1",w_para),
+           other = gsub("w\\[(.*)(,.*)","\\2",w_para),
+           z = as.numeric(old_z) + min(sets[boxes[[i]],]$Cluster)-1,
+           new_w = paste0("w[",z,other))
+  colnames(out_chain)[grep("w",colnames(out_chain))] <- col$new_w 
+  
+  # convert w chain to data frame to build w matrix
+  out_w <- out_chain[,grep("w",colnames(out_chain))]%>%
+    as.data.frame()%>%
+    gather(key = "Parameter",value = "value")
+  out[[type]] <- out_w
+}
+w_chain <- do.call(rbind.data.frame, out)%>%
+  mutate()
+w_mat <- estimateCCFs(w_chain)
+```
