@@ -97,25 +97,27 @@ graph_G <- expand.grid(parent = c(seq.int(1,nrow(w_mat),1),"root"),
          parent.ccf = ifelse(parent == "root",1,w_mat[.$parent]),
          child.ccf = w_mat[.$child],
          topo_cost = child.ccf - parent.ccf)%>%
-  filter(topo_cost < 0.1)
+  filter(topo_cost < 0.1)%>%
+  select(parent, child, edge)
 
 enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=0.5)
+scores <- calcTreeScores(chains$w_chain, all_spanning_trees)
 
 ## no topology cost bc there was a filter before, all bad edges are removed
-get_score <- function(tree){
-top <- tree %>%
-  pull(topo_cost)%>%
-  sum()
-mas <- tree%>%
-  group_by(parent)%>%
-  mutate(sum_child = sum(child.ccf),
-         mass_cost = sum_child - parent.ccf)%>%
-  distinct(parent, .keep_all = TRUE)%>%
-  pull(mass_cost)%>%
-  sum()
-return(abs(top+mas))
-}
-scores <- sapply(all_spanning_trees, function(x) get_score(x))
+# get_score <- function(tree){
+# top <- tree %>%
+#   pull(topo_cost)%>%
+#   sum()
+# mas <- tree%>%
+#   group_by(parent)%>%
+#   mutate(sum_child = sum(child.ccf),
+#          mass_cost = sum_child - parent.ccf)%>%
+#   distinct(parent, .keep_all = TRUE)%>%
+#   pull(mass_cost)%>%
+#   sum()
+# return(abs(top+mas))
+# }
+# scores <- sapply(all_spanning_trees, function(x) get_score(x))
 best_tree <- all_spanning_trees[[which.max(scores)]]
 best_tree <- all_spanning_trees[[40]]
 plotTree(best_tree)

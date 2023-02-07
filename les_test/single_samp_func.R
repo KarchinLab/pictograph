@@ -211,3 +211,117 @@ estimateCCFs <- function(w_chain) {
   w.map.matrix <- matrix(w.map$value_rounded, K, 1, byrow=TRUE)
   return(w.map.matrix)
 }
+
+mcfMatrix <- function(mcf_stats, parameter="mean"){
+  # changed k and s assignment
+  K <- nrow(mcf_stats)
+  S <- 1
+  if(parameter=="mean")
+    MCF <- matrix(mcf_stats$mean, K, S, byrow=TRUE)
+  if(parameter=="sd")
+    MCF <- matrix(mcf_stats$sd, K, S, byrow=TRUE)
+  MCF
+}
+
+initializeAdjacencyMatrix <- function(mcf_stats=NULL, mcf_matrix=NULL, zero.thresh=0.01) {
+  if (!is.null(mcf_stats)) {
+    MCF <- mcfMatrix(mcf_stats)
+  } else if (!is.null(mcf_matrix)) {
+    MCF <- mcf_matrix
+  } else stop("must supply either mcf_stats or mcf_matrix")
+  
+  ##
+  ## for each row (cluster) of the MCF matrix,
+  ## list indices of samples for which the cluster is present
+  ##
+  K <- nrow(MCF)
+  S <- ncol(MCF)
+  # cluster.sample.presence should be a list
+  MCF_list <- split(MCF, seq(nrow(MCF)))
+  #cluster.sample.presence <- lapply(MCF_list, 
+  #                                  function(x) which(x > zero.thresh))
+  #all.samples <- seq_len(S)
+  ## initialize adjacency matrix
+  ##admat <- matrix(data=0, nrow=(1+K), ncol=K)
+  admat <- matrix(data=0, K, K)
+  ## can't go to self
+  diag(admat) <- NA
+  # removed nested for loop to check box hierarchy
+  ## Add root
+  ## can go from root to anyone
+  admat <- rbind(0, admat)
+  dimnames(admat) <- list(c("root", paste0("cluster", seq_len(K))),
+                          paste0("cluster", seq_len(K)))
+  admat
+}
+
+
+
+create.cpov <- function(mcf_stats, alpha=0.05, zero.thresh=0.01, mcf_matrix = NULL, restriction.val = 1) {
+  cpov <- NA
+  MCF <- NA
+  
+  ## if mcf_matrix is supplied, use that to create cpov
+  if (is.null(mcf_matrix)) {
+    cpov <- initializeAdjacencyMatrix(mcf_stats = mcf_stats, zero.thresh = zero.thresh)
+    cpov[is.na(cpov)] <- restriction.val
+    MCF <- mcfMatrix(mcf_stats)
+  } else {
+    cpov <- initializeAdjacencyMatrix(mcf_matrix = mcf_matrix, zero.thresh = zero.thresh)
+    cpov[is.na(cpov)] <- restriction.val
+    MCF <- mcf_matrix
+  }
+  
+  sds <- mcfMatrix(mcf_stats, parameter="sd")
+  ##S <- ncol(mcmc_w) # number of samples
+  S <- 1
+  ##cpov <- cpov[-1, ]
+  ## root can go to anyone -- all 0's (default base admat value)
+  for (r in 2:nrow(cpov)) {
+    for (c in 1:ncol(cpov)) {
+      if (cpov[r,c] == restriction.val) next # skip restricted position
+      from <- r-1 # 'from' cluster node
+      to <- c # 'to' cluster node
+      statistic <- 0
+      pval <- 0
+      for(s in seq_len(S)) {
+        ##d <- mcmc_w[from,s] - mcmc_w[to,s]
+        d <- MCF[from, s] - MCF[to, s]
+        d_sd <- sqrt(sds[from, s]^2 + sds[to, s]^2)
+        ##d_sd <- sqrt((mcmc_w_sd[from,s])^2 + (mcmc_w_sd[to,s])^2)
+        I <- sum(d < 0)
+        ## cumulative sum of the
+        ## number of standard deviations for the difference in
+        ## MCFs between 2 samples
+        if (d == 0 || is.nan(d / d_sd)) {
+          next
+        } else {
+          statistic <- statistic + (d / d_sd)^2 * I
+        }
+        
+        for (k in 0:S) {
+          pval <- pval + ((1 - pchisq(statistic, k)) *
+                            choose(S, k) / (2^S))
+        }
+      }
+      ##
+      ## edge seems to be based on this ad-hoc statistic, not
+      ## the probability of the tree
+      ##
+      cpov[r,c] <- decide.ht(pval, alpha)
+    }
+  }
+  cpov
+}
+
+
+calcTreeScores <- function(w_chain, trees, mc.cores = 1) {
+  mcf_stats <- summarizeWChain(w_chain)
+  cpov <- create.cpov(mcf_stats)
+  w_mat <- estimateCCFs(w_chain)%>%
+    cbind(matrix(rep(0, nrow(.)),nrow = nrow(.), ncol = 1))
+  schism_scores <- unlist(parallel:::mclapply(trees, 
+                                              function(x) calcTreeFitness(x, cpov, w_mat, am_format = "edges"),
+                                              mc.cores = mc.cores))
+  return(schism_scores)
+}

@@ -107,7 +107,7 @@ names(samp_list) <- names(temp)
 
 # original
 ```{r}
-k = 5
+k = 1
 box_indata <- getBoxInputData(temp_box)
 n <- box_indata$I * box_indata$S
 ll <- calcChainLogLik(samp_list[[k]], box_indata, k)
@@ -119,7 +119,7 @@ j = k
 #get one chain from a box and its K
 chains <- samp_list[[j]]
 # get w matrix
-w <- chains$w_chain
+w <- chains$w_chain%>%
   mutate(value = round(value,5),
          Cluster = as.numeric(gsub("w\\[(.*)\\]","\\1", Parameter)))%>%
   group_by(Cluster)%>%
