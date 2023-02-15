@@ -26,7 +26,7 @@ source("single_samp_func.R")
 # prepare single sample data
 ```{r}
 ## change to input path
-ori_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
+ori_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP02_input_data.rds")
 
 ## split original data into single sample input
 samp_comb <- combn(1:ori_data$S,1)
@@ -45,7 +45,7 @@ subset <- function(input_data, samp_comb, x){
 subset_list <- lapply(1:ncol(samp_comb), function(x) subset(ori_data, samp_comb,x))
 
 ## pick one sample from list by changing the number in bracket
-input_data <- subset_list[[1]]
+input_data <- subset_list[[4]]
 ```
 
 
@@ -54,9 +54,24 @@ input_data <- subset_list[[1]]
 # process the data
 ```{r pressure, echo=FALSE}
 # run MCMC
-all_set_results <- clusterSep(input_data,
+job::job({
+  library(tidyverse)
+library(rjags)
+setwd("~/GitHub/pictograph/les_test")
+source("../R/bic.R")
+source("../R/cluster_separately.R")
+source("../R/clustering_functions.R")
+source("../R/plot.R")
+source("../R/gabowmyers.R")
+source("../R/graph_ops.R")
+source("../R/metrics.R")
+source("../R/tree_scoring.R")
+source("../R/tree.R")
+source("../R/subclone-proportions.R")
+source("single_samp_func.R")
+  all_set_resultsip02_4 <- clusterSep(input_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
-                              max_K = 5)
+                              max_K = 5)})
 
 ## plot ccf
 chains <- all_set_results$best_chains
@@ -68,12 +83,18 @@ chains$w_chain%>%
     facet_wrap("Cluster") +
     ylab("Cancer Cell Fraction")
 
+## modify this function to plot BIC
+plotBIC(all_set_results)
 ```
 
 ```{r}
 sets <- writeClusterAssignmentsTable(chains$z_chain)%>%
   mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
   arrange(Mut_ID)
+
+ggplot(data = sets)+
+  geom_point(aes(x = Cluster, y = Mut_ID))
+
 mut <- input_data$Mut_ID%>%
   cbind(sets)%>%
   rename("Mut" = ".")%>%
@@ -119,7 +140,82 @@ scores <- calcTreeScores(chains$w_chain, all_spanning_trees)
 # }
 # scores <- sapply(all_spanning_trees, function(x) get_score(x))
 best_tree <- all_spanning_trees[[which.max(scores)]]
-best_tree <- all_spanning_trees[[40]]
 plotTree(best_tree)
 plotEnsembleTree(all_spanning_trees)
+```
+
+#plotBIC
+```{r}
+min <- all_set_results$best_K
+elbow <- ifelse(is.logical(all_set_results$BIC), 1, findElbow2(all_set_results$BIC$BIC))
+knee <- ifelse(is.logical(all_set_results$BIC), 1, findKnee(all_set_results$BIC$BIC))
+bic_tb <- all_set_results$BIC
+k_c <- bind_rows(bic_tb[min,],bic_tb[elbow,],bic_tb[knee,])%>%
+  mutate(type = c("min","elbow","knee"))
+
+# plot
+bic_plot <- ggplot(bic_tb, aes(x = K_tested, y = BIC)) +
+    theme_light() +
+    geom_line() +
+    geom_point(data = k_c, aes(color = type, size = type, shape = type), stroke = 1) +
+    scale_shape_manual(values=c(19, 1, 1))+
+    scale_color_manual(values=c('#999999',"#56B1F7", "#E69F00")) +
+    scale_size_manual(values=c(1, 3, 5)) +
+    #geom_point(data = elbow, color = , size = 4, shape = 1)
+    theme(strip.background=element_blank(),
+          strip.text = element_text(colour = 'black'),
+          panel.grid.minor = element_blank()) +
+    xlab("K")
+```
+
+#violin plot
+```{r}
+all_set_results <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/single_sample/ip22_1.rds")
+
+vio <- all_set_results$best_chains$w_chain %>%
+  mutate(cluster = gsub("w\\[(.*)\\]","\\1",Parameter))%>%
+  ggplot(aes(cluster, value))+
+  geom_violin(aes(fill=cluster),
+                alpha=0.6,
+                scale="width",
+                draw_quantiles=c(0.25, 0.5, 0.75),
+                color="white")+
+  geom_violin(fill="transparent", color="black",
+                scale="width", draw_quantiles=0.5) +
+    theme_bw(base_size=12) +
+    theme(strip.background=element_blank(),
+          axis.text.x=element_text(size=12),
+          panel.grid=element_blank(),
+          legend.pos="bottom") +
+    ylab("Posterior CCF") + xlab("") +ylim(c(0, 1)) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+  
+```
+
+
+```{r}
+all_set_results <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/single_sample/ip22_1.rds")
+
+ca<- all_set_results$best_chains$z_chain%>%
+  group_by(Parameter, value)%>%
+  summarise(prob = n()/1000)%>%
+  ungroup()%>%
+  group_by(Parameter)%>%
+  filter(prob == max(prob))%>%
+  ungroup()%>%
+  arrange(desc(value))%>%
+  mutate(Mut_ID = gsub("z\\[(.*)\\]","\\1",Parameter))
+
+ca$Mut_ID <- factor(ca$Mut_ID, levels=c(ca$Mut_ID))
+
+ggplot(ca, aes(x = value, y = Mut_ID, color = prob)) +
+    theme_light() +
+    scale_y_discrete(drop = T, name = "Variant") +
+    scale_x_continuous(breaks = 1:K, name = "Cluster", labels = 1:K) +
+    geom_point() +
+    theme(panel.grid.minor = element_blank(),
+          strip.background=element_blank(),
+          strip.text = element_text(colour = 'black'),
+          strip.text.y = element_text(angle = 0)) +
+    scale_color_gradient(limits = c(0,1))
 ```

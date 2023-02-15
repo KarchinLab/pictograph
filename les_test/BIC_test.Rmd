@@ -107,10 +107,11 @@ names(samp_list) <- names(temp)
 
 # original
 ```{r}
-k = 1
+k = 5
 box_indata <- getBoxInputData(temp_box)
 n <- box_indata$I * box_indata$S
 ll <- calcChainLogLik(samp_list[[k]], box_indata, k)
+print(ll)
 ```
 
 # New
@@ -156,7 +157,7 @@ vaf <- m*ww%*%pp/sweep(c%*%pp, 2, -2*(1-p))
 
 ############################################################# do the log first then sum()
 lik <- sum(dbinom(y,n,vaf,log = T))
-
+print(lik)
 ```
 
 ## Including Plots
