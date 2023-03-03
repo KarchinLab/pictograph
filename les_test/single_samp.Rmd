@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-#library(pictograph)
+library(pictograph)
 library(tidyverse)
 library(rjags)
 setwd("~/GitHub/pictograph/les_test")
@@ -20,13 +20,13 @@ source("../R/metrics.R")
 source("../R/tree_scoring.R")
 source("../R/tree.R")
 source("../R/subclone-proportions.R")
-source("single_samp_func.R")
+#source("single_samp_func.R")
 ```
 
 # prepare single sample data
 ```{r}
 ## change to input path
-ori_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP02_input_data.rds")
+ori_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
 
 ## split original data into single sample input
 samp_comb <- combn(1:ori_data$S,1)
@@ -53,25 +53,9 @@ input_data <- subset_list[[4]]
 
 # process the data
 ```{r pressure, echo=FALSE}
-# run MCMC
-job::job({
-  library(tidyverse)
-library(rjags)
-setwd("~/GitHub/pictograph/les_test")
-source("../R/bic.R")
-source("../R/cluster_separately.R")
-source("../R/clustering_functions.R")
-source("../R/plot.R")
-source("../R/gabowmyers.R")
-source("../R/graph_ops.R")
-source("../R/metrics.R")
-source("../R/tree_scoring.R")
-source("../R/tree.R")
-source("../R/subclone-proportions.R")
-source("single_samp_func.R")
-  all_set_resultsip02_4 <- clusterSep(input_data,
+  all_set_results <- clusterSep(input_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
-                              max_K = 5)})
+                              max_K = 5, one_box = TRUE, les_BIC = TRUE)
 
 ## plot ccf
 chains <- all_set_results$best_chains

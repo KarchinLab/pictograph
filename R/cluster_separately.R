@@ -16,19 +16,50 @@ clusterSep <- function(input_data,
                                     ".RNG.seed" = 123),
                        max_K = 5,
                        model_type = "spike_and_slab",
-                       beta.prior = FALSE) {
+                       beta.prior = FALSE,
+                       single = FALSE,
+                       one_box = FALSE,
+                       les_BIC = FALSE) {
   # 1. separate mutations by sample presence
-  sep_list <- separateMutationsBySamplePresence(input_data)
-  
-  # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
-  all_set_results <- vector("list", length(sep_list))
-  names(all_set_results) <- names(sep_list)
-  params = c("z", "w", "ystar")
-  
-  for (i in seq_len(length(sep_list))) {
-    temp_box <- sep_list[[i]]
+  if(single == TRUE){
+    #source(paste0(system.file("R", package="pictograph"),"/single_samp_func.R"))
+    source("~/GitHub/pictograph/R/single_samp_func.R")
+    # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
+    params = c("z", "w", "ystar")
+    
     # Max number of clusters cannot be more than number of mutations
-    temp_max_K <- min(max_K, length(temp_box$mutation_indices))
+    temp_max_K <- min(max_K, input_data$I)
+    
+    all_set_results <- runMutSetMCMC(input_data, 
+                                     n.iter = n.iter, n.burn = n.burn, thin = thin, 
+                                     mc.cores = mc.cores,
+                                     inits = inits,
+                                     temp_max_K = temp_max_K,
+                                     model_type = model_type,
+                                     params = params,
+                                     beta.prior = beta.prior,
+                                     les_BIC = les_BIC)
+    return(all_set_results)
+    
+  }else if(one_box == TRUE){
+    
+    # 1. separate mutations by sample presence
+    #sep_list <- separateMutationsBySamplePresence(input_data)
+    
+    
+    # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
+    #all_set_results <- vector("list", length(sep_list))
+    #names(all_set_results) <- names(sep_list)
+    params = c("z", "w", "ystar")
+    
+    ####### very important to run mcmc #######
+    input_data$mutation_indices <- 1:input_data$I
+    
+    #for (i in seq_len(length(sep_list))) {
+    #temp_box <- sep_list[[4]]
+    temp_box <- input_data
+    # Max number of clusters cannot be more than number of mutations
+    temp_max_K <- min(max_K, temp_box$I)
     
     temp_samps_list <- runMutSetMCMC(temp_box, 
                                      n.iter = n.iter, n.burn = n.burn, thin = thin, 
@@ -37,11 +68,40 @@ clusterSep <- function(input_data,
                                      temp_max_K = temp_max_K,
                                      model_type = model_type,
                                      params = params,
-                                     beta.prior = beta.prior)
-    all_set_results[[i]] <- temp_samps_list
-  }
+                                     beta.prior = beta.prior,
+                                     les_BIC = les_BIC)
+    #all_set_results[[i]] <- temp_samps_list
+    #}
+    
+    return(temp_samps_list)
+    
+  }else{
   
-  return(all_set_results)
+    sep_list <- separateMutationsBySamplePresence(input_data)
+    
+    # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
+    all_set_results <- vector("list", length(sep_list))
+    names(all_set_results) <- names(sep_list)
+    params = c("z", "w", "ystar")
+    
+    for (i in seq_len(length(sep_list))) {
+      temp_box <- sep_list[[i]]
+      # Max number of clusters cannot be more than number of mutations
+      temp_max_K <- min(max_K, length(temp_box$mutation_indices))
+      
+      temp_samps_list <- runMutSetMCMC(temp_box, 
+                                       n.iter = n.iter, n.burn = n.burn, thin = thin, 
+                                       mc.cores = mc.cores,
+                                       inits = inits,
+                                       temp_max_K = temp_max_K,
+                                       model_type = model_type,
+                                       params = params,
+                                       beta.prior = beta.prior,
+                                       les_BIC = les_BIC)
+      all_set_results[[i]] <- temp_samps_list
+    }
+    return(all_set_results)
+  }
 }
 
 separateMutationsBySamplePresence <- function(input_data) {
@@ -195,56 +255,108 @@ runMutSetMCMC <- function(temp_box,
                           temp_max_K = 5,
                           model_type = "spike_and_slab",
                           params = c("z", "w", "ystar"),
-                          beta.prior = FALSE) {
-  
-  # Run MCMC
-  if (temp_max_K == 1) {
-    # only 1 possible cluster
-    temp_samps_list <- runMCMCForABox(temp_box,
-                                      n.iter = n.iter, n.burn = n.burn, 
-                                      thin = thin, mc.cores = mc.cores,
-                                      inits = inits,
-                                      params = params,
-                                      max_K = temp_max_K)
-  } else {
-    # assess range of K: [1, temp_max_K]
-    temp_samps_list <- runMCMCForABox(temp_box,
-                                      n.iter = n.iter, n.burn = n.burn, 
-                                      thin = thin, mc.cores = mc.cores,
-                                      inits = inits,
-                                      params = params,
-                                      max_K = temp_max_K,
-                                      model = model_type,
-                                      beta.prior = beta.prior)
+                          beta.prior = FALSE,
+                          les_BIC = FALSE) {
+  if(les_BIC == TRUE){
+    #source(paste0(system.file("R", package="pictograph"),"/single_samp_func.R"))
+    source("~/GitHub/pictograph/R/les_bic.R")
+    # Run MCMC
+    if (temp_max_K == 1) {
+      # only 1 possible cluster
+      temp_samps_list <- runMCMCForABox(temp_box,
+                                        n.iter = n.iter, n.burn = n.burn, 
+                                        thin = thin, mc.cores = mc.cores,
+                                        inits = inits,
+                                        params = params,
+                                        max_K = temp_max_K)
+    } else {
+      # assess range of K: [1, temp_max_K]
+      temp_samps_list <- runMCMCForABox(temp_box,
+                                        n.iter = n.iter, n.burn = n.burn, 
+                                        thin = thin, mc.cores = mc.cores,
+                                        inits = inits,
+                                        params = params,
+                                        max_K = temp_max_K,
+                                        model = model_type,
+                                        beta.prior = beta.prior)
+    }
+    
+    # Format chains
+    samps_list <- parallel::mclapply(temp_samps_list, formatChains,
+                                     mc.cores = mc.cores)
+    
+    # Calculate BIC
+    K_tested <- seq_len(temp_max_K)
+    if (temp_max_K > 1) {
+      bic_vec <- calcBIC_les(samps_list,temp_box)
+      bic_tb <- tibble(K_tested = K_tested,
+                       BIC = bic_vec)
+      best_chains <- samps_list[[which.min(bic_vec)]]
+      res_list <- list(all_chains = samps_list,
+                       BIC = bic_tb,
+                       best_chains = best_chains,
+                       best_K = which.min(bic_vec))
+    } else {
+      # only 1 variant, so must be 1 cluster and don't need to check BIC
+      res_list <- list(all_chains = samps_list,
+                       BIC = NA,
+                       best_chains = samps_list[[1]],
+                       best_K = 1)
+    }
+    
+    return(res_list)
+    
+  }else{
+    
+    # Run MCMC
+    if (temp_max_K == 1) {
+      # only 1 possible cluster
+      temp_samps_list <- runMCMCForABox(temp_box,
+                                        n.iter = n.iter, n.burn = n.burn, 
+                                        thin = thin, mc.cores = mc.cores,
+                                        inits = inits,
+                                        params = params,
+                                        max_K = temp_max_K)
+    } else {
+      # assess range of K: [1, temp_max_K]
+      temp_samps_list <- runMCMCForABox(temp_box,
+                                        n.iter = n.iter, n.burn = n.burn, 
+                                        thin = thin, mc.cores = mc.cores,
+                                        inits = inits,
+                                        params = params,
+                                        max_K = temp_max_K,
+                                        model = model_type,
+                                        beta.prior = beta.prior)
+    }
+    
+    # Format chains
+    samps_list <- parallel::mclapply(temp_samps_list, formatChains,
+                                     mc.cores = mc.cores)
+    
+    # Calculate BIC
+    K_tested <- seq_len(temp_max_K)
+    if (temp_max_K > 1) {
+      box_indata <- getBoxInputData(temp_box)
+      bic_vec <- unname(unlist(parallel::mclapply(samps_list, 
+                                                  function(chains) calcChainBIC(chains, box_indata),
+                                                  mc.cores = mc.cores)))
+      bic_tb <- tibble(K_tested = K_tested,
+                       BIC = bic_vec)
+      best_chains <- samps_list[[which.min(bic_vec)]]
+      res_list <- list(all_chains = samps_list,
+                       BIC = bic_tb,
+                       best_chains = best_chains,
+                       best_K = which.min(bic_vec))
+    } else {
+      # only 1 variant, so must be 1 cluster and don't need to check BIC
+      res_list <- list(all_chains = samps_list,
+                       BIC = NA,
+                       best_chains = samps_list[[1]],
+                       best_K = 1)
+    }
+    
+    return(res_list)
   }
-  
-  # Format chains
-  samps_list <- parallel::mclapply(temp_samps_list, formatChains,
-                                   mc.cores = mc.cores)
-  
-  # Calculate BIC
-  K_tested <- seq_len(temp_max_K)
-  if (temp_max_K > 1) {
-    box_indata <- getBoxInputData(temp_box)
-    bic_vec <- unname(unlist(parallel::mclapply(samps_list, 
-                                         function(chains) calcChainBIC(chains, box_indata),
-                                         mc.cores = mc.cores)))
-    bic_tb <- tibble(K_tested = K_tested,
-                     BIC = bic_vec)
-    best_chains <- samps_list[[which.min(bic_vec)]]
-    res_list <- list(all_chains = samps_list,
-                     BIC = bic_tb,
-                     best_chains = best_chains,
-                     best_K = which.min(bic_vec))
-  } else {
-    # only 1 variant, so must be 1 cluster and don't need to check BIC
-    res_list <- list(all_chains = samps_list,
-                     BIC = NA,
-                     best_chains = samps_list[[1]],
-                     best_K = 1)
-  }
-  
-  return(res_list)
 }
 
 
