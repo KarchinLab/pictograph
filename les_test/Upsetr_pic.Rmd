@@ -1,0 +1,58 @@
+---
+title: "Untitled"
+author: "Lester"
+date: "2023-03-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(UpSetR)
+library(tidyverse)
+```
+
+## Load data
+```{r cars}
+files <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/PanIN-2023/PICTograph Mutation Calls 1.31.23/", full.names = T)
+file_list <- lapply(files, function(x) read_excel(x)%>%
+                      select(contains(c("Hugo_Symbol","HGVSp_Short")))%>%
+                      mutate(file = gsub(".*31.23/(.*) Filter.*","\\1",x)))
+
+
+## excels has duplicated columns, and for AB_14_1.3&1.4 two columns of HGVSp is not the same
+
+ff <- lapply(1:length(file_list), function(x) file_list[[x]][!duplicated(as.list(file_list[[x]]))]%>%
+                      select(c(1:2,"file"))%>%
+                      rename("Hugo_Symbol" = grep("Hugo",colnames(.)),
+                             "HGVSp_Short" = grep("HGVS", colnames(.))))%>%
+  do.call(rbind,.)%>%
+  mutate(gene = paste0(Hugo_Symbol,HGVSp_Short),
+         reigon = gsub("(.*)\\..*","\\1",file),
+         reigon = gsub(" ","_",reigon))%>%
+  select(gene, file, reigon)
+```
+
+## Including Plots
+```{r pressure, echo=FALSE}
+reigon <- unique(ff$reigon)
+# remove TC98_2 bc 98_2.5 has duplicated gene name
+#reigon <- reigon[-12]
+
+bind_reigon <- function(rei, dat){
+
+  out <- dat%>%
+    filter(reigon == rei)%>%
+    mutate(type = row_number())%>%
+    spread(key = file, value = gene)%>%
+    select(-c("type","reigon"))%>%
+    as.list()
+  return(out)
+}
+
+dat_in <- lapply(reigon, function(x) bind_reigon(x,ff))
+```
+
+# UPSETr
+```{r}
+upset(fromList(dat_in[[3]]))
+  
+```
