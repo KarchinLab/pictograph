@@ -34,7 +34,7 @@ reshapeW <- function(w.chain.iter) {
     mutate(sample=stringr::str_replace_all(Parameter, "w\\[[:digit:]+,", ""),
            sample=as.numeric(stringr::str_replace_all(sample, "\\]", "")),
            cluster=stringr::str_replace_all(Parameter, "w\\[", ""),
-           cluster=as.numeric(stringr::str_replace_all(cluster, ",[:digit:]\\]", ""))) %>%
+           cluster=as.numeric(stringr::str_replace_all(cluster, ",.*]", ""))) %>%
     select(cluster, sample, value) 
   S <- max(w.mat$sample)
   w.mat <- w.mat %>%
