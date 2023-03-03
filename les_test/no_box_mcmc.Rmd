@@ -11,10 +11,11 @@ library(tidyr)
 library(rjags)
 library(ggplot2)
 library(stringr)
-#library(pictograph)
-source("C:/Users/Leste/Documents/GitHub/pictograph/R/bic.R")
-source("C:/Users/Leste/Documents/GitHub/pictograph/R/cluster_separately.R")
-source("C:/Users/Leste/Documents/GitHub/pictograph/R/clustering_functions.R")
+library(pictograph)
+setwd("~/GitHub/pictograph/les_test")
+source("../R/bic.R")
+source("../R/cluster_separately.R")
+source("../R/clustering_functions.R")
 get.parameter.chain <- function(param, chains) {
   chains[grep(paste0(param, "\\["), chains$Parameter), ]
 }
@@ -67,24 +68,38 @@ clusterSep <- function(input_data,
 
 ## Including Plots
 ```{r pressure, echo=FALSE}
-input_data <- readRDS("C:/Users/Leste/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
-
-tt <- as.data.frame(input_data$y)%>%
-  cbind(as.data.frame(input_data$n))
+input_data <- readRDS("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-input-PanIN-AB/panin_number_TC_98.1_pictograph_input_all_counts.rds")
 
 all_set_results <- clusterSep(input_data,
-                              n.iter = 1000, n.burn = 100, thin = 1,
-                              max_K = 10)
-chains <- all_set_results$best_chains
+                                          n.iter = 1000, n.burn = 100, thin = 1,
+                                          max_K = 10)
+
+all_set_results <- readRDS("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/PanIN-2023/one_box_tc98_1/one_box_tc98_1.rds")
+
+chains <- all_set_results$all_chains$K4
 plotChainsCCF(chains$w_chain)
 
 sets <- writeClusterAssignmentsTable(chains$z_chain)%>%
   mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
   arrange(Mut_ID)
-mut <- input_data$Mut_ID%>%
+mut <- input_data$mut_ID%>%
   cbind(sets)%>%
-  rename("Mut" = ".")
+  rename("Mut" = ".")%>%
+  select(-Mut_ID)
   filter(grepl('KRAS|GNAS',Mut, ignore.case = TRUE))
+```
+
+
+```{r}
+w_mat <- chains$w_chain%>%
+  mutate(cluster = gsub("w\\[(.*),.*","\\1",Parameter),
+         sample = gsub(".*,(.*)\\]","\\1",Parameter))%>%
+  group_by(sample,cluster)%>%
+  summarise(ccf = mean(value))%>%
+  spread(key = sample, value = ccf)%>%
+  select(-1)%>%
+  as.matrix()
+
 ```
 
 
@@ -92,15 +107,16 @@ mut <- input_data$Mut_ID%>%
 ```{r}
 w_mat <- estimateCCFs(chains$w_chain)
 graph_G_pre <- prepareGraphForGabowMyers(w_mat, chains, input_data)
-graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.98)
+graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.5)
 enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=1)
 scores <- calcTreeScores(chains$w_chain, all_spanning_trees)
-best_tree <- all_spanning_trees[[which.max(scores)]]
+best_tree <- all_spanning_trees[[4]]
 plotTree(best_tree)
 plotEnsembleTree(all_spanning_trees)
 subclone_props <- calcSubcloneProportions(w_mat, best_tree)
 subclone_props[subclone_props<0]=0
-subclone_props_n <- sapply(c(1,2,3), function(x) round(subclone_props[,x]/sum(subclone_props[,x]),digits = 5))
+subclone_props_n <- sapply(1:ncol(subclone_props), function(x) round(subclone_props[,x]/sum(subclone_props[,x]),digits = 5))
 plotSubclonePie(subclone_props_n)
 plotSubcloneBar(subclone_props_n)
+plotCCFViolin(chains$w_chain, chains$z_chain, indata = input_data)
 ```
