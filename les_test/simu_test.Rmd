@@ -1,0 +1,184 @@
+---
+title: "Untitled"
+author: "Lester"
+date: "2023-02-19"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(rjags)
+setwd("~/GitHub/pictograph/les_test")
+source("../R/bic.R")
+source("../R/cluster_separately.R")
+source("../R/clustering_functions.R")
+source("../R/plot.R")
+source("../R/gabowmyers.R")
+source("../R/graph_ops.R")
+source("../R/metrics.R")
+source("../R/tree_scoring.R")
+source("../R/tree.R")
+source("../R/subclone-proportions.R")
+
+```
+
+# test
+```{r}
+n.iter = 10000
+n.burn = 1000
+thin = 10
+mc.cores = 1
+inits = list(".RNG.name" = "base::Wichmann-Hill",
+                                    ".RNG.seed" = 123)
+max_K = 5
+model_type = "spike_and_slab"
+beta.prior = FALSE
+
+
+w.mat <- w.chain.iter %>%
+    mutate(sample=stringr::str_replace_all(Parameter, "w\\[[:digit:]+,", ""),
+           sample=as.numeric(stringr::str_replace_all(sample, "\\]", "")),
+           cluster=stringr::str_replace_all(Parameter, "w\\[", ""),
+           cluster=as.numeric(stringr::str_replace_all(cluster, ",:digit:]+\\]", "")))
+```
+
+## read simulated data
+```{r cars}
+t <- read.delim("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-schism-simulations/results/5_1/5_1_0.40_50.tree.mut.reads", header=FALSE, comment.char="#", skip = 18)
+coln <- c("cluster","mut",paste0("sample", 1:(ncol(t)-2)))
+colnames(t) <- coln
+rm(coln)
+```
+
+## transform simulated data into input format
+```{r pressure, echo=FALSE}
+make_input <- function(t){
+y <- t[,-1] %>%
+  column_to_rownames("mut")%>%
+  mutate(across(everything(), ~ as.numeric(gsub("/.*","",.))))%>%
+  as.matrix()
+n <- t[,-1] %>%
+  column_to_rownames("mut")%>%
+  mutate(across(everything(), ~ as.numeric(gsub(".*/","",.))))%>%
+  as.matrix()
+tcn <- matrix(rep(2,nrow(y)*ncol(y)),nrow=nrow(y))
+m <- matrix(rep(1,nrow(y)*ncol(y)),nrow=nrow(y))
+I <- nrow(y)
+S <- ncol(y)
+purity <- rep(0.4,ncol(y))
+Sample_names <- paste0("sample", 1:(ncol(t)-2))
+Mut_ID <- as.character(1:nrow(y))
+
+input_data <- list(
+  y = y,
+  n = n,
+  tcn =tcn,
+  m=m,
+  I = I,
+  S=S,
+  purity = purity,
+  Sample_names = Sample_names,
+  Mut_ID = Mut_ID)
+return(input_data)
+}
+
+input_data <- make_input(t)
+```
+
+
+
+```{r}
+job::job({
+  library(tidyverse)
+library(rjags)
+setwd("~/GitHub/pictograph/les_test")
+source("../R/bic.R")
+source("../R/cluster_separately.R")
+source("../R/clustering_functions.R")
+source("../R/plot.R")
+source("../R/gabowmyers.R")
+source("../R/graph_ops.R")
+source("../R/metrics.R")
+source("../R/tree_scoring.R")
+source("../R/tree.R")
+source("../R/subclone-proportions.R")
+all_set_results <- clusterSep(input_data,
+                              n.iter = 1000, n.burn = 100, thin = 1,
+                              max_K = 5)
+})
+
+saveRDS(all_set_results,"C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/simu_5_1.rds")
+all_set_results <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/simu_5_1.rds")
+set_k_choices <- writeSetKTable(all_set_results)
+```
+
+
+#my method to find k
+```{r}
+input_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/pictograph-input/IP22_input_data.rds")
+all_set_results <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab/data/simu_5_1.rds")
+sep_list <- separateMutationsBySamplePresence(input_data)
+
+
+calc_lik <- function(k, samp_list, temp_box){
+  
+  lik <- rep(0,length(samp_list))
+  
+  for (k in 1:length(samp_list)){
+    chains <- samp_list[[k]]
+    #get one chain from a box and its K
+    # get w matrix
+    w <- chains$w_chain%>%
+      mutate(value = round(value,5),
+             Cluster = as.numeric(gsub("w\\[(.*),.*","\\1", Parameter)),
+             Sample = as.numeric(gsub(".*,(.*)\\]","\\1", Parameter)))%>%
+      group_by(Cluster,Sample)%>%
+      summarize(w = mean(value))%>%
+      ungroup()%>%
+      spread(key = Sample, value = w)%>%
+      rename("sample1" = "1","sample2" = "2", "sample3" = "3")
+    
+    samp_list[[3]]$w_chain%>%
+      mutate(Cluster = as.numeric(gsub("w\\[(.*),.*","\\1", Parameter)),
+             Sample = as.numeric(gsub(".*,(.*)\\]","\\1", Parameter)))%>%
+      ggplot(aes(x = Iteration, y = value))+
+      geom_line() +
+      theme_light() +
+      facet_wrap("Cluster"~"Sample") +
+      ylab("Cancer Cell Fraction")
+    # get mutation assignment
+    ww <- writeClusterAssignmentsTable(chains$z_chain)%>%
+      mutate(Mut_ID = as.numeric(gsub("Mut","",Mut_ID)))%>%
+      arrange(Mut_ID)%>%
+      left_join(w)%>%
+      select(-c("Mut_ID","Cluster"))%>%
+      as.matrix()
+    
+    y <- temp_box$y
+    n <- temp_box$n
+    m <- temp_box$m
+    p <- temp_box$purity
+    pp <- diag(p,length(p),length(p))
+    c <- temp_box$tcn
+    
+    vaf <- m*ww%*%pp/sweep(c%*%pp, 2, -2*(1-p))
+    
+    # vaf is the probability
+    # trails is n
+    #assume predicted n is from the input
+    
+    ############################################################# do the log first then sum()
+    lik[k] <- sum(dbinom(y,n,vaf,log = T))
+  }
+  return(lik)
+}
+
+tt <- lapply(1:length(sep_list), function(k) calc_lik(k,all_set_results[[k]]$all_chains,sep_list[[k]]))
+```
+
+
+## try no box
+```{r}
+
+```
+  
