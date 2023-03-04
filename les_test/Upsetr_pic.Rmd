@@ -8,9 +8,10 @@ output: html_document
 ```{r setup, include=FALSE}
 library(UpSetR)
 library(tidyverse)
+library(readxl)
 ```
 
-## Load data
+## Load data from excel
 ```{r cars}
 files <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/PanIN-2023/PICTograph Mutation Calls 1.31.23/", full.names = T)
 file_list <- lapply(files, function(x) read_excel(x)%>%
@@ -29,10 +30,7 @@ ff <- lapply(1:length(file_list), function(x) file_list[[x]][!duplicated(as.list
          reigon = gsub("(.*)\\..*","\\1",file),
          reigon = gsub(" ","_",reigon))%>%
   select(gene, file, reigon)
-```
 
-## Including Plots
-```{r pressure, echo=FALSE}
 reigon <- unique(ff$reigon)
 # remove TC98_2 bc 98_2.5 has duplicated gene name
 #reigon <- reigon[-12]
@@ -50,9 +48,26 @@ bind_reigon <- function(rei, dat){
 
 dat_in <- lapply(reigon, function(x) bind_reigon(x,ff))
 ```
+## load from rds
+```{r}
+files <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-input-PanIN-AB", full.names = T)
+
+reigon <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-input-PanIN-AB")
+
+file_list <- lapply(files, function(x) list(y = readRDS(x)[[2]],
+                                            mut_id = readRDS(x)[[1]]))
+get_list <- function(a_list){
+  mut <- a_list[[2]]
+  y <- a_list[[1]] %>%
+    as.data.frame()%>%
+    mutate_all(function(x) ifelse(x == 0,NA,mut))%>%
+    as.list()
+}
+
+dat_in <- lapply(file_list, function(x) get_list(x))
+```
 
 # UPSETr
 ```{r}
-upset(fromList(dat_in[[3]]))
-  
+upset(fromList(dat_in[[13]]))
 ```
