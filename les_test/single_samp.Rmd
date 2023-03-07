@@ -5,21 +5,21 @@ date: "2023-01-24"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r}
 library(pictograph)
 library(tidyverse)
-library(rjags)
-setwd("~/GitHub/pictograph/les_test")
-source("../R/bic.R")
-source("../R/cluster_separately.R")
-source("../R/clustering_functions.R")
-source("../R/plot.R")
-source("../R/gabowmyers.R")
-source("../R/graph_ops.R")
-source("../R/metrics.R")
-source("../R/tree_scoring.R")
-source("../R/tree.R")
-source("../R/subclone-proportions.R")
+# library(rjags)
+# setwd("~/GitHub/pictograph/les_test")
+# source("../R/bic.R")
+# source("../R/cluster_separately.R")
+# source("../R/clustering_functions.R")
+# source("../R/plot.R")
+# source("../R/gabowmyers.R")
+# source("../R/graph_ops.R")
+# source("../R/metrics.R")
+# source("../R/tree_scoring.R")
+# source("../R/tree.R")
+# source("../R/subclone-proportions.R")
 #source("single_samp_func.R")
 ```
 
@@ -53,7 +53,7 @@ input_data <- subset_list[[4]]
 
 # process the data
 ```{r pressure, echo=FALSE}
-  all_set_results <- clusterSep(input_data,
+  all_set_results <- clusterSep(ori_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
                               max_K = 5, one_box = TRUE, les_BIC = TRUE)
 

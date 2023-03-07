@@ -22,8 +22,8 @@ clusterSep <- function(input_data,
                        les_BIC = FALSE) {
   # 1. separate mutations by sample presence
   if(single == TRUE){
-    #source(paste0(system.file("R", package="pictograph"),"/single_samp_func.R"))
-    source("~/GitHub/pictograph/R/single_samp_func.R")
+    source(paste0(system.file("extdata", package="pictograph"),"/single_samp_func.R"))
+    #source("~/GitHub/pictograph/R/single_samp_func.R")
     # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
     params = c("z", "w", "ystar")
     
@@ -76,7 +76,7 @@ clusterSep <- function(input_data,
     return(temp_samps_list)
     
   }else{
-  
+    
     sep_list <- separateMutationsBySamplePresence(input_data)
     
     # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
@@ -193,7 +193,7 @@ runMCMCForABox <- function(box,
     }else{
       sample_to_sort <- which(colSums(box$y) > 0)[1]
     }
-     
+    
   } else {
     if (sum(box$y) == 0){
       sample_to_sort <- 1
@@ -213,7 +213,7 @@ runMCMCForABox <- function(box,
   # Max number of clusters cannot be more than number of mutations
   max_K <- min(max_K, length(box$mutation_indices)) 
   if (max_K > 1) {
-  
+    
     box_input_data$sample_to_sort <- sample_to_sort
     
     samps_2 <- parallel::mclapply(2:max_K,
@@ -257,36 +257,36 @@ runMutSetMCMC <- function(temp_box,
                           params = c("z", "w", "ystar"),
                           beta.prior = FALSE,
                           les_BIC = FALSE) {
+  
+  if (temp_max_K == 1) {
+    # only 1 possible cluster
+    temp_samps_list <- runMCMCForABox(temp_box,
+                                      n.iter = n.iter, n.burn = n.burn, 
+                                      thin = thin, mc.cores = mc.cores,
+                                      inits = inits,
+                                      params = params,
+                                      max_K = temp_max_K)
+  } else {
+    # assess range of K: [1, temp_max_K]
+    temp_samps_list <- runMCMCForABox(temp_box,
+                                      n.iter = n.iter, n.burn = n.burn, 
+                                      thin = thin, mc.cores = mc.cores,
+                                      inits = inits,
+                                      params = params,
+                                      max_K = temp_max_K,
+                                      model = model_type,
+                                      beta.prior = beta.prior)
+  }
+  
+  # Format chains
+  samps_list <- parallel::mclapply(temp_samps_list, formatChains,
+                                   mc.cores = mc.cores)
+  
+  # Calculate BIC
+  K_tested <- seq_len(temp_max_K)
+  
   if(les_BIC == TRUE){
-    #source(paste0(system.file("R", package="pictograph"),"/single_samp_func.R"))
-    source("~/GitHub/pictograph/R/les_bic.R")
-    # Run MCMC
-    if (temp_max_K == 1) {
-      # only 1 possible cluster
-      temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, 
-                                        thin = thin, mc.cores = mc.cores,
-                                        inits = inits,
-                                        params = params,
-                                        max_K = temp_max_K)
-    } else {
-      # assess range of K: [1, temp_max_K]
-      temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, 
-                                        thin = thin, mc.cores = mc.cores,
-                                        inits = inits,
-                                        params = params,
-                                        max_K = temp_max_K,
-                                        model = model_type,
-                                        beta.prior = beta.prior)
-    }
-    
-    # Format chains
-    samps_list <- parallel::mclapply(temp_samps_list, formatChains,
-                                     mc.cores = mc.cores)
-    
-    # Calculate BIC
-    K_tested <- seq_len(temp_max_K)
+    source(paste0(system.file("extdata", package="pictograph"),"/les_bic.R"))
     if (temp_max_K > 1) {
       bic_vec <- calcBIC_les(samps_list,temp_box)
       bic_tb <- tibble(K_tested = K_tested,
@@ -303,38 +303,7 @@ runMutSetMCMC <- function(temp_box,
                        best_chains = samps_list[[1]],
                        best_K = 1)
     }
-    
-    return(res_list)
-    
   }else{
-    
-    # Run MCMC
-    if (temp_max_K == 1) {
-      # only 1 possible cluster
-      temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, 
-                                        thin = thin, mc.cores = mc.cores,
-                                        inits = inits,
-                                        params = params,
-                                        max_K = temp_max_K)
-    } else {
-      # assess range of K: [1, temp_max_K]
-      temp_samps_list <- runMCMCForABox(temp_box,
-                                        n.iter = n.iter, n.burn = n.burn, 
-                                        thin = thin, mc.cores = mc.cores,
-                                        inits = inits,
-                                        params = params,
-                                        max_K = temp_max_K,
-                                        model = model_type,
-                                        beta.prior = beta.prior)
-    }
-    
-    # Format chains
-    samps_list <- parallel::mclapply(temp_samps_list, formatChains,
-                                     mc.cores = mc.cores)
-    
-    # Calculate BIC
-    K_tested <- seq_len(temp_max_K)
     if (temp_max_K > 1) {
       box_indata <- getBoxInputData(temp_box)
       bic_vec <- unname(unlist(parallel::mclapply(samps_list, 
@@ -354,10 +323,11 @@ runMutSetMCMC <- function(temp_box,
                        best_chains = samps_list[[1]],
                        best_K = 1)
     }
-    
-    return(res_list)
   }
+  
+  return(res_list)
 }
+
 
 
 
