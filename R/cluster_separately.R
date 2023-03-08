@@ -120,16 +120,31 @@ separateMutationsBySamplePresence <- function(input_data) {
   }
   
   sep_list <- list()
-  for (t in seq_len(length(types))) {
-    sep_list[[types[t]]] <- list(pattern = types[t],
-                                 mutation_indices = type_indices[[types[t]]],
-                                 purity = input_data$purity,
-                                 I = length(type_indices[[types[t]]]),
-                                 S = input_data$S,
-                                 y = input_data$y[type_indices[[types[t]]], ],
-                                 n = input_data$n[type_indices[[types[t]]], ],
-                                 tcn = input_data$tcn[type_indices[[types[t]]], ],
-                                 m = input_data$m[type_indices[[types[t]]], ])
+  if (input_data$S == 1) {
+    for (t in seq_len(length(types))) {
+      sep_list[[types[t]]] <- list(pattern = types[t],
+                                   mutation_indices = type_indices[[types[t]]],
+                                   purity = input_data$purity,
+                                   I = length(type_indices[[types[t]]]),
+                                   S = input_data$S,
+                                   y = input_data$y[type_indices[[types[t]]], ,drop=FALSE],
+                                   n = input_data$n[type_indices[[types[t]]], ,drop=FALSE],
+                                   tcn = input_data$tcn[type_indices[[types[t]]], ,drop=FALSE],
+                                   m = input_data$m[type_indices[[types[t]]], ,drop=FALSE])
+      break
+    }
+  } else {
+    for (t in seq_len(length(types))) {
+      sep_list[[types[t]]] <- list(pattern = types[t],
+                                   mutation_indices = type_indices[[types[t]]],
+                                   purity = input_data$purity,
+                                   I = length(type_indices[[types[t]]]),
+                                   S = input_data$S,
+                                   y = input_data$y[type_indices[[types[t]]], ],
+                                   n = input_data$n[type_indices[[types[t]]], ],
+                                   tcn = input_data$tcn[type_indices[[types[t]]], ],
+                                   m = input_data$m[type_indices[[types[t]]], ])
+    }
   }
   return(sep_list)
 }
@@ -240,6 +255,10 @@ formatChains <- function(samps) {
     mutate(Parameter = as.character(Parameter))
   temp_w <- get.parameter.chain("w", ggmcmc::ggs(samps)) %>%
     mutate(Parameter = as.character(Parameter))
+  if (nrow(temp_w) == 0) {
+    temp_w <- get.parameter.chain(“w”, ggmcmc::ggs(samps) %>% mutate(Parameter = gsub(“w”,“w[1,1]“,Parameter)) ) %>%
+      mutate(Parameter = as.character(Parameter))
+  }
   temp_ystar <- get.parameter.chain("ystar", ggmcmc::ggs(samps)) %>%
     mutate(Parameter = as.character(Parameter))
   samps_list_formatted <- list(w_chain = temp_w,
