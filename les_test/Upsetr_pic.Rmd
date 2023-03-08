@@ -66,7 +66,7 @@ get_list <- function(a_list){
     as.data.frame()%>%
     mutate_all(function(x) ifelse(x != 0,"1","0"))%>%
     unite("type", colnames(.),sep = "", remove = F)
-  summ <- lapply(unique(summary$type), function(x) mut[summary$type==x])
+  summ <- lapply(unique(summary$type), function(x) as.data.frame(mut[summary$type==x]))
   names(summ) = unique(summary$type)
   for (i in 1:length(y)){
     y[[i]] <- y[[i]][!is.na(y[[i]])]
@@ -77,9 +77,10 @@ get_list <- function(a_list){
 }
 
 dat_in <- lapply(file_list, function(x) get_list(x))
+names(dat_in) <- gsub("panin_number_(.*)_picto.*","\\1",reigon)
 ```
 
 # UPSETr
 ```{r}
-a <- upset(fromList(dat_in[[1]]), text.scale = 2)
+upset(fromList(dat_in[[3]][[1]]), text.scale = 2, )
 ```
