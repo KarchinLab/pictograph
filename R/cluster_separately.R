@@ -10,6 +10,8 @@
 #' @param max_K maximum number of clusters to assess for each mutation set
 #' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
 #' @param beta.prior option to run an initial MCMC chain and use results to specify beta priors for a second MCMC chain 
+#' @param one_box 
+#' @example 
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
@@ -256,7 +258,7 @@ formatChains <- function(samps) {
   temp_w <- get.parameter.chain("w", ggmcmc::ggs(samps)) %>%
     mutate(Parameter = as.character(Parameter))
   if (nrow(temp_w) == 0) {
-    temp_w <- get.parameter.chain(“w”, ggmcmc::ggs(samps) %>% mutate(Parameter = gsub(“w”,“w[1,1]“,Parameter)) ) %>%
+    temp_w <- get.parameter.chain("w", ggmcmc::ggs(samps) %>% mutate(Parameter = gsub("w","w[1,1]",Parameter))) %>%
       mutate(Parameter = as.character(Parameter))
   }
   temp_ystar <- get.parameter.chain("ystar", ggmcmc::ggs(samps)) %>%
