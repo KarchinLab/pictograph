@@ -62,10 +62,18 @@ get_list <- function(a_list){
     as.data.frame()%>%
     mutate_all(function(x) ifelse(x == 0,NA,mut))%>%
     as.list()
+  summary <- a_list[[1]]%>%
+    as.data.frame()%>%
+    mutate_all(function(x) ifelse(x != 0,"1","0"))%>%
+    unite("type", colnames(.),sep = "", remove = F)
+  summ <- lapply(unique(summary$type), function(x) mut[summary$type==x])
+  names(summ) = unique(summary$type)
   for (i in 1:length(y)){
     y[[i]] <- y[[i]][!is.na(y[[i]])]
   }
-  return(y)
+  
+  out <- list(y = y, mut = summ)
+  return(out)
 }
 
 dat_in <- lapply(file_list, function(x) get_list(x))
@@ -73,5 +81,5 @@ dat_in <- lapply(file_list, function(x) get_list(x))
 
 # UPSETr
 ```{r}
-upset(fromList(dat_in[[1]]))
+a <- upset(fromList(dat_in[[1]]), text.scale = 2)
 ```
