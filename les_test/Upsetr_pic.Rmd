@@ -58,10 +58,14 @@ file_list <- lapply(files, function(x) list(y = readRDS(x)[[2]],
                                             mut_id = readRDS(x)[[1]]))
 get_list <- function(a_list){
   mut <- a_list[[2]]
-  y <- a_list[[1]] %>%
+  y <- a_list[[1]]%>%
     as.data.frame()%>%
     mutate_all(function(x) ifelse(x == 0,NA,mut))%>%
     as.list()
+  for (i in 1:length(y)){
+    y[[i]] <- y[[i]][!is.na(y[[i]])]
+  }
+  return(y)
 }
 
 dat_in <- lapply(file_list, function(x) get_list(x))
@@ -69,5 +73,5 @@ dat_in <- lapply(file_list, function(x) get_list(x))
 
 # UPSETr
 ```{r}
-upset(fromList(dat_in[[13]]))
+upset(fromList(dat_in[[1]]))
 ```
