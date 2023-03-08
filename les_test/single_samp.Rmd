@@ -6,21 +6,33 @@ output: html_document
 ---
 
 ```{r}
-library(pictograph)
+#library(pictograph)
 library(tidyverse)
-# library(rjags)
-# setwd("~/GitHub/pictograph/les_test")
-# source("../R/bic.R")
-# source("../R/cluster_separately.R")
-# source("../R/clustering_functions.R")
-# source("../R/plot.R")
-# source("../R/gabowmyers.R")
-# source("../R/graph_ops.R")
-# source("../R/metrics.R")
-# source("../R/tree_scoring.R")
-# source("../R/tree.R")
-# source("../R/subclone-proportions.R")
+library(rjags)
+setwd("~/GitHub/pictograph/les_test")
+source("../R/bic.R")
+source("../R/cluster_separately.R")
+source("../R/clustering_functions.R")
+source("../R/plot.R")
+source("../R/gabowmyers.R")
+source("../R/graph_ops.R")
+source("../R/metrics.R")
+source("../R/tree_scoring.R")
+source("../R/tree.R")
+source("../R/subclone-proportions.R")
 #source("single_samp_func.R")
+```
+
+```{r}
+n.iter = 1000
+n.burn = 1000
+thin = 10
+mc.cores = 1
+inits = list(".RNG.name" = "base::Wichmann-Hill",
+                                    ".RNG.seed" = 123)
+max_K = 5
+model_type = "spike_and_slab"
+beta.prior = FALSE
 ```
 
 # prepare single sample data
@@ -31,11 +43,12 @@ ori_data <- readRDS("C:/Users/Leste/OneDrive - Johns Hopkins/Desktop/Karchin Lab
 ## split original data into single sample input
 samp_comb <- combn(1:ori_data$S,1)
 subset <- function(input_data, samp_comb, x){
-  out <- list(y = input_data$y[,samp_comb[,x]],
-              n = input_data$n[,samp_comb[,x]],
-              tcn = input_data$tcn[,samp_comb[,x]],
-              m = input_data$m[,samp_comb[,x]],
-              I = input_data$I,
+  keeps <- ori_data$y[,samp_comb[,x]]  != 0
+  out <- list(y = input_data$y[keeps,samp_comb[,x]],
+              n = input_data$n[keeps,samp_comb[,x]],
+              tcn = input_data$tcn[keeps,samp_comb[,x]],
+              m = input_data$m[keeps,samp_comb[,x]],
+              I = sum(keeps),
               S = 1,
               purity = input_data$purity[samp_comb[,x]],
               Sample_names = input_data$Sample_names[samp_comb[,x]],
@@ -45,7 +58,7 @@ subset <- function(input_data, samp_comb, x){
 subset_list <- lapply(1:ncol(samp_comb), function(x) subset(ori_data, samp_comb,x))
 
 ## pick one sample from list by changing the number in bracket
-input_data <- subset_list[[4]]
+input_data <- subset_list[[1]]
 ```
 
 
@@ -53,9 +66,9 @@ input_data <- subset_list[[4]]
 
 # process the data
 ```{r pressure, echo=FALSE}
-  all_set_results <- clusterSep(ori_data,
+  all_set_results <- clusterSep(input_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
-                              max_K = 5, one_box = TRUE, les_BIC = TRUE)
+                              max_K = 5, one_box = T)
 
 ## plot ccf
 chains <- all_set_results$best_chains
