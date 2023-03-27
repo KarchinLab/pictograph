@@ -72,6 +72,9 @@ separateMutationsBySamplePresence <- function(input_data) {
                                  n = input_data$n[type_indices[[types[t]]], ,drop=FALSE],
                                  tcn = input_data$tcn[type_indices[[types[t]]], ,drop=FALSE],
                                  m = input_data$m[type_indices[[types[t]]], ,drop=FALSE])
+    if (input_data$S == 1) {
+      break
+    }
   }
   return(sep_list)
 }
@@ -189,6 +192,10 @@ runMCMCForABox <- function(box,
   
   samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
                       inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
+  
+  if(box$S == 1) {
+    colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "w")] <- "w[1,1]"
+  }
   
   if (drop_zero) {
     samps_K1 <- reverseDrop(samps_K1, box$pattern, n.iter)
