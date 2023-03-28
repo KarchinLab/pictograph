@@ -275,7 +275,7 @@ estimateCCFs <- function(w_chain) {
   w.map <- w.dens.p %>%
     as_tibble() %>%
     group_by(PANEL) %>%
-    arrange(y)%>%
+    arrange(desc(y))%>%
     slice(1)%>%
     ## need ungroup()
     ungroup()%>%
