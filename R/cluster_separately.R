@@ -185,10 +185,7 @@ runMCMCForABox <- function(box,
   } else stop("provide model_type either 'spike_and_slab' or 'simple'")
   
   # choose sample in which mutations are present
-  sample_to_sort <- which(colSums(box$y) > 0)[1]
-  if (drop_zero) {
-    sample_to_sort <- 1
-  }
+  sample_to_sort <- which(colSums(box_input_data$y) > 0)[1]
   
   samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
                       inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
@@ -287,8 +284,13 @@ runMutSetMCMC <- function(temp_box,
   }
   
   # Format chains
-  samps_list <- parallel::mclapply(temp_samps_list, formatChains,
-                                   mc.cores = mc.cores)
+  if (drop_zero && temp_box$I == 1) {
+    samps_list <- list(formatChains(temp_samps_list))
+    names(samps_list) <- "K1"
+  } else {
+    samps_list <- parallel::mclapply(temp_samps_list, formatChains,
+                                     mc.cores = mc.cores)
+  }
   
   # Calculate BIC
   K_tested <- seq_len(temp_max_K)
