@@ -29,25 +29,50 @@ ff <- lapply(1:length(file_list), function(x) file_list[[x]][!duplicated(as.list
   mutate(gene = paste0(Hugo_Symbol,HGVSp_Short),
          reigon = gsub("(.*)\\..*","\\1",file),
          reigon = gsub(" ","_",reigon))%>%
+  group_by(file)%>%
+  distinct(gene, .keep_all = T)%>%
+  ungroup()%>%
   select(gene, file, reigon)
 
 reigon <- unique(ff$reigon)
 # remove TC98_2 bc 98_2.5 has duplicated gene name
 #reigon <- reigon[-12]
+new_rei <- c("TC_92","AB_14","AB_17")
 
-bind_reigon <- function(rei, dat){
-
-  out <- dat%>%
-    filter(reigon == rei)%>%
-    mutate(type = row_number())%>%
-    spread(key = file, value = gene)%>%
-    select(-c("type","reigon"))%>%
-    as.list()
+# this function still consider each panin reigono seperately
+get_list <- function(rei, dat){
+  
+  mut<- dat%>%
+    filter(grepl(rei,.$reigon))%>%
+    mutate(type = gene)%>%
+    spread(key = file, value = gene)
+  
+  order = colnames(mut[,-c(1,2)])
+  
+  temp <- mut[,-c(1,2)]%>%
+    mutate_all(function(x) ifelse(is.na(x),0,1))%>%
+    unite("presence", colnames(.),sep = "", remove = F)
+  summ <- lapply(unique(temp$presence), function(x) mut$type[temp$presence==x])
+  names(summ) = unique(temp$presence)
+  
+  mut_ <- as.list(mut[,-c(1,2)])
+  
+  for (i in 1:length(mut_)){
+    mut_[[i]] <- mut_[[i]][!is.na(mut_[[i]])]
+  }
+  
+     
+  out <- list(mut = mut_, presence = summ, order = order)
   return(out)
 }
 
-dat_in <- lapply(reigon, function(x) bind_reigon(x,ff))
+
+
+dat_in <- lapply(reigon, function(x) get_list(x,ff))
 ```
+
+
+
 ## load from rds
 ```{r}
 files <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-input-PanIN-AB", full.names = T)
@@ -82,5 +107,6 @@ names(dat_in) <- gsub("panin_number_(.*)_picto.*","\\1",reigon)
 
 # UPSETr
 ```{r}
-upset(fromList(dat_in[[3]][[1]]), text.scale = 2, )
+upset(fromList(dat_in[[6]][[1]]), text.scale = 1.7, nsets = 100, 
+      keep.order = T, sets = c(dat_in[[6]][[3]]))
 ```
