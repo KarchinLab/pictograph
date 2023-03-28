@@ -9,7 +9,11 @@ constrainedEdgesMatrix <- function(wmat, chains, input_data) {
   ##
   ##cluster.sample.presence <- apply(w, 1, function(x) which( x>= zero.thresh))
   samp_pres <- matchSamplePresence(wmat, chains, input_data)
-  cluster.sample.presence <- apply(samp_pres, 1, function(x) which(x==1))
+  if (input_data$S == 1) {
+    cluster.sample.presence <- lapply(samp_pres, function(x) which(x==1))
+  } else {
+    cluster.sample.presence <- apply(samp_pres, 1, function(x) which(x==1))
+  }
   K <- nrow(wmat)
   S <- ncol(wmat)
   admat <- matrix(T, K, K)

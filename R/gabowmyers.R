@@ -265,7 +265,7 @@ satisfiesSumCondition <- function(edges, w, thresh = 0.2) {
     # get children CCF (sum if more than 1 child)
     children <- as.numeric(filter(edges, parent == p)$child)
     if (length(children) > 1) {
-      children_ccf <- colSums(w[children, ])
+      children_ccf <- colSums(w[children, ,drop=FALSE])
     } else {
       children_ccf <- w[children, ]
     }

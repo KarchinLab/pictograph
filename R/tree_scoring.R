@@ -117,14 +117,14 @@ calcMassCost <- function(am, mcf_matrix, am_format="long") {
       if (parent_node == "root") {
         parent_w <- rep(1, num_samples)
       } else {
-        parent_w <- mcf_matrix[as.numeric(parent_node), ]
+        parent_w <- mcf_matrix[as.numeric(parent_node), ,drop=FALSE]
       }
       
       kids <- getChildren(am, parent_node)
       if (length(kids) > 1) {
-        children_w <- colSums(mcf_matrix[as.numeric(kids), ])
+        children_w <- colSums(mcf_matrix[as.numeric(kids), ,drop=FALSE])
       } else {
-        children_w <- mcf_matrix[as.numeric(kids), ]
+        children_w <- mcf_matrix[as.numeric(kids), ,drop=FALSE]
       }
       
       mc_s <- ifelse(parent_w >= children_w, 0, children_w - parent_w)
