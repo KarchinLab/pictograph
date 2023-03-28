@@ -193,7 +193,7 @@ runMCMCForABox <- function(box,
   samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
                       inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
   
-  if(box$S == 1) {
+  if(box_input_data$S == 1) {
     colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "w")] <- "w[1,1]"
   }
   
