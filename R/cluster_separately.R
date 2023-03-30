@@ -10,6 +10,7 @@
 #' @param max_K maximum number of clusters to assess for each mutation set
 #' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
 #' @param beta.prior option to run an initial MCMC chain and use results to specify beta priors for a second MCMC chain 
+#' @param one_box skip separate mutations by sample presence
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
@@ -17,9 +18,17 @@ clusterSep <- function(input_data,
                        max_K = 5,
                        model_type = "spike_and_slab",
                        beta.prior = FALSE,
-                       drop_zero = FALSE) {
+                       drop_zero = FALSE,
+                       one_box = FALSE) {
   # 1. separate mutations by sample presence
-  sep_list <- separateMutationsBySamplePresence(input_data)
+  if (one_box) {
+    input_data$mutation_indices <- seq_len(input_data$I)
+    sep_list <- vector("list", 1)
+    sep_list[[1]] <- input_data
+    names(sep_list) <- "one_box"
+  } else {
+    sep_list <- separateMutationsBySamplePresence(input_data)
+  }
   
   # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
   all_set_results <- vector("list", length(sep_list))
