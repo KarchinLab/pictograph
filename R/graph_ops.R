@@ -27,6 +27,9 @@ constrainedEdgesMatrix <- function(wmat, chains, input_data) {
       } else if (is.list(cluster.sample.presence)) {
         from.samples <- cluster.sample.presence[[i]]
         to.samples <- cluster.sample.presence[[j]]
+      } else if (is.vector(cluster.sample.presence)) {
+        from.samples <- cluster.sample.presence[i]
+        to.samples <- cluster.sample.presence[j]
       }
       
       if (setequal(from.samples, to.samples)) next()
