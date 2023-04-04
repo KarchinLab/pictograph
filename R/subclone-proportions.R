@@ -241,6 +241,10 @@ calcSubcloneProportions <- function(w_mat, tree_edges) {
 
     subclone_props[i, ] <- w_mat[i, ] - children_ccfs
   }
+  
+  # normalize subclone_props matrix so the props add up to 1
+  subclone_props[subclone_props < 0] = 0
+  subclone_props = t(t(subclone_props) / colSums(subclone_props))
   return(subclone_props)
 }
 
