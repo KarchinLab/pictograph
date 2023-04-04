@@ -13,49 +13,55 @@ library(readxl)
 
 ## Load data from excel
 ```{r cars}
+#gather file path
 files <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/PanIN-2023/PICTograph Mutation Calls 1.31.23/", full.names = T)
+
+#read in files
 file_list <- lapply(files, function(x) read_excel(x)%>%
-                      select(contains(c("Hugo_Symbol","HGVSp_Short")))%>%
+                      select(contains(c("Hugo_Symbol","HGVSp_Short")), Tumor_Seq_Allele2)%>%
                       mutate(file = gsub(".*31.23/(.*) Filter.*","\\1",x)))
 
 
+#
 ## excels has duplicated columns, and for AB_14_1.3&1.4 two columns of HGVSp is not the same
-
+## duplicated() remove most of them, select(c(1:2)) resolve issue above, first one always more info
 ff <- lapply(1:length(file_list), function(x) file_list[[x]][!duplicated(as.list(file_list[[x]]))]%>%
-                      select(c(1:2,"file"))%>%
+                      select(c(1:2,"file","Tumor_Seq_Allele2"))%>%
                       rename("Hugo_Symbol" = grep("Hugo",colnames(.)),
-                             "HGVSp_Short" = grep("HGVS", colnames(.))))%>%
+                             "HGVSp_Short" = grep("HGVS", colnames(.)),
+                             "ALT" = "Tumor_Seq_Allele2"))%>%
   do.call(rbind,.)%>%
   mutate(gene = paste0(Hugo_Symbol,HGVSp_Short),
-         reigon = gsub("(.*)\\..*","\\1",file),
-         reigon = gsub(" ","_",reigon))%>%
+         region = gsub("(.*)\\..*","\\1",file),
+         region = gsub(" ","_",region))%>%
+  #one file has duplicaated gene name, removed here
   group_by(file)%>%
   distinct(gene, .keep_all = T)%>%
   ungroup()%>%
-  select(gene, file, reigon)
+  select(gene, file, region, ALT)
 
-reigon <- unique(ff$reigon)
+region <- unique(ff$region)
 # remove TC98_2 bc 98_2.5 has duplicated gene name
 #reigon <- reigon[-12]
 new_rei <- c("TC_92","AB_14","AB_17")
 
 # this function still consider each panin reigono seperately
 get_list <- function(rei, dat){
-  
+  #in tc92_1, 2 KRAS_Q61H have different mutations
   mut<- dat%>%
-    filter(grepl(rei,.$reigon))%>%
-    mutate(type = gene)%>%
+    filter(grepl(rei,.$region))%>%
+    mutate(type = paste0(gene, ALT))%>%
     spread(key = file, value = gene)
   
-  order = colnames(mut[,-c(1,2)])
+  order = colnames(mut[,-c(1,2,3)])
   
-  temp <- mut[,-c(1,2)]%>%
+  temp <- mut[,-c(1,2,3)]%>%
     mutate_all(function(x) ifelse(is.na(x),0,1))%>%
     unite("presence", colnames(.),sep = "", remove = F)
   summ <- lapply(unique(temp$presence), function(x) mut$type[temp$presence==x])
   names(summ) = unique(temp$presence)
   
-  mut_ <- as.list(mut[,-c(1,2)])
+  mut_ <- as.list(mut[,-c(1,2,3)])
   
   for (i in 1:length(mut_)){
     mut_[[i]] <- mut_[[i]][!is.na(mut_[[i]])]
@@ -67,42 +73,41 @@ get_list <- function(rei, dat){
 }
 
 
-
 dat_in <- lapply(reigon, function(x) get_list(x,ff))
 ```
 
 
 
-## load from rds
+## load from rds (not updated)
 ```{r}
-files <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-input-PanIN-AB", full.names = T)
-
-reigon <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-input-PanIN-AB")
-
-file_list <- lapply(files, function(x) list(y = readRDS(x)[[2]],
-                                            mut_id = readRDS(x)[[1]]))
-get_list <- function(a_list){
-  mut <- a_list[[2]]
-  y <- a_list[[1]]%>%
-    as.data.frame()%>%
-    mutate_all(function(x) ifelse(x == 0,NA,mut))%>%
-    as.list()
-  summary <- a_list[[1]]%>%
-    as.data.frame()%>%
-    mutate_all(function(x) ifelse(x != 0,"1","0"))%>%
-    unite("type", colnames(.),sep = "", remove = F)
-  summ <- lapply(unique(summary$type), function(x) as.data.frame(mut[summary$type==x]))
-  names(summ) = unique(summary$type)
-  for (i in 1:length(y)){
-    y[[i]] <- y[[i]][!is.na(y[[i]])]
-  }
-  
-  out <- list(y = y, mut = summ)
-  return(out)
-}
-
-dat_in <- lapply(file_list, function(x) get_list(x))
-names(dat_in) <- gsub("panin_number_(.*)_picto.*","\\1",reigon)
+# files <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-input-PanIN-AB", full.names = T)
+# 
+# reigon <- list.files("C:/Users/Leste/Karchin Lab Dropbox/YunZhou Liu/for-lester (1)/pictograph-input-PanIN-AB")
+# 
+# file_list <- lapply(files, function(x) list(y = readRDS(x)[[2]],
+#                                             mut_id = readRDS(x)[[1]]))
+# get_list <- function(a_list){
+#   mut <- a_list[[2]]
+#   y <- a_list[[1]]%>%
+#     as.data.frame()%>%
+#     mutate_all(function(x) ifelse(x == 0,NA,mut))%>%
+#     as.list()
+#   summary <- a_list[[1]]%>%
+#     as.data.frame()%>%
+#     mutate_all(function(x) ifelse(x != 0,"1","0"))%>%
+#     unite("type", colnames(.),sep = "", remove = F)
+#   summ <- lapply(unique(summary$type), function(x) as.data.frame(mut[summary$type==x]))
+#   names(summ) = unique(summary$type)
+#   for (i in 1:length(y)){
+#     y[[i]] <- y[[i]][!is.na(y[[i]])]
+#   }
+#   
+#   out <- list(y = y, mut = summ)
+#   return(out)
+# }
+# 
+# dat_in <- lapply(file_list, function(x) get_list(x))
+# names(dat_in) <- gsub("panin_number_(.*)_picto.*","\\1",reigon)
 ```
 
 # UPSETr
