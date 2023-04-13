@@ -203,6 +203,31 @@ prepareGraphForGabowMyers <- function(w, chains, input_data) {
   return(graph_G)
 }
 
+#' Create tibble of possible edges from CCF values based on w_mat only
+#' 
+#' @export
+#' @import tibble
+#' @import dplyr
+#' @import tidyr
+#' @param w matrix of CCF values (rows = clusters, columns = samples)
+#' @return graph_G tibble of possible edges with columns edge, parent, child
+prepareGraph <- function(w_mat) {
+  graph_pre <- data.frame(edge = character(), parent = character(), child = character())
+  for (i in seq_len(nrow(w_mat))) {
+    graph_pre <- graph_pre %>% add_row(edge = paste("root->", i, sep = ""), parent = "root", child = as.character(i))
+    for (j in seq_len(nrow(w_mat))) {
+      if (i!=j) {
+        i_row = w_mat[i, ]
+        j_row = w_mat[j, ]
+        if (all(j_row[i_row > 0] > 0)) {
+          graph_pre <- graph_pre %>% add_row(edge = paste(j, "->", i, sep = ""), parent = as.character(j), child = as.character(i))
+        }
+      }
+    }
+  }
+  return(graph_pre)
+}
+
 #' Enumerate all spanning trees and filter based on Sum Condition
 #' 
 #' @export
