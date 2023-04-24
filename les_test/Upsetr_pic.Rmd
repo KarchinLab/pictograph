@@ -76,6 +76,85 @@ get_list <- function(rei, dat){
 dat_in <- lapply(reigon, function(x) get_list(x,ff))
 ```
 
+# new xl
+```{r}
+sheets <- c("92",'114','117')
+cp <- "C:/Users/Leste/Downloads/Supplementary Table 5 WES Data New add CN.xlsx"
+xl <- lapply(sheets, function(x) read_excel(cp,skip = 2, col_names = T, sheet = x)%>%
+                    mutate(file = x))%>%
+  do.call(rbind,.)%>%
+  select(`Gene Name`,Chromosome, `Start position`,`Protein Change`,Depth, 
+         `Alternate Count`,`cDNA Change`, `Sample ID`,Region,Lesion,`Patient ID`)%>%
+  dplyr::rename("Hugo_Symbol" = "Gene Name", "Start_Position" = "Start position", "y" = "Alternate Count", 
+         "n" = "Depth", "HGVSp" = "Protein Change","DNAc" = "cDNA Change")%>%
+  mutate(ref = gsub(".*(\\w)>(\\w)", "\\1", DNAc),
+         alt = gsub(".*(\\w)>(\\w)", "\\2", DNAc),
+         Chromosome = paste0("chr",Chromosome),
+         gene = paste0(Hugo_Symbol, HGVSp),
+         type = paste0(`Patient ID`, Lesion, Region))%>%
+  filter(!grepl("PDAC", `Sample ID`),
+#######removed deletion, can't find the ref and alt############
+         !grepl("del",DNAc))
+c92 <- xl %>%
+  filter(`Patient ID` == "92")%>%
+    mutate(Lesion = ifelse(Lesion == "A", 1,
+                    ifelse(Lesion == "B", 4,
+                    ifelse(grepl("D",Lesion), 6, Lesion))))%>%
+  # didn't find lesion C in the processed cns file
+  filter(!Lesion == 'C')
+c14 <- xl %>%
+  filter(`Patient ID` == "114")%>%
+    mutate(Lesion = ifelse(Lesion == "A", 1,
+                    ifelse(Lesion == "B", 2,Lesion)),
+           `Patient ID` = "14")
+c17 <- xl %>%
+  filter(`Patient ID` == "117")%>%
+    mutate(Lesion = ifelse(Lesion == "A", 1,Lesion),
+           `Patient ID` = "17")
+
+newxl <- rbind(c92,c14,c17)%>%
+  mutate(Lesion = ifelse(grepl("H", `Sample ID`), paste0(Lesion,"H"), Lesion),
+         Lesion = ifelse(grepl("L", `Sample ID`), paste0(Lesion,"L"), Lesion),
+         file = paste0(`Patient ID`,Lesion,Region),
+         region = paste0(`Patient ID`,Lesion),
+         ALT = alt,
+         region = gsub("[A-Z]","",region))%>%
+  select(gene, file, region,ALT)
+  
+
+# remove TC98_2 bc 98_2.5 has duplicated gene name
+#reigon <- reigon[-12]
+get_list <- function(rei, dat){
+  #in tc92_1, 2 KRAS_Q61H have different mutations
+  mut<- dat%>%
+    filter(grepl(rei,.$region))%>%
+    mutate(type = paste0(gene, ALT))%>%
+    spread(key = file, value = gene)
+  
+  order = colnames(mut[,-c(1,2,3)])
+  
+  temp <- mut[,-c(1,2,3)]%>%
+    mutate_all(function(x) ifelse(is.na(x),0,1))%>%
+    unite("presence", colnames(.),sep = "", remove = F)
+  summ <- lapply(unique(temp$presence), function(x) mut$type[temp$presence==x])
+  names(summ) = unique(temp$presence)
+  
+  mut_ <- as.list(mut[,-c(1,2,3)])
+  
+  for (i in 1:length(mut_)){
+    mut_[[i]] <- mut_[[i]][!is.na(mut_[[i]])]
+  }
+  
+     
+  out <- list(mut = mut_, presence = summ, order = order)
+  return(out)
+}
+
+regions <- unique(newxl$region)
+dat_in <- lapply(regions, function(x) get_list(x,newxl))
+names(dat_in) <- regions
+```
+
 
 
 ## load from rds (not updated)
@@ -110,8 +189,51 @@ dat_in <- lapply(reigon, function(x) get_list(x,ff))
 # names(dat_in) <- gsub("panin_number_(.*)_picto.*","\\1",reigon)
 ```
 
+## from tsv
+```{r}
+files <- list.files("C:/Users/Leste/Desktop/summary/", pattern = "S\\d\\d_\\d+.csv",full.names = T)
+xl <- lapply(files, function(x) read.csv(x)%>%
+                    mutate(file = gsub("(.*)_(.*)","\\2_\\1",samples)))%>%
+  do.call(rbind,.)%>%
+  select(hugo, chrom, pos,achange, ref_base, alt_base, file, samples, vcfinfo.alt_reads, vcfinfo.tot_reads, vaf)%>%
+  mutate(gene = paste0(hugo, achange, alt_base),
+         patient = gsub("(.*)_(.*_.*)_LCM.*","\\2",file))%>%
+  filter(vaf > 0.05,
+         vcfinfo.alt_reads > 7)
+
+get_list <- function(rei, dat){
+  mut<- dat%>%
+    filter(grepl(rei,.$patient))%>%
+    mutate(type = gene)%>%
+    select(type, gene, file, chrom)%>%
+    spread(key = file, value = gene)
+  
+  order = colnames(mut[,-c(1,2)])
+  
+  temp <- mut[,-c(1,2)]%>%
+    mutate_all(function(x) ifelse(is.na(x),0,1))%>%
+    unite("presence", colnames(.),sep = "", remove = F)
+  summ <- lapply(unique(temp$presence), function(x) mut$type[temp$presence==x])
+  names(summ) = unique(temp$presence)
+  
+  mut_ <- as.list(mut[,-c(1,2)])
+  
+  for (i in 1:length(mut_)){
+    mut_[[i]] <- mut_[[i]][!is.na(mut_[[i]])]
+  }
+  
+     
+  out <- list(mut = mut_, presence = summ, order = order)
+  return(out)
+}
+
+lev <- unique(xl$patient)
+dat_in <- lapply(lev, function(x) get_list(x,xl))
+names(dat_in) <- lev
+```
+
 # UPSETr
 ```{r}
-upset(fromList(dat_in[[6]][[1]]), text.scale = 1.7, nsets = 100, 
-      keep.order = T, sets = c(dat_in[[6]][[3]]))
+upset(fromList(dat_in[[5]][[1]]), text.scale = 1.2, nsets = 100, 
+      keep.order = T, sets = c(dat_in[[5]][[3]]))
 ```
