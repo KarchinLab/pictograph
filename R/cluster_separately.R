@@ -451,7 +451,9 @@ relabel_z_chain <- function(z_chain, new_cluster_labels, mutation_indices) {
   if (length(mutation_indices) != length(unique(z_chain$Parameter))) {
     stop("number of supplied mutation indices does not match the number of mutations in z_chain")
   }
-  if (length(new_cluster_labels) != length(unique(z_chain$value))) {
+  ## would break when no mutation is assigned to a cluster
+  ## poor choice of k, would prob lower the k
+  if (length(new_cluster_labels) < length(unique(z_chain$value))) {
     stop("number of supplied new cluster labels does not match the number of clusters in z_chain")
   }
   new_z <- z_chain %>%
