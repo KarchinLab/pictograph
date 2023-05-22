@@ -10,7 +10,7 @@
 #' @param max_K maximum number of clusters to assess for each mutation set
 #' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
 #' @param beta.prior option to run an initial MCMC chain and use results to specify beta priors for a second MCMC chain 
-#' @param one_box skip separate mutations by sample presence
+#' @param one_box option to run the MCMC chain without using sample presence
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
