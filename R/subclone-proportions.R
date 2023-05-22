@@ -293,6 +293,8 @@ plotSubcloneBar <- function(subclone_props, sample_names = NULL, label_cluster =
     geom_text(data = subset(props_tb, `Proportion of Tumor` != 0),
               aes(label = text_label, colour = text_color),
               size = 3, position = position_stack(vjust = 0.5)) +
+    xlab("")+
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
     scale_color_manual(values = c("white", "black"), guide = "none") +
     ylim(0,1)
 
