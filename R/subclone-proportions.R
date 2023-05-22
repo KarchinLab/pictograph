@@ -79,7 +79,7 @@ normalizeProps <- function(subclone_props) {
 
   for (s in seq_len(ncol(subclone_props))) {
     if (props_sums[s] != 1) {
-      new_col <- round(subclone_props[, s] / props_sums[s], 3)
+      new_col <- round(subclone_props[, s] / props_sums[s], digits = 3)
       subclone_props[, s] <- new_col
     }
   }
@@ -244,7 +244,8 @@ calcSubcloneProportions <- function(w_mat, tree_edges) {
   
   # normalize subclone_props matrix so the props add up to 1
   subclone_props[subclone_props < 0] = 0
-  subclone_props = t(t(subclone_props) / colSums(subclone_props))
+  subclone_props = round(t(t(subclone_props) / colSums(subclone_props)),digit = 3)
+  
   return(subclone_props)
 }
 
