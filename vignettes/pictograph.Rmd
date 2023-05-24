@@ -25,19 +25,17 @@ This tutorial walks through how to run PICTograph on a toy example. PICTograph i
 
 ## 2. Input data
 
-The input data are organized as a list of 7 objects. Variant read count (y), depth (n), total copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.
+The required user input is a csv file that contains at least columns named "sample", "mutation", "total_reads", "alt_reads", "total_copy_number", and "purity". Total copy number refers to the integer copy number for the sample of interest. Purity should have the same value for the same sample. User can also provide 'multiplicity" of the mutation. An example input file with 3 tumor samples and 42 mutations is shown below. This data was simulated from a true tree containing 5 mutation clusters.
 
-Here we use a toy example with 3 tumor samples and 42 mutations. This data was simulated from a true tree containing 5 mutation clusters.
+```{r raw_data format}
+raw_input <- read.csv(system.file('data/example_input.csv', package = 'pictograph'))
+head(raw_input)
+```
+
+The input file can be read using the importCSV function. Alt read count (y), total read count (n), total copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.  
 
 ```{r input_data}
-data("sim_data_1")
-input_data <- list(y = sim_data_1$y,
-                   n = sim_data_1$n,
-                   purity = sim_data_1$purity,
-                   tcn = sim_data_1$tcn,
-                   m = sim_data_1$m,
-                   I = sim_data_1$I,
-                   S = sim_data_1$S)
+input_data <- importCSV(system.file('data/example_input.csv', package = 'pictograph'))
 ```
 
 ```{r load_results, include = F}
@@ -133,7 +131,7 @@ writeClusterAssignmentsTable(chains$z_chain)
 
 ## 4. Tree inference
 
-We can then use the mutation cluster CCF estimates for tree inference. We first determine the possible edges by applying sample presence and lineage precedence filters. The `thresh` option constrains the maximum child node CCF can exceed parent node CCF. The default of `thresh` is 0.1. Note: the filtered edges must be in an object named `graph_G`. 
+We can then use the mutation cluster CCF estimates for tree inference. We first determine the possible edges by applying sample presence and lineage precedence filters. The `thresh` option constrains the maximum child node CCF can exceed parent node CCF. The default of `thresh` is 0.1. Note: the filtered edges must be in an object named `graph_G`.
 
 ```{r possible-edges}
 w_mat <- estimateCCFs(chains$w_chain)
@@ -141,8 +139,7 @@ graph_G_pre <- prepareGraph(w_mat)
 graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
 ```
 
-Next, we enumerate this constrained tree space, and apply a filtered based on the Sum Condition. The `sum_filter_thresh` option constrains the
-maximum sum of child node CCF can exceed parent node CCF. The default of `sum_filter_thresh` is 0.2.
+Next, we enumerate this constrained tree space, and apply a filtered based on the Sum Condition. The `sum_filter_thresh` option constrains the maximum sum of child node CCF can exceed parent node CCF. The default of `sum_filter_thresh` is 0.2.
 
 ```{r enumerate-trees}
 enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=0.2)
