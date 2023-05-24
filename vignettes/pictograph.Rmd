@@ -80,7 +80,7 @@ From `all_set_results`, BIC values for all $K$ assessed in each mutation set can
 plotBIC(all_set_results)
 ```
 
-Use `writeSetKTable` to generate a table with the K at minimum, elbow, and knee points of the BIC plot for each mutation set.
+Use `writeSetKTable` to generate a table with the K at minimum, elbow, and knee points of the BIC plot for each mutation set. The default chosen_K is the minimum K among the three, but users can also adjust the chosen_K accordingly.
 
 ```{r set_choices}
 set_k_choices <- writeSetKTable(all_set_results)
@@ -126,7 +126,7 @@ We can write tables for estimated cluster CCFs and mutation cluster assignments.
 
 ```{r tables}
 writeClusterCCFsTable(chains$w_chain)
-writeClusterAssignmentsTable(chains$z_chain)
+writeClusterAssignmentsTable(chains$z_chain, Mut_ID = input_data$MutID)
 ```
 
 ## 4. Tree inference
