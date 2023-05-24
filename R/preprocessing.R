@@ -15,6 +15,8 @@ importCSV <- function(inputFile) {
   rownames(output_data$y) = rowname
   colnames(output_data$y) = colname
   
+  output_data$MutID <- rowname
+  
   output_data$n <- as.matrix(data[c("mutation", "sample", "total_reads")] %>% pivot_wider(names_from = sample, values_from = total_reads, values_fill = 0))
   rownames(output_data$n) <- output_data$n[,'mutation']
   output_data$n <- output_data$n[,-1]
