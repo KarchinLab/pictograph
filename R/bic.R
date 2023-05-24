@@ -101,7 +101,7 @@ writeSetKTable <- function(all_set_results, sample_names = NULL) {
     chosen_K[i] <- ifelse(min_bic_k_tb$min_BIC[i] == min_bic_k_tb$elbow[i] & 
                             min_bic_k_tb$min_BIC[i] == min_bic_k_tb$knee[i],
                           min_bic_k_tb$min_BIC[i],
-                          NA)
+                          min(min_bic_k_tb$min_BIC[i],min_bic_k_tb$elbow[i],min_bic_k_tb$knee[i]))
   }
   
   min_bic_k_tb <- min_bic_k_tb %>%
