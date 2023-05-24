@@ -28,14 +28,13 @@ This tutorial walks through how to run PICTograph on a toy example. PICTograph i
 The required user input is a csv file that contains at least columns named "sample", "mutation", "total_reads", "alt_reads", "total_copy_number", and "purity". Total copy number refers to the integer copy number for the sample of interest. Purity should have the same value for the same sample. User can also provide 'multiplicity" of the mutation. An example input file with 3 tumor samples and 42 mutations is shown below. This data was simulated from a true tree containing 5 mutation clusters.
 
 ```{r raw_data format}
-raw_input <- read.csv(system.file('data/example_input.csv', package = 'pictograph'))
-head(raw_input)
+head(read.csv(system.file('extdata/example_input.csv', package = 'pictograph')))
 ```
 
 The input file can be read using the importCSV function. Alt read count (y), total read count (n), total copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.  
 
 ```{r input_data}
-input_data <- importCSV(system.file('data/example_input.csv', package = 'pictograph'))
+input_data <- importCSV(system.file('extdata/example_input.csv', package = 'pictograph'))
 ```
 
 ```{r load_results, include = F}
