@@ -8,7 +8,7 @@ importCSV <- function(inputFile) {
   
   output_data$y <- as.matrix(data[c("mutation", "sample", "alt_reads")] %>% pivot_wider(names_from = sample, values_from = alt_reads, values_fill = 0))
   rownames(output_data$y) <- output_data$y[,'mutation']
-  output_data$y <- output_data$y[,-1]
+  output_data$y <- output_data$y[,-1, drop=FALSE]
   rowname = rownames(output_data$y)
   colname = colnames(output_data$y)
   output_data$y <- matrix(as.numeric(output_data$y), ncol = ncol(output_data$y))
@@ -19,7 +19,7 @@ importCSV <- function(inputFile) {
   
   output_data$n <- as.matrix(data[c("mutation", "sample", "total_reads")] %>% pivot_wider(names_from = sample, values_from = total_reads, values_fill = 0))
   rownames(output_data$n) <- output_data$n[,'mutation']
-  output_data$n <- output_data$n[,-1]
+  output_data$n <- output_data$n[,-1, drop=FALSE]
   rowname = rownames(output_data$n)
   colname = colnames(output_data$n)
   output_data$n <- matrix(as.numeric(output_data$n), ncol = ncol(output_data$n))
@@ -28,7 +28,7 @@ importCSV <- function(inputFile) {
   
   output_data$tcn <- as.matrix(data[c("mutation", "sample", "total_copy_number")] %>% pivot_wider(names_from = sample, values_from = total_copy_number, values_fill = 0))
   rownames(output_data$tcn) <- output_data$tcn[,'mutation']
-  output_data$tcn <- output_data$tcn[,-1]
+  output_data$tcn <- output_data$tcn[,-1, drop=FALSE]
   rowname = rownames(output_data$tcn)
   colname = colnames(output_data$tcn)
   output_data$tcn <- matrix(as.numeric(output_data$tcn), ncol = ncol(output_data$tcn))
@@ -37,16 +37,23 @@ importCSV <- function(inputFile) {
   
   output_data$purity <- as.matrix(data[c("mutation", "sample", "purity")] %>% pivot_wider(names_from = sample, values_from = purity))
   rownames(output_data$purity) <- output_data$purity[,'mutation']
-  output_data$purity <- output_data$purity[,-1]
+  output_data$purity <- output_data$purity[,-1, drop=FALSE]
   rowname = rownames(output_data$purity)
   colname = colnames(output_data$purity)
   output_data$purity <- matrix(as.numeric(output_data$purity), ncol = ncol(output_data$purity))
   rownames(output_data$purity) = rowname
   colnames(output_data$purity) = colname
-  if (nrow(unique(output_data$purity[,])) != 1) {
-    warning("purity not consistent for the same sample")
+  if (ncol(output_data$purity) == 1) {
+    if (length(unique(output_data$purity[,])) != 1) {
+      warning("purity not consistent for the same sample")
+    }
+    output_data$purity <- unique(output_data$purity[,])
+  } else {
+    if (nrow(unique(output_data$purity[,])) != 1) {
+      warning("purity not consistent for the same sample")
+    }
+    output_data$purity <- unique(output_data$purity[,])[1,]
   }
-  output_data$purity <- unique(output_data$purity[,])[1,]
   
   output_data$S = ncol(output_data$y)
   output_data$I = nrow(output_data$y)
@@ -54,7 +61,7 @@ importCSV <- function(inputFile) {
   if ("multiplicity" %in% colnames(data)) {
     output_data$m <- as.matrix(data[c("mutation", "sample", "multiplicity")] %>% pivot_wider(names_from = sample, values_from = multiplicity))
     rownames(output_data$m) <- output_data$m[,'mutation']
-    output_data$m <- output_data$m[,-1]
+    output_data$m <- output_data$m[,-1, drop=FALSE]
     rowname = rownames(output_data$m)
     colname = colnames(output_data$m)
     output_data$m <- matrix(as.numeric(output_data$m), ncol = ncol(output_data$m))
