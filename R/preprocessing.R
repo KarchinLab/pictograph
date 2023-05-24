@@ -60,6 +60,9 @@ importCSV <- function(inputFile) {
     output_data$m <- matrix(as.numeric(output_data$m), ncol = ncol(output_data$m))
     rownames(output_data$m) = rowname
     colnames(output_data$m) = colname
+    if(any(data$multiplicity == 0)){
+      warning("input has 0 as multiplicity, please check!")
+    }
   } else {
     output_data$m <- estimateMultiplicityMatrix(output_data)
   }
