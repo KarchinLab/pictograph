@@ -26,6 +26,16 @@ importCSV <- function(inputFile) {
   rownames(output_data$n) = rowname
   colnames(output_data$n) = colname
   
+  if (any((output_data$y - output_data$n) > 0)) {
+    warning("Total read count must be equal or bigger than alt read count. Please check input data before proceeding!")
+    stop()
+  }
+  
+  if (any(output_data$n==0)) {
+    warning("Total read counts of 0 encoutered. Replaced 0 with mean total read count.")
+    output_data$n[output_data$n==0] <- round(mean(output_data$n))
+  }
+  
   output_data$tcn <- as.matrix(data[c("mutation", "sample", "total_copy_number")] %>% pivot_wider(names_from = sample, values_from = total_copy_number, values_fill = 0))
   rownames(output_data$tcn) <- output_data$tcn[,'mutation']
   output_data$tcn <- output_data$tcn[,-1, drop=FALSE]
@@ -45,14 +55,18 @@ importCSV <- function(inputFile) {
   colnames(output_data$purity) = colname
   if (ncol(output_data$purity) == 1) {
     if (length(unique(output_data$purity[,])) != 1) {
-      warning("purity not consistent for the same sample")
+      warning("purity not consistent for the same sample; taking the mean purity")
+      output_data$purity <- round(colMeans(output_data$purity), digit=2)
+    } else {
+      output_data$purity <- unique(output_data$purity[,])
     }
-    output_data$purity <- unique(output_data$purity[,])
   } else {
     if (nrow(unique(output_data$purity[,])) != 1) {
-      warning("purity not consistent for the same sample")
+      warning("Purity not consistent for the same sample; taking the mean purity")
+      output_data$purity <- round(colMeans(output_data$purity), digit=2)
+    } else {
+      output_data$purity <- unique(output_data$purity[,])[1,]
     }
-    output_data$purity <- unique(output_data$purity[,])[1,]
   }
   
   output_data$S = ncol(output_data$y)
@@ -68,7 +82,7 @@ importCSV <- function(inputFile) {
     rownames(output_data$m) = rowname
     colnames(output_data$m) = colname
     if(any(data$multiplicity == 0)){
-      warning("input has 0 as multiplicity, please check!")
+      warning("Multiplicity of 0 encoutered in the input data file which may cause issue for jags model!")
     }
   } else {
     output_data$m <- estimateMultiplicityMatrix(output_data)
