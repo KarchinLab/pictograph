@@ -36,7 +36,7 @@ importCSV <- function(inputFile) {
     output_data$n[output_data$n==0] <- round(mean(output_data$n))
   }
   
-  output_data$tcn <- as.matrix(data[c("mutation", "sample", "total_copy_number")] %>% pivot_wider(names_from = sample, values_from = total_copy_number, values_fill = 0))
+  output_data$tcn <- as.matrix(data[c("mutation", "sample", "tumor_integer_copy_number")] %>% pivot_wider(names_from = sample, values_from = tumor_integer_copy_number, values_fill = 0))
   rownames(output_data$tcn) <- output_data$tcn[,'mutation']
   output_data$tcn <- output_data$tcn[,-1, drop=FALSE]
   rowname = rownames(output_data$tcn)
