@@ -79,7 +79,7 @@ normalizeProps <- function(subclone_props) {
 
   for (s in seq_len(ncol(subclone_props))) {
     if (props_sums[s] != 1) {
-      new_col <- round(subclone_props[, s] / props_sums[s], 3)
+      new_col <- round(subclone_props[, s] / props_sums[s], digits = 3)
       subclone_props[, s] <- new_col
     }
   }
@@ -241,6 +241,11 @@ calcSubcloneProportions <- function(w_mat, tree_edges) {
 
     subclone_props[i, ] <- w_mat[i, ] - children_ccfs
   }
+  
+  # normalize subclone_props matrix so the props add up to 1
+  subclone_props[subclone_props < 0] = 0
+  subclone_props = round(t(t(subclone_props) / colSums(subclone_props)),digit = 3)
+  
   return(subclone_props)
 }
 
@@ -288,6 +293,8 @@ plotSubcloneBar <- function(subclone_props, sample_names = NULL, label_cluster =
     geom_text(data = subset(props_tb, `Proportion of Tumor` != 0),
               aes(label = text_label, colour = text_color),
               size = 3, position = position_stack(vjust = 0.5)) +
+    xlab("")+
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
     scale_color_manual(values = c("white", "black"), guide = "none") +
     ylim(0,1)
 

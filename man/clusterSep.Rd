@@ -13,7 +13,9 @@ clusterSep(
   inits = list(.RNG.name = "base::Wichmann-Hill", .RNG.seed = 123),
   max_K = 5,
   model_type = "spike_and_slab",
-  beta.prior = FALSE
+  beta.prior = FALSE,
+  drop_zero = FALSE,
+  one_box = FALSE
 )
 }
 \arguments{
@@ -32,6 +34,8 @@ clusterSep(
 \item{model_type}{hierarchical model type for ("spike_and_slab" or "simple)}
 
 \item{beta.prior}{option to run an initial MCMC chain and use results to specify beta priors for a second MCMC chain}
+
+\item{one_box}{option to run the MCMC chain without using sample presence}
 }
 \description{
 Run MCMC to cluster mutations and estimate CCFs

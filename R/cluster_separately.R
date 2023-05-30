@@ -10,15 +10,25 @@
 #' @param max_K maximum number of clusters to assess for each mutation set
 #' @param model_type hierarchical model type for ("spike_and_slab" or "simple)
 #' @param beta.prior option to run an initial MCMC chain and use results to specify beta priors for a second MCMC chain 
+#' @param one_box option to run the MCMC chain without using sample presence
 clusterSep <- function(input_data,
                        n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                        inits = list(".RNG.name" = "base::Wichmann-Hill",
                                     ".RNG.seed" = 123),
                        max_K = 5,
                        model_type = "spike_and_slab",
-                       beta.prior = FALSE) {
+                       beta.prior = FALSE,
+                       drop_zero = FALSE,
+                       one_box = FALSE) {
   # 1. separate mutations by sample presence
-  sep_list <- separateMutationsBySamplePresence(input_data)
+  if (one_box) {
+    input_data$mutation_indices <- seq_len(input_data$I)
+    sep_list <- vector("list", 1)
+    sep_list[[1]] <- input_data
+    names(sep_list) <- "one_box"
+  } else {
+    sep_list <- separateMutationsBySamplePresence(input_data)
+  }
   
   # 2a. For each presence set, run clustering MCMC, calc BIC and choose best K (min BIC)
   all_set_results <- vector("list", length(sep_list))
@@ -37,7 +47,8 @@ clusterSep <- function(input_data,
                                      temp_max_K = temp_max_K,
                                      model_type = model_type,
                                      params = params,
-                                     beta.prior = beta.prior)
+                                     beta.prior = beta.prior,
+                                     drop_zero = drop_zero)
     all_set_results[[i]] <- temp_samps_list
   }
   
@@ -66,10 +77,13 @@ separateMutationsBySamplePresence <- function(input_data) {
                                  purity = input_data$purity,
                                  I = length(type_indices[[types[t]]]),
                                  S = input_data$S,
-                                 y = input_data$y[type_indices[[types[t]]], ],
-                                 n = input_data$n[type_indices[[types[t]]], ],
-                                 tcn = input_data$tcn[type_indices[[types[t]]], ],
-                                 m = input_data$m[type_indices[[types[t]]], ])
+                                 y = input_data$y[type_indices[[types[t]]], ,drop=FALSE],
+                                 n = input_data$n[type_indices[[types[t]]], ,drop=FALSE],
+                                 tcn = input_data$tcn[type_indices[[types[t]]], ,drop=FALSE],
+                                 m = input_data$m[type_indices[[types[t]]], ,drop=FALSE])
+    if (input_data$S == 1) {
+      break
+    }
   }
   return(sep_list)
 }
@@ -84,15 +98,86 @@ getBoxInputData <- function(box) {
        tcn = box$tcn)
 }
 
+reverseDrop <- function(samps, pattern, n.iter) {
+  total_sample = nchar(pattern)
+  sample_list = vector()
+  for (j in seq_len(nchar(pattern))) {
+    if (strsplit(pattern, "")[[1]][j] == "1") {
+      sample_list <- append(sample_list, j)
+    }
+  }
+  k_list = vector()
+  ystar_list = vector()
+  # replace current sample id by true sample id from pattern
+  for (i in seq_len(length(colnames(samps[[1]])))) {
+    # print(colnames(samps[[1]])[i])
+    if (startsWith(colnames(samps[[1]])[i], "w")) {
+      para <- str_extract_all(colnames(samps[[1]])[i], "[0-9]+")[[1]]
+      colnames(samps[[1]])[i] <- paste("w[", para[1], ",", sample_list[strtoi(para[2])], "]", sep = "")
+      k_list <- c(k_list, para[1])
+    } else if (startsWith(colnames(samps[[1]])[i], "ystar")) {
+      para <- str_extract_all(colnames(samps[[1]])[i], "[0-9]+")[[1]]
+      colnames(samps[[1]])[i] <- paste("ystar[", para[1], ",", sample_list[strtoi(para[2])], "]", sep = "")
+      ystar_list <- c(ystar_list, para[1])
+    }
+  }
+  k_list <- unique(k_list)
+  ystar_list <- unique(ystar_list)
+  
+  # add back dropped samples
+  absent_sample <- vector()
+  for (sample in seq_len(total_sample)) {
+    if (! sample %in% sample_list) {
+      absent_sample <- append(absent_sample, sample)
+    }
+  }
+  for (k in seq_len(length(k_list))) {
+    for (j in seq_len(length(absent_sample))) {
+      col = paste("w[", k_list[k], ",", absent_sample[j], "]", sep = "")
+      samps[[1]] <- cbind(samps[[1]], col=0)
+      colnames(samps[[1]])[colnames(samps[[1]]) == 'col'] <- col
+    }
+  }
+  for (ystar in seq_len(length(ystar_list))) {
+    for (j in seq_len(length(absent_sample))) {
+      col = paste("ystar[", ystar_list[ystar], ",", absent_sample[j], "]", sep = "")
+      samps[[1]] <- cbind(samps[[1]], col=0)
+      colnames(samps[[1]])[colnames(samps[[1]]) == 'col'] <- col
+    }
+  }
+  
+  samps[[1]] <- samps[[1]][,order(colnames(samps[[1]]))]
+  
+  return(samps)
+}
+
 runMCMCForABox <- function(box, 
                            n.iter = 10000, n.burn = 1000, thin = 10, mc.cores = 1,
                            inits = list(".RNG.name" = "base::Wichmann-Hill",
                                         ".RNG.seed" = 123),
                            params = c("z", "w", "ystar"),
                            max_K = 5, model_type = "simple",
-                           beta.prior = FALSE) {
+                           beta.prior = FALSE,
+                           drop_zero = FALSE) {
   # returns samps_list 
   box_input_data <- getBoxInputData(box)
+  
+  # modify box_input_data so it only contain non-zero samples
+  if (drop_zero) {
+    sample_list = vector()
+    for (j in 1:box$S) {
+      if (strsplit(box$pattern, "")[[1]][j] == "1") {
+        sample_list <- append(sample_list, j)
+      }
+    }
+    # print(temp_box)
+    box_input_data$purity <- box_input_data$purity[sample_list]
+    box_input_data$y <- box_input_data$y[,sample_list,drop=FALSE]
+    box_input_data$n <- box_input_data$n[,sample_list,drop=FALSE]
+    box_input_data$tcn <- box_input_data$tcn[,sample_list,drop=FALSE]
+    box_input_data$m <- box_input_data$m[,sample_list,drop=FALSE]
+    box_input_data$S <- length(sample_list)
+  }
   
   extdir <- system.file("extdata", package="pictograph")
   if (box$I == 1) {
@@ -109,15 +194,19 @@ runMCMCForABox <- function(box,
   } else stop("provide model_type either 'spike_and_slab' or 'simple'")
   
   # choose sample in which mutations are present
-  if (box$I > 1) {
-    sample_to_sort <- which(colSums(box$y) > 0)[1] 
-  } else {
-    sample_to_sort <- which(box$y > 0)[1]
-  }
-  
+  sample_to_sort <- which(colSums(box_input_data$y) > 0)[1]
   
   samps_K1 <- runMCMC(box_input_data, 1, jags.file.K1, 
                       inits, params, n.iter=n.iter, thin=thin, n.burn=n.burn)
+  
+  if(box_input_data$S == 1) {
+    colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "w")] <- "w[1,1]"
+  }
+  
+  if (drop_zero) {
+    samps_K1 <- reverseDrop(samps_K1, box$pattern, n.iter)
+  }
+  
   if(box$I == 1) {
     colnames(samps_K1[[1]])[which(colnames(samps_K1[[1]]) == "z")] <- "z[1]"
   }
@@ -136,6 +225,12 @@ runMCMCForABox <- function(box,
                                                       beta.prior=beta.prior),
                                   mc.cores=mc.cores)
     
+    if (drop_zero) {
+      for (i in seq_len(length(samps_2))) {
+        samps_2[[i]] <- reverseDrop(samps_2[[i]], box$pattern, n.iter)
+      }
+    }
+    
     samps_list <- c(list(samps_K1), samps_2)
     names(samps_list) <- paste0("K", 1:max_K)
     return(samps_list)
@@ -152,6 +247,10 @@ formatChains <- function(samps) {
     mutate(Parameter = as.character(Parameter))
   temp_w <- get.parameter.chain("w", ggmcmc::ggs(samps)) %>%
     mutate(Parameter = as.character(Parameter))
+  if (nrow(temp_w) == 0) {
+    temp_w <- get.parameter.chain("w", ggmcmc::ggs(samps) %>% mutate(Parameter = gsub("w","w[1,1]",Parameter))) %>%
+      mutate(Parameter = as.character(Parameter))
+  }
   temp_ystar <- get.parameter.chain("ystar", ggmcmc::ggs(samps)) %>%
     mutate(Parameter = as.character(Parameter))
   samps_list_formatted <- list(w_chain = temp_w,
@@ -167,7 +266,8 @@ runMutSetMCMC <- function(temp_box,
                           temp_max_K = 5,
                           model_type = "spike_and_slab",
                           params = c("z", "w", "ystar"),
-                          beta.prior = FALSE) {
+                          beta.prior = FALSE,
+                          drop_zero = FALSE) {
   
   # Run MCMC
   if (temp_max_K == 1) {
@@ -177,7 +277,8 @@ runMutSetMCMC <- function(temp_box,
                                       thin = thin, mc.cores = mc.cores,
                                       inits = inits,
                                       params = params,
-                                      max_K = temp_max_K)
+                                      max_K = temp_max_K,
+                                      drop_zero = drop_zero)
   } else {
     # assess range of K: [1, temp_max_K]
     temp_samps_list <- runMCMCForABox(temp_box,
@@ -187,12 +288,18 @@ runMutSetMCMC <- function(temp_box,
                                       params = params,
                                       max_K = temp_max_K,
                                       model = model_type,
-                                      beta.prior = beta.prior)
+                                      beta.prior = beta.prior,
+                                      drop_zero = drop_zero)
   }
   
   # Format chains
-  samps_list <- parallel::mclapply(temp_samps_list, formatChains,
-                                   mc.cores = mc.cores)
+  if (drop_zero && temp_box$I == 1) {
+    samps_list <- list(formatChains(temp_samps_list))
+    names(samps_list) <- "K1"
+  } else {
+    samps_list <- parallel::mclapply(temp_samps_list, formatChains,
+                                     mc.cores = mc.cores)
+  }
   
   # Calculate BIC
   K_tested <- seq_len(temp_max_K)
@@ -344,7 +451,9 @@ relabel_z_chain <- function(z_chain, new_cluster_labels, mutation_indices) {
   if (length(mutation_indices) != length(unique(z_chain$Parameter))) {
     stop("number of supplied mutation indices does not match the number of mutations in z_chain")
   }
-  if (length(new_cluster_labels) != length(unique(z_chain$value))) {
+  ## would break when no mutation is assigned to a cluster
+  ## poor choice of k, would prob lower the k
+  if (length(new_cluster_labels) < length(unique(z_chain$value))) {
     stop("number of supplied new cluster labels does not match the number of clusters in z_chain")
   }
   new_z <- z_chain %>%

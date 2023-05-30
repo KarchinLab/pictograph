@@ -21,23 +21,20 @@ library(dplyr)
 
 ## 1. Introduction
 
-This tutorial walks through how to run PICTograph on a toy example. PICTograph infers the clonal evolution of tumors from multi-region sequencing data. It models uncertainty in assigning mutations to subclones using a Bayesian hierarchical model and reduces the space of possible evolutionary trees by using constraints based on principles of sample-presence, lineage precedence, and Sum Condition. The inputs to PICTograph are variant read counts of single nucleotide variants (SNVs), sequencing depth of mutation loci, number of mutant alleles (multiplicity), DNA copy number of the tumor genome containing the mutation, and the tumor purity of each sample. PICTograph summarizes the posterior distributions of the mutation cluster assignments and the cancer cell fractions (CCF) for each cluster by the mode. The estimates of cluster CCFs are then used to determine the most probable trees. Multiple trees that share the same score can be summarized as an ensemble tree, where edges are weighted by their concordance among constituent trees in the ensemble. 
+This tutorial walks through how to run PICTograph on a toy example. PICTograph infers the clonal evolution of tumors from multi-region sequencing data. It models uncertainty in assigning mutations to subclones using a Bayesian hierarchical model and reduces the space of possible evolutionary trees by using constraints based on principles of sample-presence, lineage precedence, and Sum Condition. The inputs to PICTograph are variant read counts of single nucleotide variants (SNVs), sequencing depth of mutation loci, number of mutant alleles (multiplicity), DNA copy number of the tumor genome containing the mutation, and the tumor purity of each sample. PICTograph summarizes the posterior distributions of the mutation cluster assignments and the cancer cell fractions (CCF) for each cluster by the mode. The estimates of cluster CCFs are then used to determine the most probable trees. Multiple trees that share the same score can be summarized as an ensemble tree, where edges are weighted by their concordance among constituent trees in the ensemble.
 
 ## 2. Input data
 
-The input data are organized as a list of 7 objects. Variant read count (y), depth (n), total copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.
+The required user input is a csv file that contains at least columns named "sample", "mutation", "total_reads", "alt_reads", "total_copy_number", and "purity". Total copy number refers to the integer copy number for the sample of interest. Purity should have the same value for the same sample. User can also provide 'multiplicity" of the mutation. An example input file with 3 tumor samples and 42 mutations is shown below. This data was simulated from a true tree containing 5 mutation clusters.
 
-Here we use a toy example with 3 tumor samples and 42 mutations. This data was simulated from a true tree containing 5 mutation clusters. 
+```{r raw_data format}
+head(read.csv(system.file('extdata/example_input.csv', package = 'pictograph')))
+```
+
+The input file can be read using the importCSV function. Alt read count (y), total read count (n), total copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.  
 
 ```{r input_data}
-data("sim_data_1")
-input_data <- list(y = sim_data_1$y,
-                   n = sim_data_1$n,
-                   purity = sim_data_1$purity,
-                   tcn = sim_data_1$tcn,
-                   m = sim_data_1$m,
-                   I = sim_data_1$I,
-                   S = sim_data_1$S)
+input_data <- importCSV(system.file('extdata/example_input.csv', package = 'pictograph'))
 ```
 
 ```{r load_results, include = F}
@@ -46,27 +43,27 @@ data("example_results")
 
 ## 3. Clustering mutations and estimating CCFs
 
-The first step of evolutionary analysis is clustering mutations and estimating their CCFs. This is comprised of three steps: 
+The first step of evolutionary analysis is clustering mutations and estimating their CCFs. This is comprised of three steps:
 
-a. Splitting the mutation data into sets by sample-presence and approximating the joint posterior by Markov chain Monte Carlo (MCMC) across a range of possible values for the number of clusters, $K$
-b. Selecting the best $K$ for each mutation set
-c. Merging the best chains of each mutation set
+a.  Splitting the mutation data into sets by sample-presence and approximating the joint posterior by Markov chain Monte Carlo (MCMC) across a range of possible values for the number of clusters, $K$
+b.  Selecting the best $K$ for each mutation set
+c.  Merging the best chains of each mutation set
 
-### 3a. Run clustering and CCF estimation separately for each mutation set 
+### 3a. Run clustering and CCF estimation separately for each mutation set
 
-In toy example, we run a short MCMC chain with only 1000 iterations (`n.iter`), burn-in of 100 (`n.burn`), and no thinning (`thin`). In practice, we recommend running the MCMC for longer e.g. 10,000 iterations, burn-in of 1000, and thinning by 10. PICTograph separates mutations into sets by sample-presence patterns, and clusters mutations separately within each set. We can set the maximum number of clusters to evaluate with `max_K`.
+In toy example, we run a short MCMC chain with only 1000 iterations (`n.iter`), burn-in of 100 (`n.burn`), and no thinning (`thin`). In practice, we recommend running the MCMC for longer e.g. 10,000 iterations, burn-in of 1000, and thinning by 10. By default, PICTograph separates mutations into sets by sample-presence patterns, and clusters mutations separately within each set. The maximum number of clusters can be set with the `max_K` option. To turn off the sample-presence separation, set the `one_box` option to `T`. To run the MCMC chains in parallel, set the `mc.cores` option to the number of desired cores.
 
 ```{r cluster, eval = FALSE}
 all_set_results <- clusterSep(input_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
-                              max_K = 5)
+                              max_K = 5, one_box = F, mc.cores = 1)
 ```
 
 This gives us a list with results for each mutation set, which contains `all_chains`, `BIC`, `best_chains`, and `best_K`.
 
-`all_chains` is a list of MCMC chains for each value of $K$ tested. For each $K$, there are chains for cluster CCF (`w_chain`), mutation cluster assignments (`z_chain`), and simulated variant read counts (`ystar_chain`) for posterior predictive distributions. 
+`all_chains` is a list of MCMC chains for each value of $K$ tested. For each $K$, there are chains for cluster CCF (`w_chain`), mutation cluster assignments (`z_chain`), and simulated variant read counts (`ystar_chain`) for posterior predictive distributions.
 
-`BIC` is a table of the BIC for each $K$ assessed. 
+`BIC` is a table of the BIC for each $K$ assessed.
 
 As default, PICTograph chooses the $K$ with the lowest BIC. The MCMC chains for this chosen $K$ are under `best_chains` and the $K$ chosen is listed under `best_K`.
 
@@ -76,26 +73,25 @@ str(all_set_results, give.attr = F, max.level = 4)
 
 ### 3b. Select the best number of clusters, $K$, for each mutation set
 
-From `all_set_results`, BIC values for all $K$ assessed in each mutation set can be visualized using `plotBIC`. The minimum, elbow, and knee points are marked. 
+From `all_set_results`, BIC values for all $K$ assessed in each mutation set can be visualized using `plotBIC`. The minimum, elbow, and knee points are marked.
 
 ```{r plot_bic, fig.height = 3, fig.width = 7}
 plotBIC(all_set_results)
 ```
 
-Use `writeSetKTable` to generate a table with the K at minimum, elbow, and knee points of the BIC plot for each mutation set. 
+Use `writeSetKTable` to generate a table with the K at minimum, elbow, and knee points of the BIC plot for each mutation set. The default chosen_K is the minimum K among the three, but users can also adjust the chosen_K accordingly.
 
 ```{r set_choices}
 set_k_choices <- writeSetKTable(all_set_results)
 set_k_choices
 ```
 
-We can extract the MCMC chains for the best $K$ of each mutation set using `collectBestKChains`. As default, PICTograph chooses the $K$ with the lowest BIC, and these chains will be automatically extracted. Users also have the option to specify the $K$ to choose for each mutation set by supplying a vector of integers to the parameter `chosen_K` in the same order as the listed sets in `all_set_results`. 
+We can extract the MCMC chains for the best $K$ of each mutation set using `collectBestKChains`. As default, PICTograph chooses the $K$ with the lowest BIC, and these chains will be automatically extracted. Users also have the option to specify the $K$ to choose for each mutation set by supplying a vector of integers to the parameter `chosen_K` in the same order as the listed sets in `all_set_results`.
 
 ```{r collect_best_chains}
 best_set_chains <- collectBestKChains(all_set_results, chosen_K = set_k_choices$chosen_K)
 str(best_set_chains, give.attr = F, max.level = 2)
 ```
-
 
 ### 3c. Merge results for all mutation sets
 
@@ -107,20 +103,19 @@ chains <- mergeSetChains(best_set_chains, input_data)
 
 ### Visualizing clustering and CCF estimation results
 
-Traces for CCF chains can be visualized to check for convergence. 
+Traces for CCF chains can be visualized to check for convergence.
 
 ```{r ccf_trace, fig.height = 6, fig.width = 6}
 plotChainsCCF(chains$w_chain)
 ```
 
-The posterior distribtuion of cluster CCFs can be visualized as violin plots. The number of mutations assigned to each cluster is listed in brackets after the cluster name. 
+The posterior distribtuion of cluster CCFs can be visualized as violin plots. The number of mutations assigned to each cluster is listed in brackets after the cluster name.
 
-```{r ccf_violin, fig.height = 4, fig.width = 6} 
+```{r ccf_violin, fig.height = 4, fig.width = 6}
 plotCCFViolin(chains$w_chain, chains$z_chain, indata = input_data)
 ```
 
-
-We can also visualize the posterior probabilities of mutation cluster assignments and determine the most probable cluster assignments. In this toy example, there is high concordance of the cluster assignments of mutations across the MCMC chain.  
+We can also visualize the posterior probabilities of mutation cluster assignments and determine the most probable cluster assignments. In this toy example, there is high concordance of the cluster assignments of mutations across the MCMC chain.
 
 ```{r cluster-assignments, fig.height = 6, fig.width = 5}
 plotClusterAssignmentProbVertical(chains$z_chain, chains$w_chain)
@@ -130,32 +125,35 @@ We can write tables for estimated cluster CCFs and mutation cluster assignments.
 
 ```{r tables}
 writeClusterCCFsTable(chains$w_chain)
-writeClusterAssignmentsTable(chains$z_chain)
+writeClusterAssignmentsTable(chains$z_chain, Mut_ID = input_data$MutID)
 ```
 
-## 4. Tree inference 
+## 4. Tree inference
 
-We can then use the mutation cluster CCF estimates for tree inference. We first determine the possible edges by applying sample presence and lineage precedence filters. Note: the filtered edges must be in an object named `graph_G`. 
+We can then use the mutation cluster CCF estimates for tree inference. We first determine the possible edges by applying sample presence and lineage precedence filters. The `thresh` option constrains the maximum child node CCF can exceed parent node CCF. The default of `thresh` is 0.1. Note: the filtered edges must be in an object named `graph_G`.
 
 ```{r possible-edges}
 w_mat <- estimateCCFs(chains$w_chain)
-graph_G_pre <- prepareGraphForGabowMyers(w_mat, chains, input_data)
+graph_G_pre <- prepareGraph(w_mat)
 graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
 ```
 
-Next, we enumerate this constrained tree space, and apply a filtered based on the Sum Condition. Here we use a threshold of 0.2 for the maximum allowed violation of the Sum Condition. 
+Next, we enumerate this constrained tree space, and apply a filtered based on the Sum Condition. The `sum_filter_thresh` option constrains the maximum sum of child node CCF can exceed parent node CCF. The default of `sum_filter_thresh` is 0.2.
+
 ```{r enumerate-trees}
 enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=0.2)
 ```
 
-All spanning trees given by the possible edges that pass the Sum Condition filter are stored in `all_spanning_trees`. 
+All spanning trees given by the possible edges that pass the Sum Condition filter are stored in `all_spanning_trees`.
+
 ```{r tree-space}
 length(all_spanning_trees)
 all_spanning_trees
 ```
 
-We then calculate a fitness score for all the trees that have passed our filtering and identify the highest scoring tree. 
-```{r tree-scoring}
+We then calculate a fitness score for all the trees that have passed our filtering and identify the highest scoring tree.
+
+```{r tree-scoring,  fig.height = 4, fig.width = 5}
 # calculate SCHISM fitness score for all trees
 scores <- calcTreeScores(chains$w_chain, all_spanning_trees)
 scores
@@ -165,33 +163,33 @@ best_tree <- all_spanning_trees[[which.max(scores)]]
 plotTree(best_tree)
 ```
 
-In this toy example, there is only one tree with the maximum score. In some cases, multiple trees will share the maximum score. We can plot an ensemble tree to visualize the evolutionary relationships (edges) that are shared among multiple trees. In the ensemble tree, edges are weighted by the number of trees in which they are represented. To illustrate this plotting function, here we plot an ensemble of the two trees that were enumerated. The solid black edges represent those supported in both trees.  
+In this toy example, there is only one tree with the maximum score. In some cases, multiple trees will share the maximum score. We can plot an ensemble tree to visualize the evolutionary relationships (edges) that are shared among multiple trees. In the ensemble tree, edges are weighted by the number of trees in which they are represented. To illustrate this plotting function, here we plot an ensemble of the two trees that were enumerated. The solid black edges represent those supported in both trees.
 
-```{r ensemble-tree}
+```{r ensemble-tree,  fig.height = 4, fig.width = 5}
 plotEnsembleTree(all_spanning_trees)
 ```
 
 ## Subclone proportions
 
-The proportion of each subclone in each sample can be calculated using `calcSubcloneProportions`. This is calculated using the estimated CCFs and a single tree. Two available options for visualizing subclone proportions are pie charts using `plotSubclonePie` and stacked bar graphs using `plotSubcloneBar`. 
+The proportion of each subclone in each sample can be calculated using `calcSubcloneProportions`. This is calculated using the estimated CCFs and a single tree. Two available options for visualizing subclone proportions are pie charts using `plotSubclonePie` and stacked bar graphs using `plotSubcloneBar`.
 
-```{r subclone-props}
+```{r subclone-props, fig.height = 4, fig.width = 5}
 subclone_props <- calcSubcloneProportions(w_mat, best_tree)
 plotSubclonePie(subclone_props)
 plotSubcloneBar(subclone_props)
 ```
 
-We can force the cluster CCF estimates to comply with the Sum Condition for a given tree using `forceCCFs`. 
+We can force the cluster CCF estimates to comply with the Sum Condition for a given tree using `forceCCFs`.
 
-```{r force_ccfs}
+```{r force_ccfs,  fig.height = 4, fig.width = 5}
 fixed_w_mat <- forceCCFs(w_mat, best_tree)
 fixed_subclone_props <- calcSubcloneProportions(fixed_w_mat, best_tree)
 plotSubcloneBar(fixed_subclone_props)
 ```
 
-Subclone proportions can also be calculated for the edges of an ensemble tree that are shared by all summarized trees (backbone). For this example ensemble tree, the "backbone" is made up of the root node and nodes 1, 2, 3, and 5, which are connected by thick black edges. 
+Subclone proportions can also be calculated for the edges of an ensemble tree that are shared by all summarized trees (backbone). For this example ensemble tree, the "backbone" is made up of the root node and nodes 1, 2, 3, and 5, which are connected by thick black edges.
 
-```{r backbone}
+```{r backbone,  fig.height = 4, fig.width = 5}
 selected_trees <- all_spanning_trees
 plotEnsembleTree(selected_trees)
 
@@ -204,8 +202,8 @@ backbone <- bind_rows(selected_trees) %>%
   select(edge, parent, child)
 
 fixed_w_mat_backbone <- forceCCFs(w_mat, backbone)
+fixed_w_mat_backbone[is.na(fixed_w_mat_backbone)] = 0
+
 backbone_subclone_props <- calcSubcloneProportions(fixed_w_mat_backbone, backbone)
 plotSubcloneBar(backbone_subclone_props)
 ```
-
-
