@@ -21,17 +21,17 @@ library(dplyr)
 
 ## 1. Introduction
 
-This tutorial walks through how to run PICTograph on a toy example. PICTograph infers the clonal evolution of tumors from multi-region sequencing data. It models uncertainty in assigning mutations to subclones using a Bayesian hierarchical model and reduces the space of possible evolutionary trees by using constraints based on principles of sample-presence, lineage precedence, and Sum Condition. The inputs to PICTograph are variant read counts of single nucleotide variants (SNVs), sequencing depth of mutation loci, number of mutant alleles (multiplicity), DNA copy number of the tumor genome containing the mutation, and the tumor purity of each sample. PICTograph summarizes the posterior distributions of the mutation cluster assignments and the cancer cell fractions (CCF) for each cluster by the mode. The estimates of cluster CCFs are then used to determine the most probable trees. Multiple trees that share the same score can be summarized as an ensemble tree, where edges are weighted by their concordance among constituent trees in the ensemble.
+This tutorial walks through how to run PICTograph on a toy example. PICTograph infers the clonal evolution of tumors from multi-region sequencing data. It models uncertainty in assigning mutations to subclones using a Bayesian hierarchical model and reduces the space of possible evolutionary trees by using constraints based on principles of lineage precedence, sum condition, and optionally by sample-presence. The inputs to PICTograph are variant ("alt allele") read counts of small somatic mutations, sequencing depth at the mutation loci, DNA copy number of the tumor genome at the mutation loci, tumor purity, if known, the number of mutant alleles (multiplicity). If multiplicity is not entered, PICTograph will estimate it.  If multiple tumor samples are considered, an option is available to restrict the number of possible evolutionary trees by partitioning mutations according to sample presence. PICTograph summarizes the posterior distributions of the mutation cluster assignments and the cancer cell fractions (CCF) for each cluster by the mode. The estimates of cluster CCFs are then used to determine the most probable trees. Multiple trees that share the same score can be summarized as an ensemble tree, where edges are weighted by their concordance among constituent trees in the ensemble.
 
 ## 2. Input data
 
-The required user input is a csv file that contains at least columns named "sample", "mutation", "total_reads", "alt_reads", "total_copy_number", and "purity". Total copy number refers to the integer copy number for the sample of interest. Purity should have the same value for the same sample. User can also provide 'multiplicity" of the mutation. An example input file with 3 tumor samples and 42 mutations is shown below. This data was simulated from a true tree containing 5 mutation clusters.
+The required user input is a csv file that contains at least columns named "sample", "mutation", "total_reads", "alt_reads", "tumor_integer_copy_number", and "purity". All mutations in a sample must share the same purity. Users can also provide their own estimates of mutation multiplicity (number of tumor DNA copies harboring the mutation). An example input file from an individual with 3 tumor samples and 42 mutations is shown below. This data was simulated from a tree containing 5 mutation clusters.
 
 ```{r raw_data format}
 head(read.csv(system.file('extdata/example_input.csv', package = 'pictograph')))
 ```
 
-The input file can be read using the importCSV function. Alt read count (y), total read count (n), total copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.  
+The input file can be read using the importCSV function. Alt read count (y), total read count (n), tumor copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.  
 
 ```{r input_data}
 input_data <- importCSV(system.file('extdata/example_input.csv', package = 'pictograph'))
@@ -43,9 +43,9 @@ data("example_results")
 
 ## 3. Clustering mutations and estimating CCFs
 
-The first step of evolutionary analysis is clustering mutations and estimating their CCFs. This is comprised of three steps:
+The first step of evolutionary analysis is clustering mutations and estimating their cancer cell fractions (CCFs). This is comprised of three steps:
 
-a.  Splitting the mutation data into sets by sample-presence and approximating the joint posterior by Markov chain Monte Carlo (MCMC) across a range of possible values for the number of clusters, $K$
+a.  By default, for individuals with multiple tumor samples, the mutation data is initially split into sets by sample-presence. Users can choose not to apply sample-presence by setting the one_box parameter in the clusterSep function to 'T'. For individuals with many samples and few mutations, this may be preferable. Next, PICTograph estimates the joint posterior of CCFs and cluster assignments by Markov chain Monte Carlo (MCMC) across a range of possible values for the number of clusters, $K$
 b.  Selecting the best $K$ for each mutation set
 c.  Merging the best chains of each mutation set
 
@@ -56,7 +56,7 @@ In toy example, we run a short MCMC chain with only 1000 iterations (`n.iter`), 
 ```{r cluster, eval = FALSE}
 all_set_results <- clusterSep(input_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
-                              max_K = 5, one_box = F, mc.cores = 1)
+                              max_K = 5, one_box = F, mc.cores = 2)
 ```
 
 This gives us a list with results for each mutation set, which contains `all_chains`, `BIC`, `best_chains`, and `best_K`.
@@ -130,21 +130,15 @@ writeClusterAssignmentsTable(chains$z_chain, Mut_ID = input_data$MutID)
 
 ## 4. Tree inference
 
-We can then use the mutation cluster CCF estimates for tree inference. We first determine the possible edges by applying sample presence and lineage precedence filters. The `thresh` option constrains the maximum child node CCF can exceed parent node CCF. The default of `thresh` is 0.1. Note: the filtered edges must be in an object named `graph_G`.
+We can then use the mutation cluster CCF estimates for tree inference. We first estimate the possible edges by applying lineage precedence filters to order the clusters on a tree. The `lineage_precedence_thresh` option allows relaxation of lineage precedence constraints so that the child cluster CCF can exceed a parent cluster CCF by a small amounts. The default of `lineage_precedence_threshh` is 0.1. Filtered edges are stored in an object named `graph_G`.
 
-```{r possible-edges}
-w_mat <- estimateCCFs(chains$w_chain)
-graph_G_pre <- prepareGraph(w_mat)
-graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = 0.1)
+Next, we enumerate this constrained tree space, and apply a filter based on the sum condition. The `sum_filter_thresh` option allows relaxation of sum condition constraints so that the sum of child cluster CCFs at a branch point can exceed the parent cluster CCF by a small amount. The default of `sum_filter_thresh` is 0.2.
+
+```{r generate-all-tree}
+generateAllTrees(chains$w_chain, lineage_precedence_thresh = 0.1, sum_filter_thresh = 0.2)
 ```
 
-Next, we enumerate this constrained tree space, and apply a filtered based on the Sum Condition. The `sum_filter_thresh` option constrains the maximum sum of child node CCF can exceed parent node CCF. The default of `sum_filter_thresh` is 0.2.
-
-```{r enumerate-trees}
-enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh=0.2)
-```
-
-All spanning trees given by the possible edges that pass the Sum Condition filter are stored in `all_spanning_trees`.
+All spanning trees given by the possible edges that pass the sum condition filter are stored in `all_spanning_trees`.
 
 ```{r tree-space}
 length(all_spanning_trees)
@@ -179,7 +173,7 @@ plotSubclonePie(subclone_props)
 plotSubcloneBar(subclone_props)
 ```
 
-We can force the cluster CCF estimates to comply with the Sum Condition for a given tree using `forceCCFs`.
+We can force the cluster CCF estimates to comply with the sum condition for a given tree using `forceCCFs`.
 
 ```{r force_ccfs,  fig.height = 4, fig.width = 5}
 fixed_w_mat <- forceCCFs(w_mat, best_tree)
