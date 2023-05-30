@@ -21,7 +21,7 @@ library(dplyr)
 
 ## 1. Introduction
 
-This tutorial walks through how to run PICTograph on a toy example. PICTograph infers the clonal evolution of tumors from multi-region sequencing data. It models uncertainty in assigning mutations to subclones using a Bayesian hierarchical model and reduces the space of possible evolutionary trees by using constraints based on principles of lineage precedence, sum condition, and optionally by sample-presence. The inputs to PICTograph are variant ("alt allele") read counts of small somatic mutations, sequencing depth at the mutation loci, DNA copy number of the tumor genome at the mutation loci, tumor purity, if known, the number of mutant alleles (multiplicity). If multiplicity is not entered, PICTograph will estimate it.  If multiple tumor samples are considered, an option is available to restrict the number of possible evolutionary trees by partitioning mutations according to sample presence. PICTograph summarizes the posterior distributions of the mutation cluster assignments and the cancer cell fractions (CCF) for each cluster by the mode. The estimates of cluster CCFs are then used to determine the most probable trees. Multiple trees that share the same score can be summarized as an ensemble tree, where edges are weighted by their concordance among constituent trees in the ensemble.
+This tutorial walks through how to run PICTograph on a toy example. PICTograph infers the clonal evolution of tumors from multi-region sequencing data. It models uncertainty in assigning mutations to subclones using a Bayesian hierarchical model and reduces the space of possible evolutionary trees by using constraints based on principles of lineage precedence, sum condition, and optionally by sample-presence. The inputs to PICTograph are variant ("alt allele") read counts of small somatic mutations, sequencing depth at the mutation loci, DNA copy number of the tumor genome at the mutation loci, tumor purity, and , if known, the number of mutant alleles (multiplicity). If multiplicity is not entered, PICTograph will estimate it. If multiple tumor samples are considered, an option is available to restrict the number of possible evolutionary trees by partitioning mutations according to sample presence. PICTograph summarizes the posterior distributions of the mutation cluster assignments and the cancer cell fractions (CCF) for each cluster by the mode. The estimates of cluster CCFs are then used to determine the most probable trees. Multiple trees that share the same score can be summarized as an ensemble tree, where edges are weighted by their concordance among constituent trees in the ensemble.
 
 ## 2. Input data
 
@@ -130,7 +130,7 @@ writeClusterAssignmentsTable(chains$z_chain, Mut_ID = input_data$MutID)
 
 ## 4. Tree inference
 
-We can then use the mutation cluster CCF estimates for tree inference. We first estimate the possible edges by applying lineage precedence filters to order the clusters on a tree. The `lineage_precedence_thresh` option allows relaxation of lineage precedence constraints so that the child cluster CCF can exceed a parent cluster CCF by a small amounts. The default of `lineage_precedence_threshh` is 0.1. Filtered edges are stored in an object named `graph_G`.
+We can then use the mutation cluster CCF estimates for tree inference. We first estimate the possible edges by applying lineage precedence filters to order the clusters on a tree. The `lineage_precedence_thresh` option allows relaxation of lineage precedence constraints so that the child cluster CCF can exceed a parent cluster CCF by a small amounts. The default of `lineage_precedence_thresh` is 0.1. Filtered edges are stored in an object named `graph_G`.
 
 Next, we enumerate this constrained tree space, and apply a filter based on the sum condition. The `sum_filter_thresh` option allows relaxation of sum condition constraints so that the sum of child cluster CCFs at a branch point can exceed the parent cluster CCF by a small amount. The default of `sum_filter_thresh` is 0.2.
 
@@ -165,7 +165,7 @@ plotEnsembleTree(all_spanning_trees)
 
 ## Subclone proportions
 
-The proportion of each subclone in each sample can be calculated using `calcSubcloneProportions`. This is calculated using the estimated CCFs and a single tree. Two available options for visualizing subclone proportions are pie charts using `plotSubclonePie` and stacked bar graphs using `plotSubcloneBar`.
+For individuals with multiple available tumor samples, the proportion of each subclone in each sample can be calculated using `calcSubcloneProportions`. This is calculated using the estimated cluster CCFs and the ordering of clusters on the best scoring tree. Two available options for visualizing subclone proportions are pie charts using `plotSubclonePie` and stacked bar graphs using `plotSubcloneBar`.
 
 ```{r subclone-props, fig.height = 4, fig.width = 5}
 subclone_props <- calcSubcloneProportions(w_mat, best_tree)
