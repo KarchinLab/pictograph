@@ -252,6 +252,21 @@ enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.2) {
 #               filtered_trees = filtered_trees))
 }
 
+#' Enumerate all spanning trees using modified Gabow-Myers wrapper
+#' 
+#' @export
+#' @param w matrix of CCF values (rows = clusters, columns = samples)
+#' @param lineage_precedence_thresh maximum allowed violation of lineage precedence (default = 0.1)
+#' @param sum_filter_thresh thresh maximum allowed violation of Sum Condition (default = 0.2)
+generateAllTrees <- function(w, lineage_precedence_thresh=0.1, sum_filter_thresh=0.2) {
+  w_mat <- estimateCCFs(w)
+  w_mat <- assign("w_mat", w_mat, envir = .GlobalEnv)
+  graph_G_pre <- prepareGraph(w_mat)
+  graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = lineage_precedence_thresh)
+  graph_G <- assign("graph_G", graph_G, envir = .GlobalEnv)
+  enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh = sum_filter_thresh)
+}
+
 #' Enumerate all spanning trees using modified Gabow-Myers
 #' 
 #' @export
