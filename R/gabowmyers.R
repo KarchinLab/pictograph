@@ -211,7 +211,7 @@ prepareGraphForGabowMyers <- function(w, chains, input_data) {
 #' @import tidyr
 #' @param w matrix of CCF values (rows = clusters, columns = samples)
 #' @return graph_G tibble of possible edges with columns edge, parent, child
-prepareGraph <- function(w_mat) {
+prepareGraph <- function(w_mat, thresh) {
   graph_pre <- data.frame(edge = character(), parent = character(), child = character())
   for (i in seq_len(nrow(w_mat))) {
     graph_pre <- graph_pre %>% add_row(edge = paste("root->", i, sep = ""), parent = "root", child = as.character(i))
@@ -219,7 +219,7 @@ prepareGraph <- function(w_mat) {
       if (i!=j) {
         i_row = w_mat[i, ]
         j_row = w_mat[j, ]
-        if (all(j_row[i_row > 0] > 0)) {
+        if (all(j_row-i_row > -thresh)) {
           graph_pre <- graph_pre %>% add_row(edge = paste(j, "->", i, sep = ""), parent = as.character(j), child = as.character(i))
         }
       }
@@ -261,7 +261,7 @@ enumerateSpanningTrees <- function(graph_G, w, sum_filter_thresh=0.2) {
 generateAllTrees <- function(w, lineage_precedence_thresh=0.1, sum_filter_thresh=0.2) {
   w_mat <- estimateCCFs(w)
   w_mat <- assign("w_mat", w_mat, envir = .GlobalEnv)
-  graph_G_pre <- prepareGraph(w_mat)
+  graph_G_pre <- prepareGraph(w_mat, lineage_precedence_thresh)
   graph_G <- filterEdgesBasedOnCCFs(graph_G_pre, w_mat, thresh = lineage_precedence_thresh)
   graph_G <- assign("graph_G", graph_G, envir = .GlobalEnv)
   enumerateSpanningTreesModified(graph_G, w_mat, sum_filter_thresh = sum_filter_thresh)
