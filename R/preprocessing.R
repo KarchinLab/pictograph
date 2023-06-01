@@ -2,7 +2,7 @@
 #' 
 #' @export
 #' @param input_file input data file; 
-importCSV <- function(inputFile) {
+importCSV <- function(inputFile, alt_reads_thresh = 5, vaf_thresh = 0.02) {
   data <- read_csv(inputFile, show_col_types = FALSE)
   output_data <- list()
   
@@ -36,7 +36,7 @@ importCSV <- function(inputFile) {
     output_data$n[output_data$n==0] <- round(mean(output_data$n))
   }
   
-  output_data$tcn <- as.matrix(data[c("mutation", "sample", "tumor_integer_copy_number")] %>% pivot_wider(names_from = sample, values_from = tumor_integer_copy_number, values_fill = 0))
+  output_data$tcn <- as.matrix(data[c("mutation", "sample", "tumor_integer_copy_number")] %>% pivot_wider(names_from = sample, values_from = tumor_integer_copy_number, values_fill = 2))
   rownames(output_data$tcn) <- output_data$tcn[,'mutation']
   output_data$tcn <- output_data$tcn[,-1, drop=FALSE]
   rowname = rownames(output_data$tcn)
@@ -45,7 +45,7 @@ importCSV <- function(inputFile) {
   rownames(output_data$tcn) = rowname
   colnames(output_data$tcn) = colname
   
-  output_data$purity <- as.matrix(data[c("mutation", "sample", "purity")] %>% pivot_wider(names_from = sample, values_from = purity))
+  output_data$purity <- as.matrix(data[c("mutation", "sample", "purity")] %>% pivot_wider(names_from = sample, values_from = purity, values_fill = 0))
   rownames(output_data$purity) <- output_data$purity[,'mutation']
   output_data$purity <- output_data$purity[,-1, drop=FALSE]
   rowname = rownames(output_data$purity)
@@ -53,21 +53,22 @@ importCSV <- function(inputFile) {
   output_data$purity <- matrix(as.numeric(output_data$purity), ncol = ncol(output_data$purity))
   rownames(output_data$purity) = rowname
   colnames(output_data$purity) = colname
-  if (ncol(output_data$purity) == 1) {
-    if (length(unique(output_data$purity[,])) != 1) {
-      warning("purity not consistent for the same sample; taking the mean purity")
-      output_data$purity <- round(colMeans(output_data$purity), digit=2)
-    } else {
-      output_data$purity <- unique(output_data$purity[,])
-    }
-  } else {
-    if (nrow(unique(output_data$purity[,])) != 1) {
-      warning("Purity not consistent for the same sample; taking the mean purity")
-      output_data$purity <- round(colMeans(output_data$purity), digit=2)
-    } else {
-      output_data$purity <- unique(output_data$purity[,])[1,]
-    }
-  }
+  output_data$purity = colSums(output_data$purity) / colSums(!!output_data$purity)
+  # if (ncol(output_data$purity) == 1) {
+  #   if (length(unique(output_data$purity[,])) != 1) {
+  #     warning("purity not consistent for the same sample; taking the mean purity")
+  #     output_data$purity <- round(colMeans(output_data$purity), digit=2)
+  #   } else {
+  #     output_data$purity <- unique(output_data$purity[,])
+  #   }
+  # } else {
+  #   if (nrow(unique(output_data$purity[,])) != 1) {
+  #     warning("Purity not consistent for the same sample; taking the mean purity")
+  #     output_data$purity <- round(colMeans(output_data$purity), digit=2)
+  #   } else {
+  #     output_data$purity <- unique(output_data$purity[,])[1,]
+  #   }
+  # }
   
   output_data$S = ncol(output_data$y)
   output_data$I = nrow(output_data$y)
@@ -88,6 +89,8 @@ importCSV <- function(inputFile) {
     output_data$m <- estimateMultiplicityMatrix(output_data)
   }
   
+  output_data$y[output_data$y / output_data$n < vaf_thresh] = 0
+  output_data$y[output_data$y <= alt_reads_thresh] = 0
   return(output_data)
 }
 
