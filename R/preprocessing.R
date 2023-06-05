@@ -2,7 +2,7 @@
 #' 
 #' @export
 #' @param input_file input data file; 
-importCSV <- function(inputFile, alt_reads_thresh = 5, vaf_thresh = 0.02) {
+importCSV <- function(inputFile, alt_reads_thresh = 6, vaf_thresh = 0.02) {
   data <- read_csv(inputFile, show_col_types = FALSE)
   output_data <- list()
   
@@ -90,7 +90,7 @@ importCSV <- function(inputFile, alt_reads_thresh = 5, vaf_thresh = 0.02) {
   }
   
   output_data$y[output_data$y / output_data$n < vaf_thresh] = 0
-  output_data$y[output_data$y <= alt_reads_thresh] = 0
+  output_data$y[output_data$y < alt_reads_thresh] = 0
   return(output_data)
 }
 
