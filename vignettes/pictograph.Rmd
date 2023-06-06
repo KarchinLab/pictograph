@@ -31,10 +31,11 @@ The required user input is a csv file that contains at least columns named "samp
 head(read.csv(system.file('extdata/example_input.csv', package = 'pictograph')))
 ```
 
-The input file can be read using the importCSV function. Alt read count (y), total read count (n), tumor copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively.  
+The input file can be read using the importCSV function. Alt read count (y), total read count (n), tumor copy number (tcn), and multiplicity (m) are stored in matrices where the columns are samples, and rows are variants. Purity is supplied as a vector. I and S are integers representing the number of variants and number of samples, respectively. The function will also pre-process the data to remove potential false positive read counts. By default, a mutation with alt reads less than 6 or a VAF less than 2% is considered a false positive. Users can change the thresholds using the `alt_reads_thresh` and `vaf_thresh` parameters.
 
 ```{r input_data}
-input_data <- importCSV(system.file('extdata/example_input.csv', package = 'pictograph'))
+input_data <- importCSV(system.file('extdata/example_input.csv', package = 'pictograph'),
+                        alt_reads_thresh = 6, vaf_thresh = 0.02)
 ```
 
 ```{r load_results, include = F}
