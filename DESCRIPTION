@@ -1,13 +1,13 @@
 Package: pictograph
 Title: Tools for modeling clonal evolution of a cancer
-Version: 1.0.1
+Version: 1.2.0.1
 Authors@R: 
-    person(given = "Lily",
-           family = "Zheng",
+    person(given = "Jiaying",
+           family = "Lai",
            role = c("aut", "cre"),
-           email = "lzheng163@gmail.com",
+           email = "jlai33@jh.edu",
            comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: Implements a Bayesian models to sample evolutionary clone trees
+Description: Implements a Bayesian model to estimate cancer clone fractions and evolutionary trees
 License: Artistic-2.0
 Encoding: UTF-8
 LazyData: true
