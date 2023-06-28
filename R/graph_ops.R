@@ -510,8 +510,21 @@ plotGraph <- function(am.long){
                                     diag = FALSE, add.row = TRUE) 
   
   par(mar=c(0,0,0,0)+.1)
+  # vertex color generation
+  gradient <- c("#ffffff", "#f7f8be", "#f3d9f7", "#f4c5ff", "#f9d496", "#f5b8b8", "#c4bdee",
+                "#d2e9a4", "#acda89", "#87cb6f", "#7ad0c7", "#7db1d5", "#f09eec", "#fCf073", 
+                "#21f8ff", "#4de4e3", "#39cdff", "#9daa57", "#54a071", "#3e643b", "#217572", 
+                "#2088AF", "#1F9AEC", "#EC63E1", "#AB3893", "#9D1540", "#8a21e9", "#9822ff", 
+                "#804dff", "#6878ff", "#51a2ff", "#1e5a9e", "#690d44", "#6f1fbd", "#541c90", 
+                "#1d3a76", "#1c1a4f", "#eeeeee", "#c9c9c9", "#a3a3a3", "#7e7e7e", "#585858", 
+                "#a6bdaa", "#a48f7f", "#83613f")
+  # warning message if num_vertices > max_vertices
+  max_vertices <- 45
+  if (length(V(ig)) > max_vertices) {
+    warning("Number of clusters exceeds maximum numbers of distinct colors.")
+  }
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
-              vertex.color = "white", vertex.label.family = "Helvetica",
+              vertex.color = gradient[1:length(V(ig))], vertex.size=35, vertex.frame.color = "#000000", vertex.label.family = "Helvetica",
               edge.arrow.size = 0.2, edge.arrow.width = 2)
 }
 
