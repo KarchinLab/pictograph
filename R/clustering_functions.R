@@ -243,15 +243,15 @@ writeClusterAssignmentsTable <- function(z_chain, Mut_ID = NULL) {
   if (is.null(Mut_ID)) {
     Mut_ID <- paste0("Mut", 1:nrow(map_z))
   }
-  # map_z <- map_z %>%
-  #   mutate(Mut_ID = Mut_ID, Cluster = value) %>%
-  #   select(Mut_ID, Cluster) %>%
-  #   arrange(Cluster)
   map_z <- map_z %>%
-    add_column(Mut_ID = Mut_ID) %>%
-    mutate(Cluster = value) %>%
+    mutate(Mut_ID = Mut_ID, Cluster = value) %>%
     select(Mut_ID, Cluster) %>%
     arrange(Cluster)
+  # map_z <- map_z %>%
+  #   add_column(Mut_ID = Mut_ID) %>%
+  #   mutate(Cluster = value) %>%
+  #   select(Mut_ID, Cluster) %>%
+  #   arrange(Cluster)
   return(map_z)
 }
 

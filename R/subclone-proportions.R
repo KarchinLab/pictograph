@@ -124,7 +124,7 @@ isLeaf <- function(node, tree_edges) {
 #' @import ggplot2
 #' @importFrom magrittr set_colnames
 #' @importFrom viridis viridis
-plotSubclonePie <- function(subclone_props, sample_names = NULL) {
+plotSubclonePie <- function(subclone_props, palette=viridis::viridis, sample_names = NULL, title_size=16, legend_size=10) {
   if (is.null(sample_names)) sample_names <- paste0("Sample ", 1:ncol(subclone_props))
   props_tb <- subclone_props %>%
     magrittr::set_colnames(sample_names) %>%
@@ -135,13 +135,17 @@ plotSubclonePie <- function(subclone_props, sample_names = NULL) {
                  names_to = "Sample",
                  values_to = "Proportion")
 
-  clone_colors <- viridis::viridis(nrow(subclone_props))
+  clone_colors <- palette(nrow(subclone_props))
+  
   ggplot(props_tb, aes(x="", y=Proportion, fill = Subclone)) +
     geom_bar(stat="identity", width=1, color="white") +
     coord_polar("y", start=0) +
     scale_fill_manual(values = clone_colors, drop = F) +
     theme_void() +
-    facet_wrap(~Sample)
+    theme(legend.position = "bottom") +
+    theme(legend.text = element_text(size=legend_size), legend.title = element_text(size=legend_size)) + 
+    facet_wrap(~Sample) +
+    theme(strip.text.x = element_text(size=title_size))
 
 }
 
@@ -258,12 +262,12 @@ calcSubcloneProportions <- function(w_mat, tree_edges) {
 #' @import ggplot2
 #' @importFrom magrittr set_colnames
 #' @importFrom viridis viridis
-plotSubcloneBar <- function(subclone_props, sample_names = NULL, label_cluster = FALSE) {
+plotSubcloneBar <- function(subclone_props, palette=viridis::viridis, sample_names = NULL, label_cluster = FALSE) {
   if (is.null(sample_names)) {
     sample_names <- paste0("Sample ", 1:ncol(subclone_props))
   }
 
-  clone_colors <- viridis::viridis(nrow(subclone_props))
+  clone_colors <- palette(nrow(subclone_props))
   color_half <- nrow(subclone_props) / 2
   color_half_vec <- factor(ifelse(1:nrow(subclone_props) < color_half, "white", "black"),
                            c("white", "black"))
@@ -292,11 +296,13 @@ plotSubcloneBar <- function(subclone_props, sample_names = NULL, label_cluster =
     scale_fill_manual(values = clone_colors) +
     geom_text(data = subset(props_tb, `Proportion of Tumor` != 0),
               aes(label = text_label, colour = text_color),
-              size = 3, position = position_stack(vjust = 0.5)) +
-    xlab("")+
-    scale_x_discrete(guide = guide_axis(angle = 45)) +
+              size = 4, position = position_stack(vjust = 0.5)) +
+    xlab("") +
+    scale_x_discrete(guide = guide_axis(angle = 0)) +
     scale_color_manual(values = c("white", "black"), guide = "none") +
-    ylim(0,1)
+    ylim(0,1.05) + 
+    theme(axis.text=element_text(size=12), axis.title=element_text(size=14,face="bold")) +
+    theme(legend.text = element_text(size=12), legend.title = element_text(size=12))
 
   return(stacked_bar)
 }

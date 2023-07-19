@@ -170,8 +170,8 @@ For individuals with multiple available tumor samples, the proportion of each su
 
 ```{r subclone-props, fig.height = 4, fig.width = 5}
 subclone_props <- calcSubcloneProportions(w_mat, best_tree)
-plotSubclonePie(subclone_props)
-plotSubcloneBar(subclone_props)
+plotSubclonePie(subclone_props, sample_names = colnames(input_data$y))
+plotSubcloneBar(subclone_props, sample_names = colnames(input_data$y))
 ```
 
 We can force the cluster CCF estimates to comply with the sum condition for a given tree using `forceCCFs`.

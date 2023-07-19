@@ -492,7 +492,7 @@ generateRandomGraphFromK <- function(K, max.num.root.children) {
   return(rand.am.long)
 }
 
-plotGraph <- function(am.long){
+plotGraph <- function(am.long, v_color){
   # make sure am.long is sorted by parent and child
   am.long <- mutate(am.long, child = as.numeric(am.long$child)) %>%
     arrange(parent, child)
@@ -508,11 +508,12 @@ plotGraph <- function(am.long){
   
   ig <- igraph::graph_from_adjacency_matrix(am, mode = "directed", weighted = TRUE,
                                     diag = FALSE, add.row = TRUE) 
-  
+  V(ig)$color <- as.list(v_color %>% arrange(match(v_sorted, names(V(ig)))) %>% select(colors))$colors
   par(mar=c(0,0,0,0)+.1)
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
-              vertex.color = "white", vertex.label.family = "Helvetica",
-              edge.arrow.size = 0.2, edge.arrow.width = 2)
+                      vertex.size=34, vertex.frame.color = "#000000", vertex.label.cex = 1.5,
+                      vertex.label.family = "Helvetica", vertex.label.color = "#000000",
+                      edge.arrow.size = 0.5, edge.arrow.width = 2)
 }
 
 getPosteriorAmLong <- function(am_chain) {
@@ -574,7 +575,7 @@ prepPostAmForGraphing <- function(post_am) {
   return(admat)
 }
 
-plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1,
+plotPosteriorAmLong <- function(post_am, v_color, filter1 = TRUE, filter1.threshold = 0.1,
                                 filter2 = TRUE, filter2.threshold = 0.1) {
   # filter1 filters columns (am wide format) for edges with posterior prob > (max(column) - filter1.threshold)
   admat <- prepPostAmForGraphing(post_am)
@@ -594,12 +595,14 @@ plotPosteriorAmLong <- function(post_am, filter1 = TRUE, filter1.threshold = 0.1
   edgeColors <- sapply(e[,2], function(x) ifelse(x %in% names(which(numTo==1)), "black", "darkgrey"))
   igraph::E(ig)$color <- edgeColors
   
-  igraph::V(ig)$label.cex <- 0.5
+  igraph::V(ig)$label.cex <- 1.5
+  
+  igraph::V(ig)$color <- as.list(v_color %>% arrange(match(v_sorted, names(V(ig)))) %>% select(colors))$colors
   
   par(mar=c(0,0,0,0)+.1)
   igraph::plot.igraph(ig, layout = igraph::layout_as_tree(ig),
-              vertex.color = "white", vertex.label.family = "Helvetica",
-              edge.arrow.size = 0.2, edge.arrow.width = 2,
+              vertex.size=34, vertex.label.family = "Helvetica",
+              edge.arrow.size = 0.5, edge.arrow.width = 2,
               edge.width = igraph::E(ig)$weight*3)
 }
 

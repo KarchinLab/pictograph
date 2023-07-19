@@ -4,7 +4,7 @@
 \alias{plotEnsembleTree}
 \title{Plot ensemble tree}
 \usage{
-plotEnsembleTree(trees)
+plotEnsembleTree(trees, palette = viridis::viridis)
 }
 \arguments{
 \item{trees}{list of tibbles of edges, each with columns edge, parent, child}

@@ -4,7 +4,7 @@
 \alias{prepareGraph}
 \title{Create tibble of possible edges from CCF values based on w_mat only}
 \usage{
-prepareGraph(w_mat)
+prepareGraph(w_mat, thresh)
 }
 \arguments{
 \item{w}{matrix of CCF values (rows = clusters, columns = samples)}
