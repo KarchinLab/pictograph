@@ -4,6 +4,7 @@
 #' @param input_file input data file; 
 importCSV <- function(inputFile, alt_reads_thresh = 6, vaf_thresh = 0.02) {
   data <- read_csv(inputFile, show_col_types = FALSE)
+  data <- data %>% filter(alt_reads/total_reads>vaf_thresh, alt_reads>alt_reads_thresh)
   output_data <- list()
   
   output_data$y <- as.matrix(data[c("mutation", "sample", "alt_reads")] %>% pivot_wider(names_from = sample, values_from = alt_reads, values_fill = 0))
@@ -89,8 +90,15 @@ importCSV <- function(inputFile, alt_reads_thresh = 6, vaf_thresh = 0.02) {
     output_data$m <- estimateMultiplicityMatrix(output_data)
   }
   
-  output_data$y[output_data$y / output_data$n < vaf_thresh] = 0
-  output_data$y[output_data$y < alt_reads_thresh] = 0
+  # output_data$y[output_data$y / output_data$n < vaf_thresh] = 0
+  # output_data$y[output_data$y < alt_reads_thresh] = 0
+  
+  # output_data$n = output_data$n[rowSums(output_data$y) > 0,]
+  # output_data$tcn = output_data$tcn[rowSums(output_data$y) > 0,]
+  # output_data$m = output_data$m[rowSums(output_data$y) > 0,]
+  # output_data$MutID = output_data$MutID[rowSums(output_data$y) > 0]
+  # output_data$y = output_data$y[rowSums(output_data$y) > 0,]
+  # output_data$I = nrow(output_data$y)
   return(output_data)
 }
 
