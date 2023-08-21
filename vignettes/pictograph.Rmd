@@ -35,7 +35,7 @@ The input file can be read using the importCSV function. Alt read count (y), tot
 
 ```{r input_data}
 input_data <- importCSV(system.file('extdata/example_input.csv', package = 'pictograph'),
-                        alt_reads_thresh = 6, vaf_thresh = 0.02)
+                        alt_reads_thresh = 0, vaf_thresh = 0)
 ```
 
 ## 3. Clustering mutations and estimating CCFs
