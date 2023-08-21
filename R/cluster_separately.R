@@ -19,7 +19,7 @@ clusterSep <- function(input_data,
                        model_type = "spike_and_slab",
                        beta.prior = FALSE,
                        drop_zero = FALSE,
-                       one_box = FALSE) {
+                       one_box = TRUE) {
   # 1. separate mutations by sample presence
   if (one_box) {
     input_data$mutation_indices <- seq_len(input_data$I)

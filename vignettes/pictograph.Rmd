@@ -38,10 +38,6 @@ input_data <- importCSV(system.file('extdata/example_input.csv', package = 'pict
                         alt_reads_thresh = 6, vaf_thresh = 0.02)
 ```
 
-```{r load_results, include = F}
-data("example_results")
-```
-
 ## 3. Clustering mutations and estimating CCFs
 
 The first step of evolutionary analysis is clustering mutations and estimating their cancer cell fractions (CCFs). This is comprised of three steps:
@@ -57,7 +53,7 @@ In toy example, we run a short MCMC chain with only 1000 iterations (`n.iter`), 
 ```{r cluster, eval = FALSE}
 all_set_results <- clusterSep(input_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
-                              max_K = 5, one_box = F, mc.cores = 2)
+                              max_K = 5, one_box = T, mc.cores = 2)
 ```
 
 This gives us a list with results for each mutation set, which contains `all_chains`, `BIC`, `best_chains`, and `best_K`.
