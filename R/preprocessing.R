@@ -75,7 +75,7 @@ importCSV <- function(inputFile, alt_reads_thresh = 6, vaf_thresh = 0.02) {
   output_data$I = nrow(output_data$y)
   
   if ("multiplicity" %in% colnames(data)) {
-    output_data$m <- as.matrix(data[c("mutation", "sample", "multiplicity")] %>% pivot_wider(names_from = sample, values_from = multiplicity))
+    output_data$m <- as.matrix(data[c("mutation", "sample", "multiplicity")] %>% pivot_wider(names_from = sample, values_from = multiplicity, values_fill = 1))
     rownames(output_data$m) <- output_data$m[,'mutation']
     output_data$m <- output_data$m[,-1, drop=FALSE]
     rowname = rownames(output_data$m)
