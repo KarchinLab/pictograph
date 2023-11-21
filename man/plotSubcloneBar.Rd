@@ -4,7 +4,12 @@
 \alias{plotSubcloneBar}
 \title{Plot subclone proportions in each sample as stacked bar chart}
 \usage{
-plotSubcloneBar(subclone_props, sample_names = NULL, label_cluster = FALSE)
+plotSubcloneBar(
+  subclone_props,
+  palette = viridis::viridis,
+  sample_names = NULL,
+  label_cluster = FALSE
+)
 }
 \arguments{
 \item{subclone_props}{matrix of subclone proportions (returned from \code{calcSubcloneProportions})}

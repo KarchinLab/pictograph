@@ -503,8 +503,19 @@ plotViolin <- function(vdat) {
 #' @import dplyr
 #' @import tidyr
 #' @import ggplot2
-plotTree <- function(edges) {
-  plotGraph(edgesToAmLong(edges))
+plotTree <- function(edges, palette=viridis::viridis) {
+  plotGraph(edgesToAmLong(edges), colorScheme(edges, palette))
+}
+
+#' generate colors for each vertice
+#' @export
+colorScheme <- function(edges, palette=viridis::viridis) {
+  v_sorted = sort(unique(c(edges$parent, edges$child)))
+  v_sorted = c(sort(as.integer(v_sorted[!v_sorted=='root'])), "root")
+  # root_idx <- which(v_sorted=="root")
+  colors <- c(palette(length(v_sorted)-1), "white")
+  v_color <- tibble(v_sorted, colors)
+  return(v_color)
 }
 
 #' Plot ensemble tree
@@ -515,10 +526,10 @@ plotTree <- function(edges) {
 #' @import dplyr
 #' @import tidyr
 #' @import ggplot2
-plotEnsembleTree <- function(trees) {
+plotEnsembleTree <- function(trees, palette=viridis::viridis) {
   am_chain <- lapply(trees, edgesToAmLong)
   post_am <- getPosteriorAmLong(am_chain)
-  plotPosteriorAmLong(post_am)
+  plotPosteriorAmLong(post_am, colorScheme(trees[[1]], palette))
 }
 
 #' Plot CCF chain trace 

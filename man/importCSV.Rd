@@ -4,7 +4,7 @@
 \alias{importCSV}
 \title{read input data file and store in PICTOGRAPH input format}
 \usage{
-importCSV(inputFile)
+importCSV(inputFile, alt_reads_thresh = 6, vaf_thresh = 0.02)
 }
 \arguments{
 \item{input_file}{input data file;}

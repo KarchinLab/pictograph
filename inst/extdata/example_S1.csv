@@ -1,0 +1,9 @@
+sample,mutation,total_reads,alt_reads,tumor_integer_copy_number,purity,multiplicity
+S1,mut1,99,28,2,0.65,1
+S1,mut2,102,65,2,0.65,2
+S1,mut3,93,33,2,0.65,1
+S1,mut4,94,26,2,0.65,1
+S1,mut5,105,32,2,0.65,1
+S1,mut6,96,60,2,0.65,2
+S1,mut7,93,58,2,0.65,2
+S1,mut8,81,52,2,0.65,2

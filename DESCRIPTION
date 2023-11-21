@@ -1,6 +1,6 @@
 Package: pictograph
 Title: Tools for modeling clonal evolution of a cancer
-Version: 1.2.0.1
+Version: 1.2.1.1
 Authors@R: 
     person(given = "Jiaying",
            family = "Lai",

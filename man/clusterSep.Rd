@@ -15,7 +15,7 @@ clusterSep(
   model_type = "spike_and_slab",
   beta.prior = FALSE,
   drop_zero = FALSE,
-  one_box = FALSE
+  one_box = TRUE
 )
 }
 \arguments{

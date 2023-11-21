@@ -4,7 +4,13 @@
 \alias{plotSubclonePie}
 \title{Plot pie charts for subclone proportions in each sample}
 \usage{
-plotSubclonePie(subclone_props, sample_names = NULL)
+plotSubclonePie(
+  subclone_props,
+  palette = viridis::viridis,
+  sample_names = NULL,
+  title_size = 16,
+  legend_size = 10
+)
 }
 \arguments{
 \item{subclone_props}{matrix of subclone proportions (returned from \code{calcSubcloneProportions})}

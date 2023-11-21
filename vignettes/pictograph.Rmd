@@ -35,11 +35,7 @@ The input file can be read using the importCSV function. Alt read count (y), tot
 
 ```{r input_data}
 input_data <- importCSV(system.file('extdata/example_input.csv', package = 'pictograph'),
-                        alt_reads_thresh = 6, vaf_thresh = 0.02)
-```
-
-```{r load_results, include = F}
-data("example_results")
+                        alt_reads_thresh = 0, vaf_thresh = 0)
 ```
 
 ## 3. Clustering mutations and estimating CCFs
@@ -57,7 +53,7 @@ In toy example, we run a short MCMC chain with only 1000 iterations (`n.iter`), 
 ```{r cluster, eval = FALSE}
 all_set_results <- clusterSep(input_data,
                               n.iter = 1000, n.burn = 100, thin = 1,
-                              max_K = 5, one_box = F, mc.cores = 2)
+                              max_K = 5, one_box = T, mc.cores = 2)
 ```
 
 This gives us a list with results for each mutation set, which contains `all_chains`, `BIC`, `best_chains`, and `best_K`.
@@ -170,8 +166,8 @@ For individuals with multiple available tumor samples, the proportion of each su
 
 ```{r subclone-props, fig.height = 4, fig.width = 5}
 subclone_props <- calcSubcloneProportions(w_mat, best_tree)
-plotSubclonePie(subclone_props)
-plotSubcloneBar(subclone_props)
+plotSubclonePie(subclone_props, sample_names = colnames(input_data$y))
+plotSubcloneBar(subclone_props, sample_names = colnames(input_data$y))
 ```
 
 We can force the cluster CCF estimates to comply with the sum condition for a given tree using `forceCCFs`.
