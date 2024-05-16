@@ -1,6 +1,6 @@
 Package: pictograph
 Title: Tools for modeling clonal evolution of a cancer
-Version: 1.2.1.1
+Version: 1.3.0
 Authors@R: 
     person(given = "Jiaying",
            family = "Lai",
@@ -15,13 +15,19 @@ Suggests:
     testthat,
     knitr,
     rmarkdown
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.1
 VignetteBuilder: knitr
 Imports: 
-    igraph,
     ggplot2,
-    tidyr,
-    dplyr,
     rjags,
-    ggmcmc,
-    stringr
+    stringr,
+    readr (>= 2.1.4),
+    tidyverse (>= 2.0.0),
+    dplyr (>= 1.1.1),
+    tidyr (>= 1.3.0),
+    LaplacesDemon (>= 16.1.6),
+    igraph (>= 2.0.1),
+    viridis (>= 0.6.5),
+    ggmcmc (>= 1.5.1),
+    UpSetR (>= 1.4.0),
+    cluster (>= 2.1.6)

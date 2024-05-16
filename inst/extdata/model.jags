@@ -1,0 +1,60 @@
+model {
+	for (i in 1:I) { ## for each variant
+		for (s in 1:S) {  ## for each sample
+			y[i,s] ~ dbin(vaf[i,s], n[i,s])
+			## posterior predictive distribution
+			ystar[i,s] ~ dbin(vaf[i,s], n[i,s])
+		}
+	}
+	
+	for (i in 1:I) {
+		for (s in 1:S) {
+      tcn.snv.est[i,s] <- icn[i] * cncf[i,s] + ploidy * (1 - cncf[i,s])
+      tcn.cna.est[i,s] <- icn[i] * mcf[z[i], s] + ploidy * (1 - mcf[z[i], s])
+      
+			vaf.snv[i,s] <- (mcf[z[i], s] + (m[i]-1) * cncf[i,s]) / tcn.snv.est[i,s]
+			vaf.cna[i,s] <- (mcf[z[i], s] * m[i] + 1 - mcf[z[i], s]) / tcn.cna.est[i,s]
+			vaf.temp[i,s] <- ifelse(is_cn[i]==0, vaf.snv[i,s], vaf.cna[i,s])
+			vaf.temp1[i,s] <- ifelse(vaf.temp[i,s] < 0, 0, vaf.temp[i,s])
+			vaf[i,s] <- ifelse(vaf.temp1[i,s] > 1, 1, vaf.temp1[i,s])
+		}
+	}
+
+	for (i in 1:I) {
+		for (s in 1:S) {
+			tcn[i,s] ~ dnorm(icn[i] * cncf[i, s] + ploidy * (1 - cncf[i, s]), epsilon)T(0,)
+		}
+	}
+	
+	epsilon ~ dnorm(0,1)T(0,)
+	
+	for (i in 1:I) {
+	  z[i] ~ dcat(pi[1:K])
+	  
+	  m1[i] ~ dcat(c(1/3,1/3,1/3))
+
+	  #lambda[i] ~ dbin(0.5, 1)
+	  #m[i] <- lambda[i]*mtp[i] + (1-lambda[i])*(icn[i]-mtp[i])
+	  
+	  m2[i] <- ifelse(m1[i] == 1, 1, ifelse(m1[i] == 2, mtp[i], icn[i]-mtp[i]))
+	  m[i] <- ifelse(is_cn[i] == 0, m2[i], max(icn[i]-mtp[i], mtp[i]))
+	  #m[i] <- ifelse(m1[i] == 1, 1, ifelse(m1[i] == 2, mtp[i], icn[i]-mtp[i]))
+	}
+	
+	alpha <- rep(1, K)
+	pi[1:K] ~ ddirch(alpha[1:K])
+  
+  for (s in 1:S) {
+		mcf[1:K, s] <- ifelse(s == sample_to_sort, sort(mcf_unsorted[1:K, s]), mcf_unsorted[1:K, s])
+	}
+	
+	for (k in 1:K) {
+		for (s in 1:S) {
+			eta[k,s] ~ dbeta(5,2)
+			z.eta[k,s] ~ dcat(c(eta[k,s], 1-eta[k,s]))
+
+			mcf1[k,s] ~ dbeta(1,1)T(0.01, purity[s])
+			mcf_unsorted[k,s] <- ifelse(z.eta[k,s] == 1, mcf1[k,s], 0)
+		}
+	}
+}
