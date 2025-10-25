@@ -7,16 +7,16 @@
 mcmcMain(
   mutation_file,
   outputDir = NULL,
-  sample_presence = TRUE,
+  sample_presence = FALSE,
   score = "silhouette",
   max_K = 10,
-  min_mutation_per_cluster = 5,
+  min_mutation_per_cluster = 1,
   cluster_diff_thresh = 0.05,
   n.iter = 5000,
   n.burn = 1000,
   thin = 10,
   mc.cores = 8,
-  inits = list(.RNG.name = "base::Wichmann-Hill", .RNG.seed = 123),
+  inits = list(.RNG.name = "base::Wichmann-Hill", .RNG.seed = 1234),
   alt_reads_thresh = 0,
   vaf_thresh = 0
 )
